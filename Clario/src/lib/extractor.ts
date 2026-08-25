@@ -139,7 +139,7 @@ function isolateTransparentIcon(croppedDataUrl: string): Promise<string> {
   });
 }
 
-// ─── Native In-Browser Video Keyframe Extractor (Fast & Zero-Failure) ────────
+// ─── Native In-Browser Visual Scene Extractor (Luma-Difference) ──────────────
 export function extractVideoFramesHTML5(
   file: File,
   onProgress?: (pct: number) => void
@@ -155,39 +155,83 @@ export function extractVideoFramesHTML5(
     video.onloadedmetadata = async () => {
       try {
         const duration = video.duration || 10;
-        const shotCount = Math.max(3, Math.min(16, Math.floor(duration / 1.8)));
-        const shotDuration = duration / shotCount;
+        
+        // Downscaled canvas for fast pixel differencing
+        const diffCanvas = document.createElement("canvas");
+        diffCanvas.width = 64;
+        diffCanvas.height = 64;
+        const diffCtx = diffCanvas.getContext("2d", { willReadFrequently: true })!;
 
-        const canvas = document.createElement("canvas");
-        canvas.width = video.videoWidth || 720;
-        canvas.height = video.videoHeight || 1280;
-        const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+        // Full-res canvas for actual frame extraction
+        const frameCanvas = document.createElement("canvas");
+        frameCanvas.width = video.videoWidth || 720;
+        frameCanvas.height = video.videoHeight || 1280;
+        const frameCtx = frameCanvas.getContext("2d", { willReadFrequently: true })!;
 
-        const rawShots: Array<{ start: number; end: number; frameDataUrl: string }> = [];
+        const cuts: number[] = [0];
+        const fps = 4; // Sample at 4 FPS for cut detection
+        const step = 1 / fps;
+        let prevData: Uint8ClampedArray | null = null;
 
-        for (let i = 0; i < shotCount; i++) {
-          const startSec = i * shotDuration;
-          const endSec = Math.min(duration, (i + 1) * shotDuration);
-          const sampleSec = startSec + (endSec - startSec) * 0.4;
-
-          video.currentTime = sampleSec;
+        // Pass 1: Detect Cuts
+        const totalSteps = Math.floor(duration / step);
+        for (let i = 0; i <= totalSteps; i++) {
+          const t = i * step;
+          video.currentTime = t;
           await new Promise<void>((seekResolve) => {
-            const onSeek = () => {
-              video.removeEventListener("seeked", onSeek);
-              seekResolve();
-            };
+            const onSeek = () => { video.removeEventListener("seeked", onSeek); seekResolve(); };
             video.addEventListener("seeked", onSeek);
           });
 
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const frameDataUrl = canvas.toDataURL("image/jpeg", 0.90);
+          diffCtx.drawImage(video, 0, 0, 64, 64);
+          const currentData = diffCtx.getImageData(0, 0, 64, 64).data;
+
+          if (prevData) {
+            let diffSum = 0;
+            for (let j = 0; j < currentData.length; j += 4) {
+              const r = Math.abs(currentData[j] - prevData[j]);
+              const g = Math.abs(currentData[j+1] - prevData[j+1]);
+              const b = Math.abs(currentData[j+2] - prevData[j+2]);
+              diffSum += r + g + b;
+            }
+            const diffRatio = diffSum / (4096 * 765); // 4096 pixels, 765 max diff per pixel
+            
+            // Hard cut threshold: 12% pixel difference
+            if (diffRatio > 0.12) {
+              // Avoid microscopic cuts (minimum 1 second per shot)
+              if (t - cuts[cuts.length - 1] > 1.0) {
+                cuts.push(t);
+              }
+            }
+          }
+          prevData = new Uint8ClampedArray(currentData);
+          onProgress?.(Math.round(((i / totalSteps) * 50))); // First 50% is cut detection
+        }
+        
+        cuts.push(duration);
+
+        // Pass 2: Extract mid-frames for each detected shot
+        const rawShots: Array<{ start: number; end: number; frameDataUrl: string }> = [];
+        for (let c = 0; c < cuts.length - 1; c++) {
+          const startSec = cuts[c];
+          const endSec = cuts[c + 1];
+          const midSec = startSec + (endSec - startSec) * 0.5;
+
+          video.currentTime = midSec;
+          await new Promise<void>((seekResolve) => {
+            const onSeek = () => { video.removeEventListener("seeked", onSeek); seekResolve(); };
+            video.addEventListener("seeked", onSeek);
+          });
+
+          frameCtx.drawImage(video, 0, 0, frameCanvas.width, frameCanvas.height);
+          const frameDataUrl = frameCanvas.toDataURL("image/jpeg", 0.90);
+          
           rawShots.push({
             start: Number(startSec.toFixed(1)),
             end: Number(endSec.toFixed(1)),
             frameDataUrl,
           });
-
-          onProgress?.(Math.round(((i + 1) / shotCount) * 100));
+          onProgress?.(50 + Math.round(((c + 1) / (cuts.length - 1)) * 50));
         }
 
         URL.revokeObjectURL(blobUrl);

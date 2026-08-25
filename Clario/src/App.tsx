@@ -2,11 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { toBlobURL } from '@ffmpeg/util';
 import type { HarvesterMode, HarvestProject } from './types/assets';
-import { HomePhase } from './phases/HomePhase';
-import { IngestPhase } from './phases/IngestPhase';
-import { HarvestStudioPhase } from './phases/HarvestStudioPhase';
-import { ExportPhase } from './phases/ExportPhase';
-import { ProvenanceLibraryPhase } from './phases/ProvenanceLibraryPhase';
+import { WorkspaceEditor } from './components/layout/WorkspaceEditor';
 import { harvestVideoProject, harvestSlideProject, generateContactSheet } from './lib/extractor';
 import { saveProject, listProjects, getVaultAssetsCount, type ClarioProject } from './lib/projectStore';
 import { checkServerHealth, uploadToWorker, pollJobStatus } from './lib/apiClient';
@@ -15,13 +11,13 @@ import { AppShell } from './components/layout/AppShell';
 import { BrandKitPanel } from './components/ui/BrandKitPanel';
 import { syncProjectHarvested, syncProjectExported } from './lib/metaphorSync';
 
-type Phase = 'home' | 'ingest' | 'harvest_studio' | 'export' | 'vault';
+type Phase = 'workspace';
 
 export default function App() {
-  const [phase, setPhase] = useState<Phase>('home');
+  const [phase, setPhase] = useState<Phase>('workspace');
   const [mode, setMode] = useState<HarvesterMode>('video_harvester');
   const [currentProject, setCurrentProject] = useState<HarvestProject | null>(null);
-  const [contactSheetUrl, setContactSheetUrl] = useState<string>('');
+  const [_contactSheetUrl, setContactSheetUrl] = useState<string>('');
   const [isHarvesting, setIsHarvesting] = useState<boolean>(false);
   const [progress, setProgress] = useState<{ msg: string; pct: number }>({ msg: '', pct: 0 });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -67,16 +63,15 @@ export default function App() {
     load();
   }, [ffmpegRef]);
 
-  const handleSelectMode = (selectedMode: HarvesterMode) => {
-    setMode(selectedMode);
-    setPhase('ingest');
+  const handleSelectMode = (_selectedMode: HarvesterMode) => {
+    // Mode is now handled purely in WorkspaceEditor or preserved for backend
   };
 
-  const handleOpenSavedProject = (proj: ClarioProject) => {
+  const _handleOpenSavedProject = (proj: ClarioProject) => {
     if (proj.harvestProject) {
       setCurrentProject(proj.harvestProject);
       setMode(proj.harvestProject.mode);
-      setPhase('harvest_studio');
+      setPhase('workspace');
     } else {
       const fallbackProject: HarvestProject = {
         id: proj.id,
@@ -90,7 +85,6 @@ export default function App() {
         updated_at: proj.updatedAt,
       };
       setCurrentProject(fallbackProject);
-      setPhase('harvest_studio');
     }
   };
 
@@ -109,7 +103,6 @@ export default function App() {
         await saveProject(serverProject);
         setCurrentProject(serverProject);
         syncProjectHarvested(serverProject.name, mode, serverProject.shots?.length || 0);
-        setPhase('harvest_studio');
       } else {
         if (mode === 'video_harvester') {
           const { project, contactSheetUrl: sheetUrl } = await harvestVideoProject(
@@ -121,7 +114,6 @@ export default function App() {
           await saveProject(project);
           setCurrentProject(project);
           setContactSheetUrl(sheetUrl);
-          setPhase('harvest_studio');
         } else {
           const { project } = await harvestSlideProject(
             files,
@@ -130,7 +122,6 @@ export default function App() {
           );
           await saveProject(project);
           setCurrentProject(project);
-          setPhase('harvest_studio');
         }
       }
       await refreshProjectList();
@@ -145,7 +136,7 @@ export default function App() {
     }
   };
 
-  const handleLoadDirectProject = async (project: HarvestProject) => {
+  const _handleLoadDirectProject = async (project: HarvestProject) => {
     await saveProject(project);
     setCurrentProject(project);
     if (project.shots && project.shots.length > 0) {
@@ -153,7 +144,6 @@ export default function App() {
       setContactSheetUrl(sheetUrl);
     }
     await refreshProjectList();
-    setPhase('harvest_studio');
   };
 
   const handleUpdateProject = async (updated: HarvestProject) => {
@@ -177,7 +167,6 @@ export default function App() {
       currentPhase={phase}
       onNavigatePhase={p => {
         if (p === 'home' || p === 'vault') setCurrentProject(null);
-        setPhase(p);
       }}
       onOpenBrandKit={() => setBrandKitOpen(true)}
       onOpenApiKeyModal={() => setShowApiKeyModal(true)}
@@ -414,49 +403,13 @@ export default function App() {
         </div>
       )}
 
-      {/* ── Main Studio Phase Router ───────────────────────────────────────── */}
-      {phase === 'home' && (
-        <HomePhase
-          onSelectMode={handleSelectMode}
-          onOpenProject={handleOpenSavedProject}
-        />
-      )}
-
-      {phase === 'ingest' && (
-        <IngestPhase
-          mode={mode}
-          onBack={() => setPhase('home')}
-          onHarvestFiles={handleHarvestFiles}
-          onLoadDirectProject={handleLoadDirectProject}
-          onSwitchMode={newMode => setMode(newMode)}
-        />
-      )}
-
-      {phase === 'harvest_studio' && currentProject && (
-        <HarvestStudioPhase
-          project={currentProject}
-          contactSheetUrl={contactSheetUrl}
-          onUpdateProject={handleUpdateProject}
-          onExportPack={() => setPhase('export')}
-          onBackToHome={() => setPhase('home')}
-        />
-      )}
-
-      {phase === 'export' && currentProject && (
-        <ExportPhase
-          project={currentProject}
-          contactSheetUrl={contactSheetUrl}
-          onBackToStudio={() => setPhase('harvest_studio')}
-          onStartOver={() => setPhase('home')}
-        />
-      )}
-
-      {phase === 'vault' && (
-        <ProvenanceLibraryPhase
-          onOpenProject={handleOpenSavedProject}
-          onBackToHome={() => setPhase('home')}
-        />
-      )}
+      {/* ── UNIFIED WORKSPACE ─────────────────────────────────────────────── */}
+      <WorkspaceEditor
+        project={currentProject}
+        onUpdateProject={handleUpdateProject}
+        onHarvestFiles={handleHarvestFiles}
+        onExportPack={() => console.log('Export triggered')}
+      />
     </AppShell>
   );
 }

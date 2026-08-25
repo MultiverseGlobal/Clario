@@ -121,15 +121,22 @@ export async function suggestClipSequence(clips: VideoClipAsset[]): Promise<CutS
 
 export async function rewriteText(
   text: string,
-  style: 'punchy' | 'minimal' | 'bold' = 'punchy'
+  style: 'punchy' | 'minimal' | 'bold' | 'clean' = 'punchy'
 ): Promise<string> {
   if (!text.trim()) return text;
 
-  const prompt = `Rewrite this text in a ${style} style for high visual engagement on a slide:
-"${text}"
-Keep it clear, concise, and impactful. Return ONLY the rewritten text.`;
+  const prompt = style === 'clean' 
+    ? `You are an expert copy editor. Clean this text by removing filler words (um, uh, like, you know), fixing grammar, and standardizing casing. Return ONLY the cleaned text:\n"${text}"`
+    : `Rewrite this text in a ${style} style for high visual engagement on a slide:\n"${text}"\nKeep it clear, concise, and impactful. Return ONLY the rewritten text.`;
 
   return callGeminiOrFallback(prompt, () => {
+    if (style === 'clean') {
+      let cleaned = text.replace(/\b(um|uh|like|you know|literally|basically)\b/gi, '').replace(/\s+/g, ' ').trim();
+      if (cleaned.length > 0) {
+        cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+      }
+      return cleaned;
+    }
     if (style === 'minimal') {
       return text.split(/[.!?]/)[0].trim().toUpperCase();
     }
