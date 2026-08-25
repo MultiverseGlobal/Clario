@@ -1,0 +1,49 @@
+import { NextResponse } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+
+export async function GET(request: Request) {
+  const { searchParams, origin } = new URL(request.url)
+  const code = searchParams.get('code')
+  
+  const cookieStore = await cookies()
+  const onboardedCookie = cookieStore.get('metaphor_onboarded')?.value
+  const defaultTarget = onboardedCookie === 'true' ? '/dashboard' : '/onboarding'
+  const next = searchParams.get('next') ?? defaultTarget
+
+
+  if (code) {
+    const response = NextResponse.next()
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll()
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options)
+              )
+            } catch {}
+          },
+        },
+      }
+    )
+    
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    
+    if (!error) {
+      let redirectUrl = `${origin}${next}`
+      if (next === '/onboarding' && !next.includes('step=')) {
+        redirectUrl = `${origin}/onboarding?step=connect`
+      }
+      return NextResponse.redirect(redirectUrl)
+    }
+  }
+
+  // return the user to an error page with instructions
+  return NextResponse.redirect(`${origin}/login?error=auth-error`)
+}

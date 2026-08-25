@@ -1,0 +1,19 @@
+# CodeRabbit Configuration
+# This file configures how CodeRabbit reviews your pull requests.
+
+language: "en-US"
+early_access: false
+reviews:
+  profile: "chill"
+  request_changes_workflow: false
+  high_level_summary: true
+  poetry_instructions: true
+  review_status: true
+  collapse_walkthrough: false
+  auto_review:
+    enabled: true
+    ignore_title_keywords:
+      - "WIP"
+      - "Draft"
+chat:
+  auto_reply: true

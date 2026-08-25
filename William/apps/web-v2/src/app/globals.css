@@ -1,0 +1,482 @@
+@import "tailwindcss";
+
+/* ─── Aurora Design System Tokens ─────────────────────────────────────────── */
+:root {
+  /* Color Palette — Light Mode */
+  --aurora-bg-mesh: #ffffff;
+  --aurora-text-main: #000000;
+  --aurora-text-sub: #666666;
+  --aurora-text-muted: #999999;
+  
+  --aurora-glass-bg: #ffffff;
+  --aurora-glass-border: #e5e5e5;
+  --aurora-glass-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  
+  --aurora-pill-bg: #f5f5f5;
+  --aurora-pill-border: #e5e5e5;
+  
+  --aurora-accent: #000000;
+  --aurora-accent-pink: #000000;
+  --aurora-accent-blue: #000000;
+
+  --aurora-orb-core: #000000;
+
+  /* Companion / Layout System Tokens — Light Mode */
+  --header-h: 60px;
+  --sidebar-w: 220px;
+  --bg-surface: #ffffff;
+  --text-primary: #000000;
+  --text-secondary: #666666;
+  --text-muted: #999999;
+  --accent: #000000;
+  --accent-subtle: rgba(0, 0, 0, 0.05);
+  --border: #e5e5e5;
+  --radius-lg: 24px;
+  --bg-subtle: #f9f9f9;
+}
+
+[data-theme="dark"] {
+  /* Color Palette — Dark Mode */
+  --aurora-bg-mesh: #000000;
+  --aurora-text-main: #ffffff;
+  --aurora-text-sub: #888888;
+  --aurora-text-muted: #555555;
+
+  --aurora-glass-bg: #111111;
+  --aurora-glass-border: #222222;
+  --aurora-glass-shadow: none;
+
+  --aurora-pill-bg: #1a1a1a;
+  --aurora-pill-border: #2a2a2a;
+
+  --aurora-orb-core: #ffffff;
+
+  /* Companion / Layout System Tokens — Dark Mode */
+  --header-h: 60px;
+  --sidebar-w: 220px;
+  --bg-surface: #000000;
+  --text-primary: #ffffff;
+  --text-secondary: #aaaaaa;
+  --text-muted: #666666;
+  --accent: #ffffff;
+  --accent-subtle: rgba(255, 255, 255, 0.1);
+  --border: #222222;
+  --radius-lg: 24px;
+  --bg-subtle: #0a0a0a;
+}
+
+/* ─── Base Styles ─────────────────────────────────────────────────────────── */
+html, body {
+  min-height: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  color: var(--aurora-text-main);
+  background: var(--aurora-bg-mesh);
+  background-attachment: fixed;
+  overflow-x: hidden;
+  transition: background 0.4s ease, color 0.3s ease;
+  letter-spacing: -0.01em;
+}
+
+/* ─── Aurora Glassmorphism Utilities ─────────────────────────────────────── */
+.aurora-glass-card {
+  background: var(--aurora-glass-bg);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border: 1px solid var(--aurora-glass-border);
+  box-shadow: var(--aurora-glass-shadow);
+  border-radius: 24px;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.4s ease;
+}
+
+.aurora-glass-card:hover {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.12), inset 0 1px 1px rgba(255, 255, 255, 1);
+}
+
+.aurora-glass-pill {
+  background: var(--aurora-pill-bg);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--aurora-pill-border);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
+  border-radius: 9999px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.aurora-glass-pill:hover {
+  background: var(--aurora-glass-bg);
+  border-color: var(--aurora-glass-border);
+  transform: translateY(-1px);
+}
+
+/* ─── View & Sidebar Component Classes ─────────────────────────────────── */
+.page-content {
+  padding: 24px 32px;
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.page-title {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.page-subtitle {
+  font-size: 14px;
+  color: var(--text-muted);
+  letter-spacing: -0.01em;
+  margin-bottom: 24px;
+}
+
+.card {
+  background: var(--aurora-glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--aurora-glass-border);
+  box-shadow: var(--aurora-glass-shadow);
+  border-radius: 18px;
+  padding: 20px;
+}
+
+.label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--bg-subtle);
+  color: var(--text-secondary);
+}
+
+.app-sidebar {
+  width: var(--sidebar-w);
+  height: calc(100vh - var(--header-h));
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: var(--aurora-glass-bg);
+  backdrop-filter: blur(16px);
+  flex-shrink: 0;
+}
+
+.sidebar-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  text-align: left;
+}
+
+.sidebar-item:hover {
+  background: var(--bg-subtle);
+  color: var(--text-primary);
+}
+
+.sidebar-item.active {
+  background: var(--accent-subtle);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.sidebar-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 12px 0;
+}
+
+.floating-bar-wrapper {
+  position: absolute;
+  bottom: 28px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  z-index: 40;
+}
+
+.floating-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--aurora-glass-bg);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--aurora-glass-border);
+  box-shadow: var(--aurora-glass-shadow);
+  padding: 6px 6px 6px 18px;
+  border-radius: 9999px;
+  width: 100%;
+  max-width: 540px;
+}
+
+.floating-bar input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.floating-bar-send {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.floating-bar-send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Focus Overlay */
+.focus-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(15, 13, 21, 0.95);
+  backdrop-filter: blur(20px);
+  display: flex;
+  flex-direction: column;
+}
+
+.focus-header {
+  height: 60px;
+  padding: 0 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.focus-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.focus-context {
+  width: 300px;
+  padding: 24px;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow-y: auto;
+}
+
+.focus-map {
+  flex: 1;
+  position: relative;
+}
+
+.focus-footer {
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 24px;
+}
+
+/* Journeys Layout */
+.journeys-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.journey-list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--aurora-glass-bg);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.journey-list-item.selected {
+  border-color: var(--accent);
+  background: var(--aurora-glass-bg);
+  box-shadow: 0 4px 16px rgba(249, 115, 22, 0.12);
+}
+
+.milestone-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.milestone-row.done {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.milestone-check {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1.5px solid var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.milestone-check.checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary {
+  background: var(--aurora-pill-bg);
+  border: 1px solid var(--aurora-pill-border);
+  color: var(--text-primary);
+}
+
+.btn-secondary:hover {
+  background: var(--aurora-glass-bg);
+}
+
+.btn-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--aurora-pill-bg);
+  border: 1px solid var(--aurora-pill-border);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+/* ─── Orb Glowing Effect ─────────────────────────────────────────────────── */
+.aurora-orb {
+  background: var(--aurora-orb-core);
+  box-shadow: 0 0 50px rgba(244, 114, 182, 0.45), 0 0 100px rgba(192, 132, 252, 0.3);
+  position: relative;
+  border-radius: 50%;
+  animation: orb-breathe 4s ease-in-out infinite alternate;
+}
+
+.aurora-orb-aura {
+  position: absolute;
+  inset: -16px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, rgba(254, 215, 170, 0.4), rgba(244, 114, 182, 0.4), rgba(192, 132, 252, 0.4), rgba(254, 215, 170, 0.4));
+  filter: blur(14px);
+  animation: aura-spin 10s linear infinite;
+  opacity: 0.7;
+}
+
+/* ─── Keyframe Animations ─────────────────────────────────────────────────── */
+@keyframes orb-breathe {
+  0% {
+    transform: scale(0.97);
+    box-shadow: 0 0 40px rgba(244, 114, 182, 0.4), 0 0 80px rgba(192, 132, 252, 0.25);
+  }
+  100% {
+    transform: scale(1.03);
+    box-shadow: 0 0 65px rgba(244, 114, 182, 0.6), 0 0 120px rgba(192, 132, 252, 0.4);
+  }
+}
+
+@keyframes aura-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes fade-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-slide-up {
+  animation: fade-slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ─── Custom Scrollbar ───────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(120, 113, 108, 0.25);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 113, 108, 0.45);
+}
+
+

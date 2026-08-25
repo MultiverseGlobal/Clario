@@ -1,0 +1,65 @@
+# ─── Node / JS / TS ──────────────────────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.js
+.yarn/install-state.gz
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ─── Build outputs ────────────────────────────────────────────────────────────
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+*.tsbuildinfo.*
+
+# ─── Python / Backend ─────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+venv/
+.venv/
+env/
+.env/
+
+# ─── Environment & Secrets (NEVER commit these) ────────────────────────────────
+.env
+.env.*
+!.env.example
+!.env.local.example
+
+# ─── IDEs ─────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.suo
+*.sw?
+
+# ─── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ─── Expo / Mobile ────────────────────────────────────────────────────────────
+.expo/
+android/build/
+ios/build/
+*.jks
+*.keystore
+
+# ─── Misc ─────────────────────────────────────────────────────────────────────
+*.pem
+coverage/
+
+# ─── Large binaries / build artifacts ─────────────────────────────────────────
+*.apk
+*.aab
+*.ipa
+*.dmg
+*.exe
+*.zip
+*.tar.gz
+*.aar

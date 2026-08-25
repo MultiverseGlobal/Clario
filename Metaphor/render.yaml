@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: metaphor-backend
+    env: python
+    plan: free
+    buildCommand: "cd backend && pip install -r requirements.txt"
+    startCommand: "cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: NOTION_INTEGRATION_TOKEN
+        sync: false
+      - key: API_PREFIX
+        value: "/api/v1"
+      - key: BACKEND_URL
+        value: "https://metaphor-backend.onrender.com"
+      - key: GITHUB_CLIENT_ID
+        value: "Ov23li43OiTLKCWt4ywX"
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: NOTION_CLIENT_ID
+        value: "3afd872b-594c-8112-8c5d-0037abbc1ffd"
+      - key: NOTION_CLIENT_SECRET
+        sync: false
+      - key: LINEAR_CLIENT_ID
+        value: "dc98e44f0ee7afaaef19c16986f7d1fa"
+      - key: LINEAR_CLIENT_SECRET
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.10.12"
