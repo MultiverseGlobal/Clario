@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { NavLink, Outlet, useLocation, useNavigate, Navigate } from "react-router-dom";
 import { 
-  Crosshair, Radio, BarChart2, MessageSquare, 
-  Database, Zap, User as UserIcon, LogOut, Moon, Sun, ChevronRight, Sparkles
+  Target, Search, MessageSquare, BarChart2,
+  Database, Zap, User as UserIcon, LogOut, Moon, Sun, ChevronRight
 } from "lucide-react";
 import { LogoMark } from "@/components/atlas/Logo";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,12 +12,12 @@ import { AtlasChat } from "@/components/atlas/ChatDrawer";
 import { TheVaultDrawer } from "@/components/atlas/TheVaultDrawer";
 import { EcosystemSwitcher } from "@/components/atlas/EcosystemSwitcher";
 
-// ─── The 4 Sequential Sovereign Acquisition Steps ─────────────────────────────
+// ── 4-Step Daily Acquisition Workflow ──────────────────────────────────────────
 const SEQUENTIAL_STEPS = [
-  { step: "01", to: "/hq/flow",     label: "Acquisition", icon: Radio,         desc: "Daily stateful acquisition engine" },
-  { step: "02", to: "/hq/icp",      label: "ICP & Offer", icon: Crosshair,     desc: "Define target thesis & pain engine" },
-  { step: "03", to: "/hq/leads",    label: "Leads",       icon: Database,      desc: "Qualified prospect intelligence" },
-  { step: "04", to: "/hq/pipeline", label: "Pipeline",    icon: BarChart2,     desc: "Stage velocity & deal Kanban" },
+  { step: "01", to: "/hq/flow",     label: "Today",    icon: Target,         desc: "Daily acquisition engine — run 20 prospects" },
+  { step: "02", to: "/hq/recon",    label: "Scout",    icon: Search,         desc: "Research a company — AI pain signal extraction" },
+  { step: "03", to: "/hq/outreach", label: "Outreach",  icon: MessageSquare,  desc: "Active sequences — Email, LinkedIn DM, Loom" },
+  { step: "04", to: "/hq/pipeline", label: "Pipeline",  icon: BarChart2,      desc: "Deal Kanban — stage velocity and revenue" },
 ];
 
 export default function HqShell() {

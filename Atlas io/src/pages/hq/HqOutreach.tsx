@@ -2,13 +2,12 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import {
   MessageSquare, Clock, Send, Copy, Check, Loader2,
-  ChevronDown, Filter, RefreshCw, Building2, Zap, X,
-  Mail, Linkedin, Phone, FileText, Video, Sparkles, ExternalLink
+  RefreshCw, Building2, Zap, X,
+  Mail, Linkedin, Video, Sparkles, ExternalLink
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { formatDistanceToNow, isPast, format } from "date-fns";
@@ -37,11 +36,12 @@ interface OutreachMsg {
   created_at?: string;
 }
 
-const OUTREACH_TYPES = [
-  { key: "cold_email",   label: "Cold Email",   icon: Mail },
-  { key: "followup",     label: "Follow-up",    icon: MessageSquare },
-  { key: "linkedin",     label: "LinkedIn DM",  icon: Linkedin },
-  { key: "loom",         label: "Loom Teardown", icon: Video },
+type ChannelKey = "email" | "linkedin_dm" | "loom";
+
+const CHANNELS: { key: ChannelKey; label: string; icon: any; type: string }[] = [
+  { key: "email",       label: "Email",       icon: Mail,     type: "cold_email" },
+  { key: "linkedin_dm", label: "LinkedIn DM", icon: Linkedin, type: "linkedin" },
+  { key: "loom",        label: "Loom Script", icon: Video,    type: "loom" },
 ];
 
 const FOLLOW_UP_DAYS: Record<string, number> = {
@@ -77,10 +77,9 @@ export default function HqOutreach() {
   // Generator state
   const [showGenerator, setShowGenerator] = useState(false);
   const [selectedCompanyId, setSelectedCompanyId] = useState(searchParams.get("company") ?? "");
-  const [selectedType, setSelectedType] = useState("followup");
-  const [context, setContext] = useState("");
+  const [activeChannel, setActiveChannel] = useState<ChannelKey>("email");
   const [generating, setGenerating] = useState(false);
-  const [generated, setGenerated] = useState<{ subject?: string; body: string } | null>(null);
+  const [allDrafts, setAllDrafts] = useState<{ email: { subject: string; body: string }; linkedin_dm: string; loom_script: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
   const [priorMessages, setPriorMessages] = useState<OutreachMsg[]>([]);
@@ -164,52 +163,57 @@ export default function HqOutreach() {
     setPriorMessages(prior);
   }, [selectedCompanyId, outreach]);
 
-  // ── Robust Pitch & Follow-up Generator ($500 Sprint Scope) ───────────────
+  // ── LLM-Powered Multi-Channel Outreach Generator ─────────────────────────
   const handleGenerate = async () => {
     if (!selectedCompanyId) { toast.error("Select a company first"); return; }
     const lead = leads.find((l) => l.id === selectedCompanyId);
     if (!lead) return;
 
     setGenerating(true);
-    setGenerated(null);
+    setAllDrafts(null);
 
-    await new Promise(r => setTimeout(r, 600));
+    try {
+      const rd = lead.research_data || {};
+      const bt = rd.bottleneck || rd[0] || {};
 
-    const companyName = lead.company || "your team";
-    const founderName = lead.founder?.name || "there";
-    const bottleneckArea = lead.research_data?.bottleneck?.area || "manual operational bottleneck";
-    const observation = lead.research_data?.bottleneck?.observation || "";
+      const { data, error } = await supabase.functions.invoke("generate-outreach", {
+        body: {
+          company:       lead.company,
+          founder_name:  lead.founder?.name || rd.founder?.name || null,
+          founder_role:  lead.founder?.role || rd.founder?.role || null,
+          team_size:     rd.team_size || null,
+          research_data: rd,
+          bottleneck:    bt,
+          approach_angle: rd.approach_angle || null,
+          sender_name:   "Ben",
+        },
+      });
 
-    let subject = `${companyName} follow-up: $500 AI Operations Sprint`;
-    let body = "";
+      if (error) throw new Error(error.message);
 
-    if (lead.outreach_draft && selectedType !== "linkedin" && selectedType !== "loom") {
-       subject = `Quick question on ${companyName}'s operations`;
-       body = lead.outreach_draft;
-    } else {
-      if (selectedType === "followup") {
-        subject = `Quick follow up — ${companyName} operations bottleneck`;
-        body = `Hi ${founderName},\n\nFollowing up on my previous note regarding ${companyName}'s ${bottleneckArea}.\n\nTo keep things simple: we run a 5-day AI Operations Sprint for $500. We audit the workflow, automate that single bottleneck in your existing tools, and hand off the deployed system with complete documentation.\n\nWould it be worth a 5-minute call this week to see if we can eliminate this for you?`;
-      } else if (selectedType === "linkedin") {
-        subject = `LinkedIn DM for ${founderName}`;
-        body = `Hey ${founderName} — following up on my note about ${companyName}'s ${bottleneckArea}. Are you still handling that manually, or open to seeing a 2-minute breakdown of how we automate it for $500 in 5 days?`;
-      } else if (selectedType === "loom") {
-        subject = `2-Minute Teardown for ${companyName}`;
-        body = `Hi ${founderName},\n\nI recorded a 2-minute Loom teardown walking through how we would automate ${companyName}'s ${bottleneckArea} in 5 days for $500.\n\nShould I send the link over?`;
-      } else {
-        subject = `${companyName} operational bottleneck automation`;
-        body = `Hi ${founderName},\n\nNoticed ${companyName}'s rapid growth. Most scaling teams run into a major bottleneck around ${bottleneckArea}. ${observation}\n\nWe offer an AI Operations Sprint ($500 / 5 days): we audit your workflow, automate that single high-leverage bottleneck, and deploy the working system with docs.\n\nOpen to seeing a quick breakdown?`;
-      }
+      setAllDrafts(data);
+      setActiveChannel("email");
+      toast.success("AI drafted all 3 channel formats!");
+    } catch (e: any) {
+      toast.error(`Generation failed: ${e.message}`);
+    } finally {
+      setGenerating(false);
     }
+  };
 
-    setGenerated({ subject, body });
-    setGenerating(false);
-    toast.success("Synthesized bespoke outreach copy!");
+  // ── Get the currently selected channel's content for copy/send ───────────
+  const getActiveDraft = () => {
+    if (!allDrafts) return null;
+    if (activeChannel === "email")       return { subject: allDrafts.email.subject, body: allDrafts.email.body, type: "cold_email" };
+    if (activeChannel === "linkedin_dm") return { subject: null, body: allDrafts.linkedin_dm, type: "linkedin" };
+    if (activeChannel === "loom")        return { subject: null, body: allDrafts.loom_script, type: "loom" };
+    return null;
   };
 
   const handleCopy = () => {
-    if (!generated) return;
-    const text = generated.subject ? `Subject: ${generated.subject}\n\n${generated.body}` : generated.body;
+    const draft = getActiveDraft();
+    if (!draft) return;
+    const text = draft.subject ? `Subject: ${draft.subject}\n\n${draft.body}` : draft.body;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -217,31 +221,36 @@ export default function HqOutreach() {
   };
 
   const sendGeneratedViaGmail = () => {
-    if (!generated || !selectedCompanyId) return;
+    if (!allDrafts || !selectedCompanyId) return;
     const lead = leads.find(l => l.id === selectedCompanyId);
     const toEmail = lead?.founder?.email || "";
-    const subject = encodeURIComponent(generated.subject || "");
-    const body = encodeURIComponent(generated.body);
+    const subject = encodeURIComponent(allDrafts.email.subject || "");
+    const body = encodeURIComponent(allDrafts.email.body);
     const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${toEmail}&su=${subject}&body=${body}`;
     window.open(gmailUrl, "_blank");
-
     handleSaveOutreach("sent");
   };
 
+  const openLoom = () => {
+    window.open("https://www.loom.com/record", "_blank");
+    toast.success("Loom opened! Use the script as your guide, then paste the link back here.");
+  };
+
   const handleSaveOutreach = async (status: string = "sent") => {
-    if (!generated || !selectedCompanyId) return;
+    const draft = getActiveDraft();
+    if (!draft || !selectedCompanyId) return;
     setSaving(true);
     const lead = leads.find((l) => l.id === selectedCompanyId);
     const followUpDate = new Date();
-    followUpDate.setDate(followUpDate.getDate() + (FOLLOW_UP_DAYS[selectedType] ?? 3));
+    followUpDate.setDate(followUpDate.getDate() + (FOLLOW_UP_DAYS[draft.type] ?? 3));
 
     const newMsg: OutreachMsg = {
       id: `msg-${Date.now()}`,
       company_id: selectedCompanyId,
       company_name: lead?.company || "Target Account",
-      type: selectedType,
-      subject: generated.subject ?? null,
-      body: generated.body,
+      type: draft.type,
+      subject: draft.subject ?? null,
+      body: draft.body,
       status,
       sent_at: new Date().toISOString(),
       created_at: new Date().toISOString(),
@@ -261,9 +270,9 @@ export default function HqOutreach() {
         await supabase.from("outreach_messages" as any).insert({
           user_id: user.id,
           company_id: selectedCompanyId,
-          type: selectedType,
-          subject: generated.subject ?? null,
-          body: generated.body,
+          type: draft.type,
+          subject: draft.subject ?? null,
+          body: draft.body,
           status,
           sent_at: new Date().toISOString(),
           follow_up_due: followUpDate.toISOString(),
@@ -272,8 +281,7 @@ export default function HqOutreach() {
     }
 
     toast.success(`Outreach recorded · Next follow-up scheduled for ${format(followUpDate, "MMM d")}`);
-    setGenerated(null);
-    setContext("");
+    setAllDrafts(null);
     setShowGenerator(false);
     setSearchParams({});
     setSaving(false);
@@ -355,106 +363,102 @@ export default function HqOutreach() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm font-bold text-foreground">
                 <Sparkles className="w-4 h-4 text-primary" />
-                Synthesize Personalized $500 Sprint Sequence
+                AI Outreach Generator — 3 Channels
               </div>
-              <button
-                onClick={() => setShowGenerator(false)}
-                className="text-muted-foreground hover:text-foreground text-sm"
-              >
-                ✕
-              </button>
+              <button onClick={() => setShowGenerator(false)} className="text-muted-foreground hover:text-foreground text-sm">✕</button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Target Company
-                </label>
-                <select
-                  value={selectedCompanyId}
-                  onChange={(e) => setSelectedCompanyId(e.target.value)}
-                  className="w-full h-10 text-sm bg-muted/40 border border-border rounded-xl px-3 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                >
-                  <option value="">Select target company…</option>
-                  {leads.map((l) => (
-                    <option key={l.id} value={l.id}>{l.company}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Sequence Format
-                </label>
-                <div className="flex flex-wrap gap-1.5">
-                  {OUTREACH_TYPES.map((t) => (
-                    <button
-                      key={t.key}
-                      onClick={() => setSelectedType(t.key)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
-                        selectedType === t.key
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "border-border/60 text-muted-foreground hover:border-border"
-                      }`}
-                    >
-                      <t.icon className="h-3.5 w-3.5" />
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
+            {/* Company selector */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Target Company</label>
+              <select
+                value={selectedCompanyId}
+                onChange={(e) => setSelectedCompanyId(e.target.value)}
+                className="w-full h-10 text-sm bg-muted/40 border border-border rounded-xl px-3 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="">Select target company…</option>
+                {leads.map((l) => (
+                  <option key={l.id} value={l.id}>{l.company}</option>
+                ))}
+              </select>
             </div>
 
             <Button
               onClick={handleGenerate}
               disabled={generating || !selectedCompanyId}
-              className="bg-primary text-primary-foreground font-bold rounded-xl text-xs px-6"
+              className="w-full bg-primary text-primary-foreground font-bold rounded-xl text-xs px-6 h-10"
             >
               {generating ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Zap className="w-3.5 h-3.5 mr-1.5 fill-current" />}
-              {generating ? "Synthesizing Copy…" : "Generate Pitch & Copy →"}
+              {generating ? "AI is writing your outreach…" : "Generate Email + LinkedIn DM + Loom Script →"}
             </Button>
 
-            {/* Generated Copy Display */}
-            {generated && (
-              <div className="p-4 rounded-xl bg-muted/30 border border-border space-y-3 pt-4 mt-2">
-                {generated.subject && (
-                  <div className="text-xs font-bold text-foreground">
-                    Subject: {generated.subject}
-                  </div>
-                )}
-                <div className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                  {generated.body}
+            {/* Multi-channel draft tabs */}
+            {allDrafts && (
+              <div className="space-y-3">
+                {/* Channel Tabs */}
+                <div className="flex gap-1 p-1 bg-muted/40 rounded-xl border border-border">
+                  {CHANNELS.map((ch) => (
+                    <button
+                      key={ch.key}
+                      onClick={() => setActiveChannel(ch.key)}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                        activeChannel === ch.key
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <ch.icon className="w-3.5 h-3.5" />
+                      {ch.label}
+                    </button>
+                  ))}
                 </div>
 
-                <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-border">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleCopy}
-                    className="text-xs rounded-full"
-                  >
+                {/* Draft Preview */}
+                <div className="rounded-xl bg-muted/30 border border-border p-4 space-y-2">
+                  {activeChannel === "email" && (
+                    <>
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Subject</div>
+                      <div className="text-xs font-semibold text-foreground mb-3">{allDrafts.email.subject}</div>
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Body</div>
+                      <div className="text-xs text-foreground/90 whitespace-pre-wrap leading-relaxed">{allDrafts.email.body}</div>
+                    </>
+                  )}
+                  {activeChannel === "linkedin_dm" && (
+                    <>
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">LinkedIn DM</div>
+                      <div className="text-xs text-foreground/90 whitespace-pre-wrap leading-relaxed">{allDrafts.linkedin_dm}</div>
+                    </>
+                  )}
+                  {activeChannel === "loom" && (
+                    <>
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">60-Second Loom Script</div>
+                      <div className="text-xs text-foreground/90 whitespace-pre-wrap leading-relaxed italic">{allDrafts.loom_script}</div>
+                    </>
+                  )}
+                </div>
+
+                {/* Action buttons — change based on active channel */}
+                <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+                  <Button variant="outline" size="sm" onClick={handleCopy} className="text-xs rounded-full">
                     {copied ? <Check className="w-3 h-3 mr-1.5 text-emerald-500" /> : <Copy className="w-3 h-3 mr-1.5" />}
-                    {copied ? "Copied" : "Copy to Clipboard"}
+                    {copied ? "Copied" : "Copy"}
                   </Button>
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={sendGeneratedViaGmail}
-                    className="text-xs rounded-full text-red-500 border-red-500/30 hover:bg-red-500/10"
-                  >
-                    <Mail className="w-3.5 h-3.5 mr-1.5 text-red-500" />
-                    Send in Gmail
-                  </Button>
+                  {activeChannel === "email" && (
+                    <Button variant="outline" size="sm" onClick={sendGeneratedViaGmail} className="text-xs rounded-full text-red-500 border-red-500/30 hover:bg-red-500/10">
+                      <Mail className="w-3.5 h-3.5 mr-1.5 text-red-500" /> Send in Gmail
+                    </Button>
+                  )}
 
-                  <Button
-                    size="sm"
-                    onClick={() => handleSaveOutreach("sent")}
-                    disabled={saving}
-                    className="bg-primary text-primary-foreground font-semibold text-xs rounded-full px-5"
-                  >
+                  {activeChannel === "loom" && (
+                    <Button variant="outline" size="sm" onClick={openLoom} className="text-xs rounded-full text-violet-400 border-violet-500/30 hover:bg-violet-500/10">
+                      <Video className="w-3.5 h-3.5 mr-1.5" /> Open Loom & Record
+                    </Button>
+                  )}
+
+                  <Button size="sm" onClick={() => handleSaveOutreach("sent")} disabled={saving} className="bg-primary text-primary-foreground font-semibold text-xs rounded-full px-5">
                     {saving ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Check className="w-3.5 h-3.5 mr-1.5" />}
-                    Save & Schedule Follow-Up
+                    Save & Queue Follow-Up
                   </Button>
                 </div>
               </div>
