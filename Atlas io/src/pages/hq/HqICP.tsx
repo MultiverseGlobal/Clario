@@ -192,7 +192,11 @@ export default function HqICP() {
   const [leads, setLeads] = useState<TargetLead[]>(() => {
     try {
       const saved = localStorage.getItem("atlas_autonomous_leads");
-      return saved ? JSON.parse(saved) : [];
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return Array.isArray(parsed) ? parsed : [];
+      }
+      return [];
     } catch {
       return [];
     }

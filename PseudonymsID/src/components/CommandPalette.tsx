@@ -31,8 +31,8 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   if (!isOpen) return null;
 
   const commands = [
-    { id: "atlas", icon: getEcosystemIcon("Atlas", 16, "#C4841F"), label: "Open Atlas io", category: "Ecosystem", action: () => window.open("http://localhost:5173", "_blank") },
-    { id: "metaphor", icon: getEcosystemIcon("Metaphor", 16, "#4E6CF2"), label: "Open Metaphor", category: "Ecosystem", action: () => window.open("http://localhost:3000", "_blank") },
+    { id: "atlas", icon: getEcosystemIcon("Atlas", 16, "#C4841F"), label: "Open Atlas io", category: "Ecosystem", action: () => window.open("https://atlas-scale.vercel.app", "_blank") },
+    { id: "metaphor", icon: getEcosystemIcon("Metaphor", 16, "#4E6CF2"), label: "Open Metaphor", category: "Ecosystem", action: () => window.open("https://metaphor-three.vercel.app", "_blank") },
     { id: "orion", icon: getEcosystemIcon("Orion", 16, "#863bff"), label: "Push session to Orion", category: "Handoff", action: () => { router.push("/devices"); onClose(); } },
     { id: "keys", icon: <Key size={16} />, label: "Manage API Keys", category: "Settings", action: () => { router.push("/settings"); onClose(); } },
     { id: "lock", icon: <ShieldCheck size={16} />, label: "Lock global session", category: "Security", action: () => { /* Add signout */ onClose(); } },
