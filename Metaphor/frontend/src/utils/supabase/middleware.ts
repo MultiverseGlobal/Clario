@@ -52,6 +52,14 @@ export async function updateSession(request: NextRequest) {
 
   const hasOnboarded = request.cookies.has("metaphor_onboarded") || isUnlocked;
 
+  // Redirect logged-in users away from the marketing landing page
+  const isLandingPage = request.nextUrl.pathname === '/';
+  if (isAuthenticated && isLandingPage) {
+    const url = request.nextUrl.clone()
+    url.pathname = hasOnboarded ? '/dashboard' : '/onboarding'
+    return NextResponse.redirect(url)
+  }
+
   if (isAuthenticated && isLoginRoute) {
     const url = request.nextUrl.clone()
     url.pathname = hasOnboarded ? '/dashboard' : '/onboarding'

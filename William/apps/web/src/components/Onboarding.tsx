@@ -155,7 +155,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
       case 8:
         setMeaning(userText);
-        nextQuestion = `Thank you, ${userName || 'friend'}. Your cognitive profile is ready. One final thing: I can sync with Metaphor OS to share your cognitive context across the Pseudonyms network.`;
+        nextQuestion = `Thank you, ${userName || 'friend'}. Your cognitive profile is ready. One final thing: sign in with Pseudonyms to sync your identity and context across the entire ecosystem.`;
         setCurrentStep(9);
         setTimeout(() => {
           setShowConnectMetaphor(true);
@@ -496,11 +496,19 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
             >
               <div className="flex flex-col gap-3 max-w-[80%]">
                 <button
-                  onClick={() => connectMetaphor()}
-                  className="bg-white text-black hover:bg-gray-200 transition-colors rounded-xl px-5 py-3 text-sm font-semibold flex items-center gap-2"
+                  onClick={() => {
+                    const returnUrl = encodeURIComponent(window.location.origin);
+                    window.location.href = `http://localhost:3005?redirect_back=${returnUrl}`;
+                  }}
+                  className="bg-white text-black hover:bg-gray-100 transition-colors rounded-xl px-5 py-3 text-sm font-semibold flex items-center gap-2"
                 >
-                  <Sparkles size={16} />
-                  Connect Metaphor OS
+                  {/* Pseudonyms ID Logo */}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 4"/>
+                    <path d="M12 6L18 12L12 18L6 12L12 6Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <circle cx="12" cy="12" r="2" fill="currentColor"/>
+                  </svg>
+                  Continue with Pseudonyms
                 </button>
                 <button
                   onClick={() => {

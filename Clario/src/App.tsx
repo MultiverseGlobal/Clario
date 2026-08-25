@@ -13,6 +13,7 @@ import { checkServerHealth, uploadToWorker, pollJobStatus } from './lib/apiClien
 import { getApiKey, setApiKey } from './lib/gemini';
 import { AppShell } from './components/layout/AppShell';
 import { BrandKitPanel } from './components/ui/BrandKitPanel';
+import { syncProjectHarvested, syncProjectExported } from './lib/metaphorSync';
 
 type Phase = 'home' | 'ingest' | 'harvest_studio' | 'export' | 'vault';
 
@@ -107,6 +108,7 @@ export default function App() {
         const serverProject = await pollJobStatus(job_id, (msg, pct) => setProgress({ msg, pct }));
         await saveProject(serverProject);
         setCurrentProject(serverProject);
+        syncProjectHarvested(serverProject.name, mode, serverProject.shots?.length || 0);
         setPhase('harvest_studio');
       } else {
         if (mode === 'video_harvester') {
