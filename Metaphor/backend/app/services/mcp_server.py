@@ -622,11 +622,48 @@ async def call_mcp_tool(
         action = arguments.get("action")
         payload = arguments.get("payload")
         project_id_raw = arguments.get("project_id")
-        
+
         try:
-            pid = uuid.UUID(project_id_raw)
+            pid = uuid.UUID(project_id_raw) if project_id_raw else None
         except Exception:
-            raise HTTPException(400, detail="Invalid project_id UUID")
+            pid = None
+
+        # Create handoff record for audit / passive fallback
+        from app.models.task_handoff import TaskHandoff
+        handoff = TaskHandoff(
+            id=uuid.uuid4(),
+            project_id=pid,
+            source_ai=source_tool.lower() if source_tool else "unknown",
+            target_ai=target_tool.lower() if target_tool else "unknown",
+            payload=f"Action: {action}\nPayload: {json.dumps(payload)}",
+            instructions=f"Dispatched command: {action}",
+            status="pending"
+        )
+        session.add(handoff)
+        await session.commit()
+        await session.refresh(handoff)
+
+        # ── Registry-based webhook dispatch (Phase 6) ──────────────────
+        from app.services.webhook_dispatcher import dispatch_to_external_agent
+        dispatch_result = await dispatch_to_external_agent(
+            source_ai=source_tool or "unknown",
+            target_ai=target_tool or "unknown",
+            action=action or "",
+            payload=payload,
+            project_id=str(pid) if pid else project_id_raw,
+            session=session,
+            callback_recipient=source_tool,  # result comes back to the caller
+        )
+
+        mode = dispatch_result.get("mode", "queued")
+        callback_id = dispatch_result.get("callback_id")
+        result_msg = (
+            f"Dispatched '{action}' to {target_tool} via webhook (callback_id: {callback_id})"
+            if mode == "webhook"
+            else f"Queued '{action}' for {target_tool} (passive queue)"
+        )
+
+        return {"content": [{"type": "text", "text": result_msg}]}
             
         # We will make a self-request to the graph dispatch endpoint we just built.
         # Since this is running in the same FastAPI app, we could call the function directly,

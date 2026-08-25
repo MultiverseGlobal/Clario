@@ -8,6 +8,8 @@ from .auth import router as auth_router
 from .mcp import router as mcp_router
 from .pipeline import router as pipeline_router
 from .system import router as system_router
+from app.routes.ai_registry import router as ai_registry_router
+from app.routes.callbacks import router as callbacks_router
 
 api_router = APIRouter()
 api_router.include_router(integrations_router, prefix="/integrations", tags=["integrations"])
@@ -19,3 +21,6 @@ api_router.include_router(auth_router, prefix="/auth", tags=["auth"])
 api_router.include_router(mcp_router, prefix="/mcp", tags=["mcp"])
 api_router.include_router(pipeline_router, prefix="/pipeline", tags=["pipeline"])
 api_router.include_router(system_router, prefix="/system", tags=["system"])
+api_router.include_router(ai_registry_router, prefix="/orchestration", tags=["AI Orchestration"])
+api_router.include_router(callbacks_router, prefix="/callbacks", tags=["Callbacks"])
+
