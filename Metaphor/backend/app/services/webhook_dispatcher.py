@@ -48,6 +48,7 @@ async def dispatch_to_external_agent(
     action: str,
     payload: Any,
     project_id: Optional[str],
+    org_id: str,
     session: AsyncSession,
     callback_recipient: Optional[str] = None,  # which AI should receive the result
 ) -> dict:
@@ -72,6 +73,7 @@ async def dispatch_to_external_agent(
         "target_ai": target_ai,
         "recipient_ai": callback_recipient or source_ai,
         "project_id": project_id,
+        "org_id": org_id,
         "action": action,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }

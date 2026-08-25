@@ -802,23 +802,30 @@ async def remote_mcp_sse_endpoint(
     token_obj = await authenticate_mcp_token(request, token, session)
     enforce_token_rate_limit(str(token_obj.id))
     
-    shutdown_event = register_sse_stream(
+    shutdown_event, message_queue = register_sse_stream(
         token_id=str(token_obj.id),
         org_id=str(token_obj.organization_id),
         project_id=project_id,
         client_name=client_name or token_obj.client_id
     )
 
-    
     async def sse_generator():
         try:
             # Send initial endpoint event
             yield f"event: endpoint\ndata: /api/v1/mcp?token={token}\n\n"
+            
             while not shutdown_event.is_set():
                 if await request.is_disconnected():
                     break
-                yield f": ping\n\n"
-                await asyncio.sleep(5)
+                
+                # Wait for the next message or ping interval
+                try:
+                    # Wait up to 5 seconds for a message
+                    message = await asyncio.wait_for(message_queue.get(), timeout=5.0)
+                    yield message
+                except asyncio.TimeoutError:
+                    yield f": ping\n\n"
+                    
         finally:
             unregister_sse_stream(str(token_obj.id), shutdown_event)
 

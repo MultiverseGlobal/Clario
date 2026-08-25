@@ -96,8 +96,15 @@ async def receive_callback(
     # Remove from pending
     PENDING_CALLBACKS.pop(callback_id, None)
 
-    # TODO (Phase 8): Fire SSE notification to recipient_ai if connected
-    # For now log it
+    # Fire SSE notification to recipient_ai if connected
+    from app.services.mcp_server import broadcast_sse_event
+    await broadcast_sse_event(
+        org_id=pending.get("org_id", "00000000-0000-0000-0000-000000000001"), # Fallback to default org
+        target_ai=result_data["recipient_ai"],
+        event_type="handoff_resolved",
+        data=result_data
+    )
+
     logger.info(
         f"[Callback] Received result from '{result_data['source_ai']}' "
         f"for '{result_data['recipient_ai']}'. callback_id={callback_id}"

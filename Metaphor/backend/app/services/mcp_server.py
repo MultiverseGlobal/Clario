@@ -3,7 +3,7 @@ import time
 import json
 import asyncio
 import logging
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime, timezone
 from fastapi import HTTPException
 from sqlmodel import select
@@ -24,18 +24,20 @@ def hash_token(raw_token: str) -> str:
 # Maps token_id (str) -> List of Dict containing connection details
 ACTIVE_SSE_STREAMS: Dict[str, List[Dict[str, Any]]] = {}
 
-def register_sse_stream(token_id: str, org_id: str, project_id: Optional[str] = None, client_name: Optional[str] = None) -> asyncio.Event:
+def register_sse_stream(token_id: str, org_id: str, project_id: Optional[str] = None, client_name: Optional[str] = None) -> Tuple[asyncio.Event, asyncio.Queue]:
     shutdown_event = asyncio.Event()
+    message_queue = asyncio.Queue()
     if token_id not in ACTIVE_SSE_STREAMS:
         ACTIVE_SSE_STREAMS[token_id] = []
     ACTIVE_SSE_STREAMS[token_id].append({
         "event": shutdown_event,
+        "queue": message_queue,
         "org_id": org_id,
         "project_id": project_id,
         "client_name": client_name,
         "connected_at": datetime.utcnow().isoformat()
     })
-    return shutdown_event
+    return shutdown_event, message_queue
 
 def unregister_sse_stream(token_id: str, shutdown_event: asyncio.Event):
     if token_id in ACTIVE_SSE_STREAMS:
@@ -49,6 +51,26 @@ def terminate_active_sse_streams(token_id: str):
         for s in ACTIVE_SSE_STREAMS[token_id]:
             s["event"].set()
         del ACTIVE_SSE_STREAMS[token_id]
+
+async def broadcast_sse_event(org_id: str, target_ai: str, event_type: str, data: dict):
+    """Broadcast an SSE event to all connected clients matching the target_ai for the given organization."""
+    count = 0
+    payload = f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
+    for token_id, streams in ACTIVE_SSE_STREAMS.items():
+        for s in streams:
+            if s["org_id"] == str(org_id):
+                # Optionally filter by target_ai if it matches client_name (if client_name is known/used)
+                # But typically handoffs should go to the specific AI client (like 'atlas', 'william', 'clario').
+                # If target_ai is specific, only send if client_name matches (case-insensitive) or if client_name is not set.
+                if s["client_name"] and target_ai.lower() not in s["client_name"].lower() and target_ai != "unknown":
+                    continue
+                try:
+                    s["queue"].put_nowait(payload)
+                    count += 1
+                except Exception as e:
+                    logger.error(f"Error putting event in queue for {token_id}: {e}")
+    if count > 0:
+        logger.info(f"Broadcasted '{event_type}' to {count} connected clients (target_ai={target_ai}).")
 
 def get_active_clients_for_org(org_id: str) -> List[Dict[str, Any]]:
     active_clients = []
@@ -339,17 +361,71 @@ async def list_mcp_tools() -> List[Dict[str, Any]]:
         },
         {
             "name": "dispatch_to_tool",
-            "description": "Omni-directional command bus. Dispatch an active command to ANY other tool in the project (Atlas, William, Clario, Claude, Cursor). If the target is an ecosystem tool, it will execute immediately via webhook. If the target is a passive AI, it is pushed to their queue.",
+            "description": "Omni-directional command bus. Dispatch an active command to ANY other tool in the project (Atlas, William, Clario, Claude, Cursor, Manus). If the target has a registered webhook URL, it will execute immediately. If passive, it is pushed to their queue.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "source_tool": {"type": "string", "description": "Your AI name (e.g. claude, cursor)"},
-                    "target_tool": {"type": "string", "description": "Target tool name (e.g. atlas, william, clario, claude)"},
-                    "action": {"type": "string", "description": "The command or action to execute (e.g. 'create_lead', 'run_diagnostic', 'fix_bug')"},
+                    "target_tool": {"type": "string", "description": "Target tool name (e.g. atlas, manus, devin, william)"},
+                    "action": {"type": "string", "description": "The command or action to execute"},
                     "payload": {"type": "object", "description": "Structured JSON arguments for the action"},
-                    "project_id": {"type": "string", "description": "The project UUID to execute this command within"}
+                    "project_id": {"type": "string", "description": "Optional project UUID"}
                 },
-                "required": ["source_tool", "target_tool", "action", "payload", "project_id"]
+                "required": ["source_tool", "target_tool", "action", "payload"]
+            },
+            "annotations": {"readOnly": False, "destructive": False}
+        },
+        {
+            "name": "open_ai_thread",
+            "description": "Start a multi-turn conversation thread between two or more AI agents, routed through Metaphor.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "participants": {"type": "array", "items": {"type": "string"}, "description": "List of AI names in this thread (e.g. ['claude', 'manus'])"},
+                    "initial_message": {"type": "string", "description": "Opening message to start the conversation"},
+                    "title": {"type": "string", "description": "Optional thread title"},
+                    "project_id": {"type": "string", "description": "Optional project UUID to scope this thread"}
+                },
+                "required": ["participants", "initial_message"]
+            },
+            "annotations": {"readOnly": False, "destructive": False}
+        },
+        {
+            "name": "send_thread_message",
+            "description": "Add a message to an existing AI conversation thread.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "thread_id": {"type": "string", "description": "Thread UUID"},
+                    "sender_ai": {"type": "string", "description": "Your AI name"},
+                    "message": {"type": "string", "description": "The message content"}
+                },
+                "required": ["thread_id", "sender_ai", "message"]
+            },
+            "annotations": {"readOnly": False, "destructive": False}
+        },
+        {
+            "name": "get_thread_messages",
+            "description": "Retrieve all messages from an AI conversation thread.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "thread_id": {"type": "string", "description": "Thread UUID"}
+                },
+                "required": ["thread_id"]
+            },
+            "annotations": {"readOnly": True, "destructive": False}
+        },
+        {
+            "name": "close_thread",
+            "description": "Mark an AI conversation thread as resolved with a summary.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "thread_id": {"type": "string", "description": "Thread UUID"},
+                    "summary": {"type": "string", "description": "Summary of what was decided or accomplished"}
+                },
+                "required": ["thread_id", "summary"]
             },
             "annotations": {"readOnly": False, "destructive": False}
         },
@@ -651,6 +727,7 @@ async def call_mcp_tool(
             action=action or "",
             payload=payload,
             project_id=str(pid) if pid else project_id_raw,
+            org_id=str(organization_id),
             session=session,
             callback_recipient=source_tool,  # result comes back to the caller
         )
@@ -663,60 +740,20 @@ async def call_mcp_tool(
             else f"Queued '{action}' for {target_tool} (passive queue)"
         )
 
+        if mode == "queued":
+            await broadcast_sse_event(
+                org_id=str(organization_id),
+                target_ai=target_tool or "unknown",
+                event_type="handoff_received",
+                data={
+                    "handoff_id": str(handoff.id),
+                    "source_ai": source_tool,
+                    "action": action,
+                    "payload": payload
+                }
+            )
+
         return {"content": [{"type": "text", "text": result_msg}]}
-            
-        # We will make a self-request to the graph dispatch endpoint we just built.
-        # Since this is running in the same FastAPI app, we could call the function directly,
-        # but to keep dependencies clean, we'll just implement the dispatch logic here directly.
-        from app.models.task_handoff import TaskHandoff
-        
-        handoff = TaskHandoff(
-            id=uuid.uuid4(),
-            project_id=pid,
-            source_ai=source_tool.lower(),
-            target_ai=target_tool.lower(),
-            payload=f"Action: {action}\nPayload: {json.dumps(payload)}",
-            instructions=f"Dispatched command: {action}",
-            status="pending"
-        )
-        session.add(handoff)
-        await session.commit()
-        await session.refresh(handoff)
-        
-        import httpx
-        target = target_tool.lower()
-        webhook_url = None
-        if target == "william":
-            webhook_url = "https://william.pseudonyms.ai/api/metaphor/webhook"
-        elif target == "atlas":
-            webhook_url = "https://sqthvliapkauoxieiwfb.supabase.co/functions/v1/metaphor-to-atlas"
-        elif target == "clario":
-            webhook_url = "https://clario.pseudonyms.ai/api/metaphor/webhook"
-            
-        dispatch_result = "Queued for passive AI"
-        if webhook_url:
-            try:
-                async with httpx.AsyncClient() as client:
-                    res = await client.post(
-                        webhook_url,
-                        json={
-                            "handoff_id": str(handoff.id),
-                            "project_id": str(pid),
-                            "source_tool": source_tool,
-                            "action": action,
-                            "payload": payload
-                        },
-                        timeout=5.0
-                    )
-                    if res.status_code in (200, 201):
-                        dispatch_result = f"Delivered actively to {target} via webhook"
-                    else:
-                        dispatch_result = f"Webhook failed with status {res.status_code}"
-            except Exception as e:
-                dispatch_result = f"Webhook failed: {e}"
-                logger.error(f"MCP Dispatch Webhook error: {e}")
-                
-        return {"content": [{"type": "text", "text": f"Successfully dispatched command '{action}' to {target_tool}. Result: {dispatch_result}"}]}
 
 
     elif name == "resolve_handoff":
@@ -749,6 +786,109 @@ async def call_mcp_tool(
         res = await session.execute(stmt)
         nodes = res.scalars().all()
         return {"content": [{"type": "text", "text": json.dumps([{"title": n.title, "updated_at": str(n.updated_at)} for n in nodes], indent=2)}]}
+
+    elif name == "open_ai_thread":
+        from app.models.ai_thread import AIThread, AIThreadMessage
+        participants = arguments.get("participants", [])
+        initial_message = arguments.get("initial_message", "")
+        title = arguments.get("title")
+        raw_pid = arguments.get("project_id")
+        try:
+            tid = uuid.UUID(raw_pid) if raw_pid else None
+        except Exception:
+            tid = None
+
+        first_msg = AIThreadMessage(
+            sender_ai=participants[0] if participants else "unknown",
+            content=initial_message
+        )
+        thread = AIThread(
+            organization_id=organization_id,
+            project_id=tid,
+            participants=participants,
+            messages=[first_msg.model_dump()],
+            title=title or f"Thread: {' ↔ '.join(participants)}",
+            created_by=participants[0] if participants else "unknown",
+        )
+        session.add(thread)
+        await session.commit()
+        await session.refresh(thread)
+        return {"content": [{"type": "text", "text": json.dumps({
+            "thread_id": str(thread.id),
+            "title": thread.title,
+            "participants": thread.participants,
+            "status": "open",
+            "message": "Thread opened. Other participants can now call send_thread_message."
+        }, indent=2)}]}
+
+    elif name == "send_thread_message":
+        from app.models.ai_thread import AIThread, AIThreadMessage
+        from datetime import timezone
+        thread_id_raw = arguments.get("thread_id")
+        sender_ai = arguments.get("sender_ai", "unknown")
+        message_content = arguments.get("message", "")
+        try:
+            tid = uuid.UUID(thread_id_raw)
+        except Exception:
+            raise HTTPException(400, detail="Invalid thread_id UUID")
+        thread = await session.get(AIThread, tid)
+        if not thread:
+            raise HTTPException(404, detail="Thread not found")
+        if thread.status != "open":
+            raise HTTPException(400, detail="Thread is closed")
+        new_msg = AIThreadMessage(sender_ai=sender_ai, content=message_content)
+        thread.messages = thread.messages + [new_msg.model_dump()]
+        thread.updated_at = datetime.now(timezone.utc)
+        session.add(thread)
+        await session.commit()
+        return {"content": [{"type": "text", "text": json.dumps({
+            "thread_id": str(thread.id),
+            "message_id": new_msg.id,
+            "total_messages": len(thread.messages),
+            "status": "sent"
+        }, indent=2)}]}
+
+    elif name == "get_thread_messages":
+        from app.models.ai_thread import AIThread
+        thread_id_raw = arguments.get("thread_id")
+        try:
+            tid = uuid.UUID(thread_id_raw)
+        except Exception:
+            raise HTTPException(400, detail="Invalid thread_id UUID")
+        thread = await session.get(AIThread, tid)
+        if not thread:
+            raise HTTPException(404, detail="Thread not found")
+        return {"content": [{"type": "text", "text": json.dumps({
+            "thread_id": str(thread.id),
+            "title": thread.title,
+            "participants": thread.participants,
+            "status": thread.status,
+            "messages": thread.messages,
+            "total_messages": len(thread.messages)
+        }, indent=2)}]}
+
+    elif name == "close_thread":
+        from app.models.ai_thread import AIThread
+        from datetime import timezone
+        thread_id_raw = arguments.get("thread_id")
+        summary = arguments.get("summary", "")
+        try:
+            tid = uuid.UUID(thread_id_raw)
+        except Exception:
+            raise HTTPException(400, detail="Invalid thread_id UUID")
+        thread = await session.get(AIThread, tid)
+        if not thread:
+            raise HTTPException(404, detail="Thread not found")
+        thread.status = "resolved"
+        thread.resolution_summary = summary
+        thread.resolved_at = datetime.now(timezone.utc)
+        session.add(thread)
+        await session.commit()
+        return {"content": [{"type": "text", "text": json.dumps({
+            "thread_id": str(thread.id),
+            "status": "resolved",
+            "resolution_summary": summary
+        }, indent=2)}]}
 
     else:
         raise HTTPException(404, detail=f"Tool '{name}' not found.")

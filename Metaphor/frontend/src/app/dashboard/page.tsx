@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { CardSkeleton } from "@/components/ui/SkeletonLoader";
+import { useMetaphorSSE } from "@/hooks/useMetaphorSSE";
 
 interface ActiveClient {
   client_name: string;
@@ -39,6 +40,7 @@ export default function SynchronizationDashboard() {
   const [handoffs, setHandoffs] = useState<HandoffItem[]>([]);
   const [recentNodes, setRecentNodes] = useState<{title: string, type: string, created_at: string}[]>([]);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const notifications = useMetaphorSSE();
 
   const supabase = createClient();
 
@@ -124,6 +126,23 @@ export default function SynchronizationDashboard() {
 
   return (
     <div className="relative w-full min-h-full animate-in fade-in duration-200">
+      
+      {/* SSE Toasts */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
+        {notifications.map((notif) => (
+          <div key={notif.id} className="w-80 bg-surface-1 border border-border-subtle rounded-xl p-4 shadow-2xl animate-in slide-in-from-right-4 fade-in duration-300">
+            <div className="flex items-center justify-between mb-1">
+              <span className={`text-xs font-bold uppercase tracking-wider ${notif.type === "handoff_received" ? "text-primary" : "text-success"}`}>
+                {notif.type === "handoff_received" ? "Action Received" : "Resolved"}
+              </span>
+              <span className="text-[10px] text-muted">Just now</span>
+            </div>
+            <h4 className="text-sm font-semibold text-foreground">{notif.title}</h4>
+            <p className="text-xs text-muted mt-1 leading-relaxed">{notif.description}</p>
+          </div>
+        ))}
+      </div>
+
       <GraphViewer />
       <div className="relative z-10 w-full max-w-4xl mx-auto p-8 pb-16 flex flex-col items-start">
 
