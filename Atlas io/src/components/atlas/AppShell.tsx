@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { LogoMark } from "@/components/atlas/Logo";
 import { useAuth } from "@/hooks/useAuth";
+import { useHandoffBroadcast } from "@/hooks/useHandoffBroadcast";
 import { supabase } from "@/integrations/supabase/client";
 import { useTheme } from "@/hooks/useTheme";
 import { AtlasChat } from "@/components/atlas/ChatDrawer";
@@ -21,6 +22,7 @@ const SEQUENTIAL_STEPS = [
 
 export default function AppShell() {
   const { user, loading, signOut } = useAuth();
+  useHandoffBroadcast();
   const navigate = useNavigate();
   const location = useLocation();
   const { theme, cycleTheme } = useTheme();
@@ -151,7 +153,7 @@ export default function AppShell() {
             <button
               onClick={() => navigate("/app/settings")}
               className="h-7 w-7 rounded-full bg-primary/10 border border-primary/25 flex items-center justify-center text-primary hover:bg-primary/20 transition-all"
-              title={profile?.display_name || user.email || "Profile"}
+              title={user.user_metadata?.username || profile?.display_name || user.email || "Profile"}
             >
               <UserIcon className="h-3.5 w-3.5" />
             </button>

@@ -79,7 +79,7 @@ export default function OverviewPage() {
             lineHeight: 1.1,
           }}
         >
-          {user ? `Welcome back, ${user.email?.split("@")[0]}.` : "Initializing Workspace..."}
+          {user ? `Welcome back, ${user.user_metadata?.username || user.email?.split("@")[0]}.` : "Initializing Workspace..."}
         </h1>
         <p
           style={{

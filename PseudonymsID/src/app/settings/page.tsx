@@ -5,7 +5,7 @@ import { Key, Save, CheckCircle2, AlertCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 
 export default function SettingsPage() {
-  const [keys, setKeys] = useState({ gemini: "", openai: "", anthropic: "" });
+  const [keys, setKeys] = useState({ gemini: "", openai: "", anthropic: "", username: "" });
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   useEffect(() => {
@@ -15,6 +15,7 @@ export default function SettingsPage() {
         gemini: meta.gemini_api_key ?? "",
         openai: meta.openai_api_key ?? "",
         anthropic: meta.anthropic_api_key ?? "",
+        username: meta.username ?? "",
       });
     });
   }, []);
@@ -26,6 +27,7 @@ export default function SettingsPage() {
         gemini_api_key: keys.gemini,
         openai_api_key: keys.openai,
         anthropic_api_key: keys.anthropic,
+        username: keys.username,
       },
     });
     
@@ -56,16 +58,48 @@ export default function SettingsPage() {
           className="font-serif-title"
           style={{ fontSize: "48px", color: "var(--text-primary)", margin: "0 0 16px", lineHeight: 1.1 }}
         >
-          Ecosystem Keys
+          Ecosystem Identity & Keys
         </h1>
         <p style={{ fontSize: "16px", color: "var(--text-secondary)", lineHeight: 1.6 }}>
-          Set your API keys once here. They are securely encrypted in your Supabase profile and dynamically loaded by Metaphor, Orion, and Atlas.
+          Set your username and API keys once here. They are securely encrypted in your Supabase profile and dynamically loaded by Metaphor, Orion, and Atlas.
         </p>
       </div>
 
       {/* Form */}
       <div className="animate-enter delay-1 glass-panel" style={{ padding: "40px 32px", borderRadius: "16px" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "24px", marginBottom: "40px" }}>
+          
+          {/* Username Field */}
+          <div>
+            <label 
+              htmlFor="username" 
+              className="label-mono"
+              style={{ display: "block", marginBottom: "12px", color: "var(--text-primary)" }}
+            >
+              Global Username
+            </label>
+            <div style={{ position: "relative" }}>
+              <input
+                id="username"
+                type="text"
+                placeholder="e.g. Theo"
+                value={keys.username}
+                onChange={(e) => setKeys((prev) => ({ ...prev, username: e.target.value }))}
+                style={{
+                  width: "100%", padding: "14px 16px",
+                  background: "var(--bg-canvas)", border: "1px solid var(--border-strong)",
+                  borderRadius: "12px", fontSize: "14px", color: "var(--text-primary)",
+                  fontFamily: "var(--font-sans)", outline: "none",
+                  transition: "all 0.2s var(--ease-out)", boxShadow: "var(--shadow-sm)"
+                }}
+                onFocus={(e) => e.target.style.borderColor = "var(--accent)"}
+                onBlur={(e) => e.target.style.borderColor = "var(--border-strong)"}
+              />
+            </div>
+          </div>
+
+          <div style={{ height: "1px", background: "var(--border-subtle)", margin: "8px 0" }} />
+
           {providers.map((p) => (
             <div key={p.id}>
               <label 
