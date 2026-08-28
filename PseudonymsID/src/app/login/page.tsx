@@ -9,6 +9,7 @@ import { getEcosystemIcon } from "@/components/EcosystemIcons";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
@@ -20,16 +21,26 @@ export default function LoginPage() {
     });
   }, [router]);
 
-  const handleEmailSignIn = async (e: React.FormEvent) => {
+  const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
-    const { error } = await createClient().auth.signInWithPassword({ email, password });
+    const authAction = isSignUp 
+      ? createClient().auth.signUp({ email, password })
+      : createClient().auth.signInWithPassword({ email, password });
+      
+    const { error } = await authAction;
+    
     if (error) {
       setError(error.message);
       setIsLoading(false);
     } else {
-      router.push("/");
+      if (isSignUp) {
+        // If it's a new account, we might want to push them to /onboarding
+        router.push("/onboarding");
+      } else {
+        router.push("/");
+      }
     }
   };
 
@@ -69,7 +80,7 @@ export default function LoginPage() {
             Pseudonym ID
           </h1>
           <p style={{ fontSize: "14px", color: "var(--text-secondary)", margin: 0, lineHeight: 1.5 }}>
-            Sign in to your sovereign company account.
+            {isSignUp ? "Create your sovereign company account." : "Sign in to your sovereign company account."}
           </p>
         </div>
 
@@ -82,7 +93,7 @@ export default function LoginPage() {
 
 
         {/* Email Form */}
-        <form onSubmit={handleEmailSignIn} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+        <form onSubmit={handleEmailAuth} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           <div style={{ position: "relative" }}>
             <div style={{ position: "absolute", left: "16px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }}>
               <Mail size={16} />
@@ -151,10 +162,21 @@ export default function LoginPage() {
               }
             }}
           >
-            {isLoading ? <Loader2 size={18} className="animate-spin" /> : "Sign In to Pseudonym"}
+            {isLoading ? <Loader2 size={18} className="animate-spin" /> : (isSignUp ? "Create Account" : "Sign In to Pseudonym")}
             {!isLoading && <ArrowRight size={16} />}
           </button>
         </form>
+
+        <p style={{ textAlign: "center", fontSize: "14px", color: "var(--text-secondary)", marginTop: "24px", fontFamily: "var(--font-sans)" }}>
+          {isSignUp ? "Already have an account? " : "Don't have an account? "}
+          <button 
+            type="button"
+            onClick={() => setIsSignUp(!isSignUp)}
+            style={{ background: "none", border: "none", color: "var(--accent)", cursor: "pointer", fontWeight: 500, padding: 0 }}
+          >
+            {isSignUp ? "Sign In" : "Sign Up"}
+          </button>
+        </p>
 
         <p style={{ textAlign: "center", fontSize: "12px", color: "var(--text-muted)", marginTop: "32px", fontFamily: "var(--font-sans)" }}>
           Secured by Supabase Core
