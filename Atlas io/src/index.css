@@ -1,225 +1,176 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,400&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* ── Metaphor Cognitive OS Design System (Unified across Pseudonyms) ───────── */
+/* ─── $1M Architectural Identity (Metaphor Light + Orion Typography) ────── */
 
-/* ── Cross-App Token Bridge ──────────────────────────────────────────────────
-   These raw CSS custom properties are shared with Clario and any
-   component that uses var(--base), var(--panel) etc. instead of the
-   Tailwind HSL tokens.  Light mode maps to Porcelain, dark mode
-   overrides below map to Obsidian.
-   ────────────────────────────────────────────────────────────────────────── */
 :root {
-  --base:           #F8F7F4;
-  --panel:          #FFFFFF;
-  --surface:        #FFFFFF;
-  --surface-hover:  #F1F0EC;
-  --surface-2:      #F1F0EC;
-  --border:         #EBEAE5;
-  --border-subtle:  #EBEAE5;
-  --border-strong:  #D4D3CE;
-  --border-hover:   rgba(0, 0, 0, 0.08);
-  --text-primary:   #111318;
-  --text-secondary: #6B7280;
-  --text-muted:     #9CA3AF;
-  --accent:         #4E6CF2;
-  --accent-hover:   #3C57CD;
-  --accent-dim:     rgba(78, 108, 242, 0.1);
-  --accent-border:  rgba(78, 108, 242, 0.3);
-  --cyan:           #06B6D4;
-  --emerald:        #10B981;
-  --emerald-dim:    rgba(16, 185, 129, 0.08);
-  --amber:          #F59E0B;
-  --amber-dim:      rgba(245, 158, 11, 0.08);
-  --rose:           #EF4444;
-  --rose-dim:       rgba(239, 68, 68, 0.08);
-  --font-sans:      'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono:      'JetBrains Mono', monospace;
-  --font-display:   'Space Grotesk', sans-serif;
-}
-.dark, [data-theme="dark"] {
-  --base:           #0C0D10;
-  --panel:          #13151A;
-  --surface:        #1C1F27;
-  --surface-hover:  #252931;
-  --surface-2:      #1C1F27;
-  --border:         #22262F;
-  --border-subtle:  #22262F;
-  --border-strong:  #363C4A;
-  --border-hover:   rgba(255, 255, 255, 0.12);
-  --text-primary:   #ECECF0;
-  --text-secondary: #8A8F9E;
-  --text-muted:     #5A5E6B;
-  --accent:         #4E6CF2;
-  --accent-hover:   #3C57CD;
-  --accent-dim:     rgba(78, 108, 242, 0.16);
-  --accent-border:  rgba(78, 108, 242, 0.4);
-  --cyan:           #06B6D4;
-  --emerald:        #10B981;
-  --emerald-dim:    rgba(16, 185, 129, 0.12);
-  --amber:          #F59E0B;
-  --amber-dim:      rgba(245, 158, 11, 0.12);
-  --rose:           #EF4444;
-  --rose-dim:       rgba(239, 68, 68, 0.12);
+  /* Foundation — Metaphor Porcelain/Obsidian */
+  --bg-canvas: #F8F7F4;       /* Porcelain */
+  --bg-surface: #FFFFFF;      /* Pure White Surface */
+  --bg-surface-2: #F1F0EC;    /* Slightly recessed */
+  --bg-hover: #EBEBE6;
+
+  /* Text & Borders */
+  --text-primary: #111318;    /* Obsidian */
+  --text-secondary: #6B7280;  /* Slate */
+  --text-muted: #9CA3AF;
+  
+  --border-subtle: #EBEAE5;
+  --border-strong: #D1D1CB;
+
+  /* Accents */
+  --accent: #4E6CF2;          /* Metaphor Context Blue */
+  --accent-dim: rgba(78, 108, 242, 0.08);
+  --accent-glow: rgba(78, 108, 242, 0.15);
+
+  /* Status Colors */
+  --green: #10B981;
+  --amber: #C5A059;
+  --red: #EF4444;
+
+  /* Typography Scale - Orion Style */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-serif: 'Cormorant Garamond', serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Architectural Shadows (Apple / Linear) */
+  --shadow-sm: 0 1px 2px rgba(17, 19, 24, 0.04);
+  --shadow-md: 0 4px 12px rgba(17, 19, 24, 0.05), 0 1px 3px rgba(17, 19, 24, 0.03);
+  --shadow-lg: 0 16px 32px rgba(17, 19, 24, 0.06), 0 4px 8px rgba(17, 19, 24, 0.03);
+  --shadow-float: 0 24px 48px rgba(17, 19, 24, 0.08), 0 8px 16px rgba(17, 19, 24, 0.04);
+
+  /* Motion */
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.05);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --fast: 150ms;
+  --base: 300ms;
 }
 
-@layer base {
-  /* ── Default: Metaphor Porcelain (Light Mode) ─────────────────────────── */
-  :root {
-    /* Porcelain Canvas */
-    --background: 40 14% 97%;        /* #F8F7F4 */
-    --foreground: 220 18% 8%;        /* #111318 Obsidian ink */
+/* ─── Reset & Base ───────────────────────────────────────────────────────── */
 
-    /* Layer 1 Surface (Cards) */
-    --card: 0 0% 100%;               /* #FFFFFF */
-    --card-foreground: 220 18% 8%;
+*, *::before, *::after { box-sizing: border-box; }
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 220 18% 8%;
-
-    --surface: 0 0% 100%;
-    --surface-2: 40 10% 95%;         /* #F1F0EC */
-
-    /* Context Blue Accent */
-    --primary: 229 86% 63%;          /* #4E6CF2 */
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 40 10% 95%;         /* #F1F0EC */
-    --secondary-foreground: 220 18% 8%;
-
-    --muted: 40 10% 94%;
-    --muted-foreground: 220 9% 46%;  /* #6B7280 Slate */
-
-    --accent: 40 10% 95%;
-    --accent-foreground: 220 18% 8%;
-
-    --destructive: 0 84% 60%;        /* #EF4444 */
-    --destructive-foreground: 0 0% 100%;
-
-    --success: 160 84% 39%;          /* #10B981 */
-    --warning: 38 92% 50%;           /* #F59E0B */
-
-    --border: 40 8% 91%;             /* #EBEAE5 Hairline border */
-    --input: 40 8% 91%;
-    --ring: 229 86% 63%;
-
-    --radius: 0.625rem;
-
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 220 9% 46%;
-    --sidebar-primary: 229 86% 63%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 40 10% 95%;
-    --sidebar-accent-foreground: 220 18% 8%;
-    --sidebar-border: 40 8% 91%;
-    --sidebar-ring: 229 86% 63%;
-  }
-
-  /* ── Dark: Metaphor Obsidian (Dark Mode) ──────────────────────────────── */
-  .dark, [data-theme="dark"] {
-    /* Obsidian Canvas */
-    --background: 225 14% 5%;        /* #0C0D10 */
-    --foreground: 240 8% 93%;        /* #ECECF0 */
-
-    /* Layer 1 Surface (Obsidian Cards) */
-    --card: 225 15% 9%;              /* #13151A */
-    --card-foreground: 240 8% 93%;
-
-    --popover: 225 15% 9%;
-    --popover-foreground: 240 8% 93%;
-
-    --surface: 225 15% 9%;
-    --surface-2: 223 16% 13%;        /* #1C1F27 */
-
-    /* Context Blue Accent */
-    --primary: 229 86% 63%;          /* #4E6CF2 */
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 223 16% 13%;        /* #1C1F27 */
-    --secondary-foreground: 240 8% 93%;
-
-    --muted: 223 16% 13%;
-    --muted-foreground: 228 9% 58%;  /* #8A8F9E Muted */
-
-    --accent: 223 16% 13%;
-    --accent-foreground: 240 8% 93%;
-
-    --destructive: 0 84% 60%;        /* #EF4444 */
-    --destructive-foreground: 0 0% 100%;
-
-    --success: 160 84% 39%;          /* #10B981 */
-    --warning: 38 92% 50%;           /* #F59E0B */
-
-    --border: 223 15% 16%;           /* #22262F Hairline */
-    --input: 223 15% 16%;
-    --ring: 229 86% 63%;
-
-    --sidebar-background: 225 15% 9%;
-    --sidebar-foreground: 228 9% 58%;
-    --sidebar-primary: 229 86% 63%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 223 16% 13%;
-    --sidebar-accent-foreground: 240 8% 93%;
-    --sidebar-border: 223 15% 16%;
-    --sidebar-ring: 229 86% 63%;
-  }
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
-@layer base {
-  * {
-    @apply border-border;
-    box-sizing: border-box;
-  }
-  body {
-    @apply bg-background text-foreground font-sans antialiased;
-    font-feature-settings: "rlig" 1, "calt" 1;
-    min-height: 100vh;
-  }
+body {
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+  line-height: 1.6;
+  margin: 0;
 }
 
-/* ── Custom Swiss Scrollbars ── */
-::-webkit-scrollbar { width: 5px; height: 5px; background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.2); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.4); }
-
-/* ── Metaphor Action CTA Button ── */
-.btn-metaphor {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background-color: #111318;
-  color: #FFFFFF;
-  padding: 8px 18px;
-  border-radius: 10px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  transition: all 0.15s ease-out;
-}
-.btn-metaphor:hover {
-  opacity: 0.9;
-  transform: translateY(-0.5px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-}
-.dark .btn-metaphor {
-  background-color: #ECECF0;
-  color: #111318;
-}
-.dark .btn-metaphor:hover {
-  background-color: #FFFFFF;
+::selection {
+  background: var(--accent-dim);
+  color: var(--accent);
 }
 
-/* ── Subtle background grain ── */
-.grain::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 99;
-  opacity: 0.018;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+/* ─── Custom Scrollbar ───────────────────────────────────────────────────── */
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ─── Glass & Surfaces ───────────────────────────────────────────────────── */
+
+.surface {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-sm);
+  border-radius: 12px;
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-md);
+}
+
+.interactive-card {
+  transition: transform var(--base) var(--ease-out), box-shadow var(--base) var(--ease-out), border-color var(--base) var(--ease-out);
+}
+
+.interactive-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--border-strong);
+}
+
+/* ─── Status Dots & Pings ────────────────────────────────────────────────── */
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background-color var(--base) var(--ease-out);
+}
+
+.status-dot.active {
+  background: var(--green);
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+  animation: pulse-green 2.5s infinite;
+}
+
+.status-dot.inactive {
+  background: var(--text-muted);
+}
+
+@keyframes pulse-green {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+}
+
+/* ─── Typography Utils (Orion Style) ─────────────────────────────────────── */
+
+.font-serif-title {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+.label-mono {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* ─── Animations (Clerk / Apple style) ───────────────────────────────────── */
+
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.animate-enter {
+  animation: slideUpFade 0.5s var(--ease-spring) both;
+}
+
+.delay-1 { animation-delay: 50ms; }
+.delay-2 { animation-delay: 100ms; }
+.delay-3 { animation-delay: 150ms; }
+.delay-4 { animation-delay: 200ms; }
+
+@keyframes blurIn {
+  from { opacity: 0; filter: blur(8px); }
+  to { opacity: 1; filter: blur(0); }
+}
+
+.animate-blur-in {
+  animation: blurIn 0.6s var(--ease-out) both;
 }

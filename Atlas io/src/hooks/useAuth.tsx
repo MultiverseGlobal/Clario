@@ -17,11 +17,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!s?.provider_token) return;
       const provider = s.user?.app_metadata?.provider;
       if (provider === "github") {
-        await (supabase as any).rpc("upsert_github_token", {
-          p_token: s.provider_token,
-          p_scopes: "read:user repo",
-          p_expires_at: s.expires_at ? new Date(s.expires_at * 1000).toISOString() : null,
-        });
+        try {
+          await (supabase as any).rpc("upsert_github_token", {
+            p_token: s.provider_token,
+            p_scopes: "read:user repo",
+            p_expires_at: s.expires_at ? new Date(s.expires_at * 1000).toISOString() : null,
+          });
+        } catch (err: any) {
+          console.warn("[useAuth] Failed to sync github token:", err.message);
+        }
       }
     };
 
@@ -77,6 +81,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(data.session?.user ?? null);
       setLoading(false);
       if (data.session) syncToken(data.session);
+    }).catch(err => {
+      console.error("[useAuth] Failed to get session:", err);
+      setLoading(false);
     });
 
     return () => sub.subscription.unsubscribe();

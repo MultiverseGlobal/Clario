@@ -23,13 +23,19 @@ function AuthorizeForm() {
     createClient().auth.getUser().then(({ data: { user } }) => setUser(user));
   }, []);
 
-  const handleApprove = () => {
+  const handleApprove = async () => {
     setApproving(true);
-    const mockAuthCode = `psc_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+    
+    const { data } = await createClient().auth.getSession();
+    const session = data.session;
     
     setTimeout(() => {
       const target = new URL(redirectUri);
-      target.searchParams.set("code", mockAuthCode);
+      if (session) {
+        target.hash = `access_token=${session.access_token}&refresh_token=${session.refresh_token}&type=recovery`;
+      } else {
+        target.searchParams.set("error", "no_session");
+      }
       if (state) target.searchParams.set("state", state);
       window.location.href = target.toString();
     }, 800);

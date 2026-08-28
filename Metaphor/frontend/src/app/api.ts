@@ -84,7 +84,18 @@ export async function fetchFromMetaphor(endpoint: string, body?: any, method?: s
   const backendUrl = getBackendUrl();
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15_000);
-  const res = await fetch(`${backendUrl}${endpoint}`, { ...options, signal: controller.signal }).finally(() => clearTimeout(timeoutId));
+  
+  let res: Response;
+  try {
+    res = await fetch(`${backendUrl}${endpoint}`, { ...options, signal: controller.signal });
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      throw new Error(`Request to ${endpoint} timed out after 15 seconds. Please try again later.`);
+    }
+    throw new Error(`Network error: ${err.message}`);
+  } finally {
+    clearTimeout(timeoutId);
+  }
   
   if (!res.ok) {
     const errText = await res.text();

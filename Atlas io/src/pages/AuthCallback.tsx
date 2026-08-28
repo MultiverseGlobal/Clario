@@ -61,7 +61,21 @@ export default function AuthCallback() {
         }
       }
 
-      // Check if we already have a valid session (identity link flow)
+      // --- Pseudonyms ID Sovereign Session Sharing (Implicit Flow) ---
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+      if (accessToken && refreshToken) {
+        const { error: setSessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken
+        });
+        if (setSessionError) {
+          console.error("[AuthCallback] Failed to set implicit session:", setSessionError);
+        }
+      }
+
+      // Check if we already have a valid session (identity link flow or implicit flow just set above)
       const { data: existingSession } = await supabase.auth.getSession();
       if (existingSession?.session) {
         // Already logged in, just redirect back

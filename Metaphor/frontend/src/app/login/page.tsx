@@ -125,8 +125,8 @@ function LoginForm() {
             <button
               type="button"
               onClick={() => {
-                const returnUrl = encodeURIComponent(window.location.origin + "/auth/callback");
-                window.location.href = `${process.env.NEXT_PUBLIC_PSEUDONYMS_URL || "http://localhost:3005"}?redirect_back=${returnUrl}`;
+                const returnUrl = encodeURIComponent(window.location.origin + "/auth/pseudonyms/callback");
+                window.location.href = `${process.env.NEXT_PUBLIC_PSEUDONYMS_URL || "https://pseudonyms.vercel.app"}/oauth/authorize?client_id=metaphor&redirect_uri=${returnUrl}`;
               }}
               disabled={loading}
               className="w-full flex items-center justify-center gap-3 p-3.5 rounded-xl border border-border-strong bg-foreground text-background hover:opacity-90 transition-all duration-200 cursor-pointer disabled:opacity-50 text-sm font-medium shadow-md"

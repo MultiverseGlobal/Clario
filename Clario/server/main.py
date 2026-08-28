@@ -4,6 +4,7 @@ import uuid
 import asyncio
 import zipfile
 import re
+import tempfile
 from typing import Dict, Any, List
 from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -173,6 +174,64 @@ async def process_video_harvest_job(job_id: str, project_id: str, video_path: st
 @app.get("/api/v1/health")
 def health_check():
     return {"status": "ok", "service": "Clario Media Intelligence Studio"}
+
+from pydantic import BaseModel
+class DownloadVideoRequest(BaseModel):
+    url: str
+
+@app.post("/api/download-video")
+async def download_video(req: DownloadVideoRequest):
+    if not req.url:
+        raise HTTPException(status_code=400, detail="URL is required")
+        
+    unique_prefix = f"clario_{uuid.uuid4().hex}"
+    out_template = os.path.join(tempfile.gettempdir(), f"{unique_prefix}.%(ext)s")
+    
+    cmd = [
+        "python", "-m", "yt_dlp",
+        "-f", "best[ext=mp4]/best",
+        "--extractor-args", "youtube:player_client=android",
+        "--no-playlist",
+        "--max-filesize", "100M",
+        "-o", out_template,
+        req.url
+    ]
+    
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await proc.communicate()
+        
+        if proc.returncode != 0:
+            raise HTTPException(status_code=500, detail=stderr.decode())
+            
+        temp_dir = tempfile.gettempdir()
+        downloaded_file = next((f for f in os.listdir(temp_dir) if f.startswith(unique_prefix)), None)
+        
+        if not downloaded_file:
+            raise HTTPException(status_code=404, detail="Downloaded file not found")
+            
+        file_path = os.path.join(temp_dir, downloaded_file)
+        
+        from starlette.background import BackgroundTask
+        def cleanup():
+            try:
+                os.unlink(file_path)
+            except Exception:
+                pass
+                
+        return FileResponse(
+            path=file_path, 
+            filename=downloaded_file, 
+            media_type="video/mp4",
+            background=BackgroundTask(cleanup)
+        )
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/v1/harvest/ingest-file")
 async def ingest_file(

@@ -123,7 +123,7 @@ export default function Auth() {
               type="button"
               onClick={() => {
                 const returnUrl = encodeURIComponent(window.location.origin + "/auth/callback");
-                window.location.href = `http://localhost:3005?redirect_back=${returnUrl}`;
+                window.location.href = `https://pseudonyms.vercel.app/oauth/authorize?client_id=atlas&redirect_uri=${returnUrl}`;
               }}
               disabled={loading}
               className="w-full h-11 rounded-xl font-mono text-xs font-semibold gap-2 bg-foreground text-background hover:bg-foreground/90"
