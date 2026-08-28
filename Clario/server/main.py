@@ -176,8 +176,73 @@ def health_check():
     return {"status": "ok", "service": "Clario Media Intelligence Studio"}
 
 from pydantic import BaseModel
+import google.generativeai as genai
+
 class DownloadVideoRequest(BaseModel):
     url: str
+
+class InsightsRequest(BaseModel):
+    url: str
+    gemini_api_key: str
+
+@app.post("/api/v1/insights/transcribe")
+async def generate_media_insights(req: InsightsRequest):
+    if not req.url:
+        raise HTTPException(status_code=400, detail="URL is required")
+    if not req.gemini_api_key:
+        raise HTTPException(status_code=400, detail="Gemini API Key is required")
+        
+    unique_prefix = f"clario_insight_{uuid.uuid4().hex}"
+    out_template = os.path.join(tempfile.gettempdir(), f"{unique_prefix}.%(ext)s")
+    
+    # Download AUDIO only for faster transcription
+    cmd = [
+        "python", "-m", "yt_dlp",
+        "-f", "bestaudio/best",
+        "--extractor-args", "youtube:player_client=android",
+        "--max-filesize", "100M",
+        "-o", out_template,
+        req.url
+    ]
+    
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await proc.communicate()
+        
+        if proc.returncode != 0:
+            raise HTTPException(status_code=500, detail=stderr.decode())
+            
+        temp_dir = tempfile.gettempdir()
+        downloaded_file = next((f for f in os.listdir(temp_dir) if f.startswith(unique_prefix)), None)
+        if not downloaded_file:
+            raise HTTPException(status_code=404, detail="Downloaded file not found")
+            
+        file_path = os.path.join(temp_dir, downloaded_file)
+        
+        # Configure Gemini
+        genai.configure(api_key=req.gemini_api_key)
+        
+        # Upload to Gemini using new File API
+        uploaded_file = genai.upload_file(path=file_path)
+        
+        model = genai.GenerativeModel('gemini-1.5-pro')
+        prompt = "Listen to this audio. Provide a detailed transcription, and then write a 'Core Idea & Key Takeaways' section summarizing the absolute most useful information. Format it beautifully with markdown headers and bullet points."
+        
+        response = model.generate_content([prompt, uploaded_file])
+        
+        # Cleanup
+        try:
+            genai.delete_file(uploaded_file.name)
+            os.unlink(file_path)
+        except Exception:
+            pass
+        
+        return {"status": "success", "insights": response.text}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/download-video")
 async def download_video(req: DownloadVideoRequest):
