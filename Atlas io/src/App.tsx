@@ -22,6 +22,7 @@ import HqProposal from "./pages/hq/HqProposal";
 import HqReport from "./pages/hq/HqReport";
 import HqSettings from "./pages/hq/HqSettings";
 import HqPartnerships from "./pages/hq/HqPartnerships";
+import HqMediaJobs from "./pages/hq/HqMediaJobs";
 import PublicProfile from "./pages/PublicProfile";
 import Landing from "./pages/Landing";
 import Privacy from "./pages/Privacy";
@@ -72,6 +73,7 @@ const App = () => (
               <Route path="leads/:id/proposal" element={<HqProposal />} />
               <Route path="report" element={<HqReport />} />
               <Route path="partnerships" element={<HqPartnerships />} />
+              <Route path="media-jobs" element={<HqMediaJobs />} />
               <Route path="settings" element={<HqSettings />} />
             </Route>
 

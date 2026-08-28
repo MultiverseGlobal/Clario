@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { 
   Crosshair, Radio, BarChart2, MessageSquare, 
-  Database, Zap, User as UserIcon, LogOut, Moon, Sun, ChevronRight, Map
+  Database, Zap, User as UserIcon, LogOut, Moon, Sun, ChevronRight, Map, Video
 } from "lucide-react";
 import { LogoMark } from "@/components/atlas/Logo";
 import { useAuth } from "@/hooks/useAuth";
@@ -140,6 +140,15 @@ export default function AppShell() {
             <Zap className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Ask Atlas</span>
           </button>
+          
+          <NavLink
+            to="/hq/media-jobs"
+            className={({ isActive }) => `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm ${isActive ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-surface-2 border border-border text-foreground'}`}
+            title="View Clario Media Jobs"
+          >
+            <Video className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Media Jobs</span>
+          </NavLink>
 
           <button
             onClick={cycleTheme}
