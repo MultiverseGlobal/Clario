@@ -5,9 +5,9 @@ import { EcosystemSwitcher } from '../ui/EcosystemSwitcher';
 interface AppShellProps {
   children: ReactNode;
   currentProject: HarvestProject | null;
-  currentPhase: 'home' | 'ingest' | 'harvest_studio' | 'export' | 'vault';
+  currentPhase: 'home' | 'ingest' | 'harvest_studio' | 'export' | 'vault' | 'workspace';
   activeResultTab?: 'evidence' | 'clean' | 'replacements' | 'provenance';
-  onNavigatePhase: (phase: 'home' | 'ingest' | 'harvest_studio' | 'export' | 'vault') => void;
+  onNavigatePhase: (phase: 'home' | 'ingest' | 'harvest_studio' | 'export' | 'vault' | 'workspace') => void;
   onOpenBrandKit: () => void;
   onOpenApiKeyModal: () => void;
   vaultCount: number;

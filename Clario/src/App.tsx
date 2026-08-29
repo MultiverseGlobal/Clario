@@ -9,7 +9,7 @@ import { checkServerHealth, uploadToWorker, pollJobStatus } from './lib/apiClien
 import { getApiKey, setApiKey } from './lib/gemini';
 import { AppShell } from './components/layout/AppShell';
 import { BrandKitPanel } from './components/ui/BrandKitPanel';
-import { syncProjectHarvested, syncProjectExported } from './lib/metaphorSync';
+import { syncProjectHarvested } from './lib/metaphorSync';
 
 type Phase = 'workspace';
 
@@ -63,30 +63,7 @@ export default function App() {
     load();
   }, [ffmpegRef]);
 
-  const handleSelectMode = (_selectedMode: HarvesterMode) => {
-    // Mode is now handled purely in WorkspaceEditor or preserved for backend
-  };
 
-  const _handleOpenSavedProject = (proj: ClarioProject) => {
-    if (proj.harvestProject) {
-      setCurrentProject(proj.harvestProject);
-      setMode(proj.harvestProject.mode);
-      setPhase('workspace');
-    } else {
-      const fallbackProject: HarvestProject = {
-        id: proj.id,
-        name: proj.name,
-        mode: (proj.mode as any) || 'video_harvester',
-        shots: [],
-        slides: [],
-        generated_prompts: [],
-        provenance: [],
-        created_at: proj.createdAt,
-        updated_at: proj.updatedAt,
-      };
-      setCurrentProject(fallbackProject);
-    }
-  };
 
   const handleHarvestFiles = async (files: File[], referenceUrl: string = '') => {
     if (files.length === 0) return;
@@ -136,15 +113,7 @@ export default function App() {
     }
   };
 
-  const _handleLoadDirectProject = async (project: HarvestProject) => {
-    await saveProject(project);
-    setCurrentProject(project);
-    if (project.shots && project.shots.length > 0) {
-      const sheetUrl = await generateContactSheet(project.shots);
-      setContactSheetUrl(sheetUrl);
-    }
-    await refreshProjectList();
-  };
+
 
   const handleUpdateProject = async (updated: HarvestProject) => {
     setCurrentProject(updated);
