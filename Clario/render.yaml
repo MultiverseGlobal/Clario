@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: clario-backend
+    env: docker
+    region: oregon
+    plan: free
+    rootDir: server
+    dockerfilePath: Dockerfile
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: 8000
