@@ -3,7 +3,7 @@ import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { toBlobURL } from '@ffmpeg/util';
 import type { HarvesterMode, HarvestProject } from './types/assets';
 import { WorkspaceEditor } from './components/layout/WorkspaceEditor';
-import { harvestVideoProject, harvestSlideProject, generateContactSheet } from './lib/extractor';
+import { harvestVideoProject, harvestSlideProject } from './lib/extractor';
 import { saveProject, listProjects, getVaultAssetsCount, type ClarioProject } from './lib/projectStore';
 import { checkServerHealth, uploadToWorker, pollJobStatus } from './lib/apiClient';
 import { getApiKey, setApiKey } from './lib/gemini';
@@ -11,11 +11,8 @@ import { AppShell } from './components/layout/AppShell';
 import { BrandKitPanel } from './components/ui/BrandKitPanel';
 import { syncProjectHarvested } from './lib/metaphorSync';
 
-type Phase = 'workspace';
-
 export default function App() {
-  const [phase, setPhase] = useState<Phase>('workspace');
-  const [mode, setMode] = useState<HarvesterMode>('video_harvester');
+  const [mode, _setMode] = useState<HarvesterMode>('video_harvester');
   const [currentProject, setCurrentProject] = useState<HarvestProject | null>(null);
   const [_contactSheetUrl, setContactSheetUrl] = useState<string>('');
   const [isHarvesting, setIsHarvesting] = useState<boolean>(false);
