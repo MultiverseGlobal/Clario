@@ -42,7 +42,7 @@ export default function App() {
 
   useEffect(() => {
     refreshProjectList();
-  }, [refreshProjectList, phase]);
+  }, [refreshProjectList]);
 
   // Load FFmpeg WASM in background
   useEffect(() => {
@@ -130,7 +130,7 @@ export default function App() {
   return (
     <AppShell
       currentProject={currentProject}
-      currentPhase={phase}
+      currentPhase="workspace"
       onNavigatePhase={p => {
         if (p === 'home' || p === 'vault') setCurrentProject(null);
       }}
