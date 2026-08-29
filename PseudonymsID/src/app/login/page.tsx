@@ -25,22 +25,27 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
-    const authAction = isSignUp 
-      ? createClient().auth.signUp({ email, password })
-      : createClient().auth.signInWithPassword({ email, password });
+    try {
+      const authAction = isSignUp 
+        ? createClient().auth.signUp({ email, password })
+        : createClient().auth.signInWithPassword({ email, password });
+        
+      const { data, error } = await authAction;
       
-    const { error } = await authAction;
-    
-    if (error) {
-      setError(error.message);
-      setIsLoading(false);
-    } else {
-      if (isSignUp) {
-        // If it's a new account, we might want to push them to /onboarding
-        router.push("/onboarding");
+      if (error) {
+        setError(error.message);
+        setIsLoading(false);
       } else {
-        router.push("/");
+        if (isSignUp) {
+          router.push("/onboarding");
+        } else {
+          router.push("/");
+        }
       }
+    } catch (err: any) {
+      console.error("Auth Exception:", err);
+      setError(err.message || "An unexpected error occurred during authentication.");
+      setIsLoading(false);
     }
   };
 

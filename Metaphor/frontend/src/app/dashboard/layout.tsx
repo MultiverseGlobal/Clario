@@ -98,6 +98,7 @@ export default function LinearLayout({
             <NavItem href="/dashboard" icon={<Database />} label="Context Dashboard" shortcut="⌘D" pathname={pathname} exact />
             <NavItem href="/dashboard/graph" icon={<Network />} label="Knowledge Graph" shortcut="⌘G" pathname={pathname} />
             <NavItem href="/dashboard/projects" icon={<Folder />} label="Projects" shortcut="⌘J" pathname={pathname} />
+            <NavItem href="/dashboard/editor" icon={<Terminal />} label="Draft Editor" shortcut="⌘E" pathname={pathname} />
             <NavItem href="/dashboard/inbox" icon={<Inbox />} label="Context Inbox" shortcut="⌘I" pathname={pathname} />
           </div>
 

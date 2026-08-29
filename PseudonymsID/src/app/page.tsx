@@ -13,8 +13,16 @@ export default function OverviewPage() {
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) {
+        window.location.href = "/login";
+        return;
+      }
+      const meta = user.user_metadata ?? {};
+      if (!meta.username) {
+        window.location.href = "/onboarding";
+        return;
+      }
       setUser(user);
-      const meta = user?.user_metadata ?? {};
       setApiKeysSet(!!(meta.gemini_api_key || meta.openai_api_key || meta.anthropic_api_key));
     });
   }, []);
