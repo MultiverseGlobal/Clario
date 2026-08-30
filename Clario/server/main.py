@@ -10,6 +10,24 @@ from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, HTTPExcept
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Depends
+from supabase import create_client, Client
+
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", os.getenv("SUPABASE_ANON_KEY", ""))
+supabase: Client | None = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
+
+security = HTTPBearer()
+
+async def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if not supabase:
+        return None
+    try:
+        user_response = supabase.auth.get_user(credentials.credentials)
+        return user_response.user.id
+    except Exception as e:
+        raise HTTPException(status_code=401, detail="Invalid authentication credentials")
 
 from models.schemas import (
     HarvestProject,
@@ -54,25 +72,44 @@ class CORSMediaStaticFiles(StaticFiles):
 
 app.mount("/media", CORSMediaStaticFiles(directory=MEDIA_ROOT), name="media")
 
-# In-memory job state (Ready for Redis upgrade)
-JOBS_DB: Dict[str, Dict[str, Any]] = {}
+# Projects in-memory (TODO: move to Supabase as well)
 PROJECTS_DB: Dict[str, HarvestProject] = {}
+
+def update_job(job_id: str, updates: dict):
+    if not supabase: return
+    try:
+        updates["id"] = job_id
+        supabase.table("clario_jobs").upsert(updates).execute()
+    except Exception as e:
+        print(f"Error updating job in Supabase: {e}")
+
+def get_job(job_id: str):
+    if not supabase: return None
+    try:
+        res = supabase.table("clario_jobs").select("*").eq("id", job_id).execute()
+        return res.data[0] if res.data else None
+    except Exception:
+        return None
 
 # ── Async Media Pipeline Worker ──────────────────────────────────────────────
 
 async def process_video_harvest_job(job_id: str, project_id: str, video_path: str, reference_url: str = ""):
     try:
-        JOBS_DB[job_id]["status"] = "processing"
-        JOBS_DB[job_id]["progress_pct"] = 10
-        JOBS_DB[job_id]["status_msg"] = "Detecting shot boundaries with FFmpeg…"
+        update_job(job_id, {
+            "status": "processing",
+            "progress_pct": 10,
+            "status_msg": "Detecting shot boundaries with FFmpeg…"
+        })
 
         project_dir = os.path.join(MEDIA_ROOT, project_id)
         os.makedirs(project_dir, exist_ok=True)
 
         # 1. Scene detection
         intervals = detect_scenes_ffmpeg(video_path, threshold=0.3)
-        JOBS_DB[job_id]["progress_pct"] = 30
-        JOBS_DB[job_id]["status_msg"] = f"Extracted {len(intervals)} shots. Slicing keyframes…"
+        update_job(job_id, {
+            "progress_pct": 30,
+            "status_msg": f"Extracted {len(intervals)} shots. Slicing keyframes…"
+        })
 
         shots: List[ShotRecord] = []
         frame_paths: List[str] = []
@@ -118,12 +155,13 @@ async def process_video_harvest_job(job_id: str, project_id: str, video_path: st
             )
             shots.append(shot_record)
 
-            progress = 30 + int(((idx + 1) / len(intervals)) * 50)
-            JOBS_DB[job_id]["progress_pct"] = progress
-            JOBS_DB[job_id]["status_msg"] = f"Analyzed shot {idx + 1}/{len(intervals)}…"
+            progress = 30 + int(70 * (idx + 1) / len(intervals))
+            update_job(job_id, {
+                "progress_pct": progress,
+                "status_msg": f"Analyzed shot {idx + 1}/{len(intervals)}…"
+            })
 
-        # 3. Composite Contact Sheet
-        JOBS_DB[job_id]["status_msg"] = "Generating composite contact sheet…"
+        update_job(job_id, {"status_msg": "Generating composite contact sheet…"})
         contact_sheet_filename = "contact_sheet.jpg"
         contact_sheet_path = os.path.join(project_dir, contact_sheet_filename)
         generate_contact_sheet_pillow(frame_paths, labels, contact_sheet_path)
@@ -157,17 +195,19 @@ async def process_video_harvest_job(job_id: str, project_id: str, video_path: st
         )
 
         PROJECTS_DB[project_id] = project
-
-        JOBS_DB[job_id]["status"] = "completed"
-        JOBS_DB[job_id]["progress_pct"] = 100
-        JOBS_DB[job_id]["status_msg"] = "Harvest completed successfully."
-        JOBS_DB[job_id]["result"] = project.model_dump()
+        update_job(job_id, {
+            "status": "completed",
+            "progress_pct": 100,
+            "status_msg": "Harvest completed successfully.",
+            "result": project.model_dump()
+        })
 
     except Exception as e:
-        print(f"Job {job_id} failed: {e}")
-        JOBS_DB[job_id]["status"] = "failed"
-        JOBS_DB[job_id]["error"] = str(e)
-        JOBS_DB[job_id]["status_msg"] = f"Failed: {str(e)}"
+        update_job(job_id, {
+            "status": "failed",
+            "status_msg": f"Failed: {str(e)}",
+            "result": {"error": str(e)}
+        })
 
 # ── API Endpoints ────────────────────────────────────────────────────────────
 
@@ -316,16 +356,13 @@ async def ingest_file(
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    JOBS_DB[job_id] = {
-        "job_id": job_id,
-        "project_id": project_id,
-        "type": "video_analysis" if mode == "video_harvester" else "slide_analysis",
-        "status": "pending",
+    # Make sure we grab the user_id if we want to secure it, but for ingest it might be unauth'd for now
+    update_job(job_id, {
+        "status": "queued",
         "progress_pct": 0,
         "status_msg": "Queued for processing",
-        "error": None,
-        "result": None,
-    }
+        "input_url": file.filename
+    })
 
     background_tasks.add_task(process_video_harvest_job, job_id, project_id, file_path)
 
@@ -333,9 +370,17 @@ async def ingest_file(
 
 @app.get("/api/v1/harvest/jobs/{job_id}")
 async def get_job_status(job_id: str):
-    if job_id not in JOBS_DB:
+    job = get_job(job_id)
+    if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    return JOBS_DB[job_id]
+    return job
+
+@app.get("/api/v1/jobs")
+async def get_user_jobs(user_id: str = Depends(get_current_user_id)):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    res = supabase.table("clario_jobs").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+    return res.data
 
 @app.get("/api/v1/projects/{project_id}/manifest")
 async def get_project_manifest(project_id: str):
