@@ -408,10 +408,6 @@ export default function ProjectsPage() {
 
   async function loadProjects() {
     setIsLoading(true);
-    if (typeof window !== "undefined") {
-      const local = localStorage.getItem("metaphor_projects");
-      if (local) { try { setProjects(JSON.parse(local)); } catch (e) {} }
-    }
     try {
       const res = await fetchFromMetaphor("/graph/nodes?type=project", undefined, "GET");
       if (res?.nodes && Array.isArray(res.nodes)) {
@@ -444,22 +440,14 @@ export default function ProjectsPage() {
       }, "POST");
       const projectId = res?.id || crypto.randomUUID();
       const newProject: Project = { id: projectId, title: name, project_status: "active", attachedAIs: newAIs };
-      setProjects(prev => {
-        const updated = [...prev, newProject];
-        if (typeof window !== "undefined") localStorage.setItem("metaphor_projects", JSON.stringify(updated));
-        return updated;
-      });
+      setProjects(prev => [...prev, newProject]);
       setNewName(""); setNewAIs([]); setShowCreate(false);
       setExpandedId(projectId);
     } catch (e) { 
       console.warn("Failed to create project on backend, generating local ID (Sovereign mode):", e);
       const projectId = crypto.randomUUID();
       const newProject: Project = { id: projectId, title: name, project_status: "active", attachedAIs: newAIs };
-      setProjects(prev => {
-        const updated = [...prev, newProject];
-        if (typeof window !== "undefined") localStorage.setItem("metaphor_projects", JSON.stringify(updated));
-        return updated;
-      });
+      setProjects(prev => [...prev, newProject]);
       setNewName(""); setNewAIs([]); setShowCreate(false);
       setExpandedId(projectId);
     }
@@ -467,20 +455,12 @@ export default function ProjectsPage() {
   };
 
   const handleDeleteProject = (projectId: string) => {
-    setProjects(prev => {
-      const updated = prev.filter(p => p.id !== projectId);
-      if (typeof window !== "undefined") localStorage.setItem("metaphor_projects", JSON.stringify(updated));
-      return updated;
-    });
+    setProjects(prev => prev.filter(p => p.id !== projectId));
     setExpandedId(null);
   };
 
   const handleUpdateProject = (projectId: string, updates: Partial<Project>) => {
-    setProjects(prev => {
-      const updated = prev.map(p => p.id === projectId ? { ...p, ...updates } : p);
-      if (typeof window !== "undefined") localStorage.setItem("metaphor_projects", JSON.stringify(updated));
-      return updated;
-    });
+    setProjects(prev => prev.map(p => p.id === projectId ? { ...p, ...updates } : p));
   };
 
   return (

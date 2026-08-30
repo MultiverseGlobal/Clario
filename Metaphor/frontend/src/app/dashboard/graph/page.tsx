@@ -37,8 +37,21 @@ const CustomNode = ({ data }: { data: any }) => {
   );
 };
 
+import { ContextNode } from "@/components/graph/ContextNode";
+import { DraftNode } from "@/components/graph/DraftNode";
+import { LeadNode } from "@/components/graph/LeadNode";
+import { GlowEdge } from "@/components/graph/GlowEdge";
+import { PushPanel } from "@/components/PushPanel";
+
 const nodeTypes = {
   custom: CustomNode,
+  context: ContextNode,
+  draft: DraftNode,
+  lead: LeadNode,
+};
+
+const edgeTypes = {
+  glow: GlowEdge,
 };
 
 import { fetchFromMetaphor } from "@/app/api";
@@ -51,6 +64,17 @@ export default function KnowledgeGraphPage() {
   const [rawNodes, setRawNodes] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("All");
+  const [selectedNodes, setSelectedNodes] = useState<FlowNode[]>([]);
+
+  const onSelectionChange = useCallback(({ nodes }: { nodes: FlowNode[] }) => {
+    setSelectedNodes(nodes);
+  }, []);
+
+  const handlePush = (model: string) => {
+    console.log(`Pushing context with model ${model}`, selectedNodes);
+    // Future integration with backend or AI SDK
+    setSelectedNodes([]);
+  };
 
   useEffect(() => {
     async function fetchGraph() {
@@ -78,14 +102,19 @@ export default function KnowledgeGraphPage() {
           const angle = ((i % nodesInRing) / nodesInRing) * 2 * Math.PI;
           const radius = ring * radiusStep + 80;
 
+          const rawType = (n.type || "project").toLowerCase();
+          let nodeType = "context";
+          if (rawType === "draft") nodeType = "draft";
+          if (rawType === "lead") nodeType = "lead";
+
           return {
             id: n.id,
-            type: 'custom',
+            type: nodeType,
             position: { 
               x: 450 + radius * Math.cos(angle), 
               y: 300 + radius * Math.sin(angle) 
             },
-            data: { label: n.name, type: (n.type || "project").toLowerCase(), summary: n.summary }
+            data: { label: n.name, type: rawType, summary: n.summary }
           };
         });
 
@@ -94,13 +123,9 @@ export default function KnowledgeGraphPage() {
           id: e.id,
           source: e.source,
           target: e.target,
-          type: 'smoothstep',
+          type: 'glow',
           animated: true,
           style: { stroke: 'var(--color-border-strong)', strokeWidth: 1.5 },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: 'var(--color-border-strong)',
-          },
         }));
 
         setNodes(flowNodes);
@@ -171,13 +196,20 @@ export default function KnowledgeGraphPage() {
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
+            onSelectionChange={onSelectionChange}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
             fitView
             className="bg-background"
           >
             <Background color="var(--color-border-strong)" gap={24} size={1} />
             <Controls className="!bg-surface-1 !border-border-subtle !shadow-sm" />
           </ReactFlow>
+          <PushPanel 
+            selectedNodes={selectedNodes}
+            onPush={handlePush}
+            onClose={() => setSelectedNodes([])}
+          />
         </div>
 
         {/* Right: Node Explorer Table */}
