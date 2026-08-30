@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import type { HarvestProject } from '../../types/assets';
 import { EcosystemSwitcher } from '../ui/EcosystemSwitcher';
+import { CommandPalette } from '@pseudonyms/ui';
 
 interface AppShellProps {
   children: ReactNode;
@@ -65,43 +66,25 @@ export function AppShell({
       >
         {/* Left: Logo & Project Name */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          {/* Wordmark */}
           <div
             onClick={() => onNavigatePhase('home')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              cursor: 'pointer',
-              textDecoration: 'none',
-            }}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
           >
-            <div
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 6,
-                background: 'var(--text-primary)',
-                color: '#FFFFFF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 800,
-                fontSize: 14,
-                fontFamily: 'var(--font-display)',
-              }}
-            >
-              C
-            </div>
-            <span
-              style={{
-                fontSize: 15,
-                fontWeight: 800,
-                letterSpacing: '-0.03em',
-                fontFamily: 'var(--font-display)',
-                color: 'var(--text-primary)',
-              }}
-            >
-              CLARIO
+            <div style={{
+              width: 6, height: 6, borderRadius: '50%',
+              backgroundColor: '#ec4899',
+              boxShadow: '0 0 8px rgba(236,72,153,0.7)',
+            }} />
+            <span style={{
+              fontSize: 13,
+              fontWeight: 400,
+              letterSpacing: '0.1em',
+              color: 'rgba(240,240,240,0.85)',
+              fontFamily: 'var(--font-sans)',
+              textTransform: 'lowercase',
+            }}>
+              clario
             </span>
           </div>
 
@@ -142,50 +125,40 @@ export function AppShell({
         </div>
 
         {/* Center: 4-Step Workflow Stepper */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            background: 'var(--surface-2)',
-            padding: '3px 6px',
-            borderRadius: 20,
-            fontSize: 11,
-            fontFamily: 'var(--font-mono)',
-          }}
-        >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {[
-            { step: 1, label: '1. Reference', phase: 'ingest' as const },
-            { step: 2, label: '2. Analyze Shots', phase: 'harvest_studio' as const },
-            { step: 3, label: '3. Resolve Assets', phase: 'harvest_studio' as const },
-            { step: 4, label: '4. Export Pack', phase: 'export' as const },
-          ].map(s => {
+            { step: 1, label: 'Reference',  phase: 'ingest' as const },
+            { step: 2, label: 'Analyze',    phase: 'harvest_studio' as const },
+            { step: 3, label: 'Resolve',    phase: 'harvest_studio' as const },
+            { step: 4, label: 'Export',     phase: 'export' as const },
+          ].map((s, idx) => {
             const isActive = currentStep === s.step;
             const isCompleted = currentStep > s.step;
             return (
-              <span
-                key={s.step}
-                onClick={() => {
-                  if (currentProject || s.phase === 'ingest') {
-                    onNavigatePhase(s.phase);
-                  }
-                }}
-                style={{
-                  padding: '3px 8px',
-                  borderRadius: 14,
-                  fontWeight: isActive ? 700 : 500,
-                  background: isActive ? 'var(--panel)' : 'transparent',
-                  color: isActive
-                    ? 'var(--text-primary)'
-                    : isCompleted
-                    ? 'var(--emerald)'
-                    : 'var(--text-muted)',
-                  cursor: currentProject ? 'pointer' : 'default',
-                  boxShadow: isActive ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
-                }}
-              >
-                {s.label}
-              </span>
+              <div key={s.step} style={{ display: 'flex', alignItems: 'center' }}>
+                {idx > 0 && (
+                  <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: 10, margin: '0 2px' }}>›</span>
+                )}
+                <span
+                  onClick={() => { if (currentProject || s.phase === 'ingest') onNavigatePhase(s.phase); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    padding: '4px 10px', borderRadius: 8,
+                    fontSize: 11,
+                    fontWeight: isActive ? 500 : 400,
+                    fontFamily: 'var(--font-sans)',
+                    background: isActive ? 'rgba(236,72,153,0.12)' : 'transparent',
+                    border: isActive ? '1px solid rgba(236,72,153,0.3)' : '1px solid transparent',
+                    color: isActive ? '#ec4899' : isCompleted ? 'rgba(240,240,240,0.5)' : 'rgba(255,255,255,0.3)',
+                    cursor: currentProject ? 'pointer' : 'default',
+                    transition: 'all 150ms ease',
+                    letterSpacing: '-0.01em',
+                  }}
+                >
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, opacity: 0.6 }}>0{s.step}</span>
+                  {s.label}
+                </span>
+              </div>
             );
           })}
         </div>
@@ -239,17 +212,20 @@ export function AppShell({
           <button
             onClick={() => onNavigatePhase('ingest')}
             style={{
-              padding: '5px 12px',
-              borderRadius: 6,
-              fontSize: 12,
-              fontWeight: 700,
-              border: 'none',
-              background: 'var(--text-primary)',
-              color: '#FFFFFF',
+              padding: '6px 14px', borderRadius: 8,
+              fontSize: 12, fontWeight: 500,
+              border: '1px solid rgba(236,72,153,0.4)',
+              background: 'rgba(236,72,153,0.1)',
+              color: '#ec4899',
               cursor: 'pointer',
+              fontFamily: 'var(--font-sans)',
+              letterSpacing: '-0.01em',
+              transition: 'background 150ms ease',
             }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(236,72,153,0.18)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(236,72,153,0.1)'; }}
           >
-            + New Harvest
+            + new harvest
           </button>
 
           <button
@@ -304,6 +280,21 @@ export function AppShell({
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         {children}
       </main>
+
+      {/* ── CommandPalette (⌘K) ─────────────────────────────────────────────── */}
+      <CommandPalette
+        currentApp="clario"
+        extraCommands={[{
+          id: 'clario-actions',
+          label: 'Clario',
+          accent: '#ec4899',
+          commands: [
+            { id: 'new-harvest', label: 'New Harvest',   accent: '#ec4899', action: () => onNavigatePhase('ingest') },
+            { id: 'vault',      label: 'Open Vault',    accent: '#ec4899', action: () => onNavigatePhase('vault') },
+            { id: 'projects',   label: 'All Projects',  accent: '#ec4899', action: () => onNavigatePhase('home') },
+          ],
+        }]}
+      />
     </div>
   );
 }
