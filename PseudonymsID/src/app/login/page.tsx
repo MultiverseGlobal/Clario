@@ -1,10 +1,28 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { ArrowRight, Mail, KeyRound, Loader2, AlertCircle } from "lucide-react";
-import { getEcosystemIcon } from "@/components/EcosystemIcons";
+
+/**
+ * PseudonymsID Login — The Cinematic Gateway
+ *
+ * New user (first visit):
+ *   Plays a one-time sequence where the ecosystem is revealed:
+ *   darkness → wordmark → five app dots → login form
+ *
+ * Returning user:
+ *   Wordmark is already present. Form fades in beneath.
+ */
+
+const APP_DOTS = [
+  { label: "atlas", color: "#10b981" },
+  { label: "metaphor", color: "hsl(260, 70%, 62%)" },
+  { label: "orion", color: "#00f0ff" },
+  { label: "clario", color: "#ec4899" },
+  { label: "id", color: "rgba(255,255,255,0.9)" },
+];
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -14,177 +32,298 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
+  // Cinematic sequence state
+  const [phase, setPhase] = useState<"black" | "wordmark" | "dots" | "tagline" | "form">("black");
+  const isFirstVisit = typeof window !== "undefined" && !localStorage.getItem("psy_visited");
+
   useEffect(() => {
-    // If already logged in, redirect to overview
     createClient().auth.getUser().then(({ data: { user } }) => {
       if (user) router.replace("/");
     });
   }, [router]);
+
+  useEffect(() => {
+    if (!isFirstVisit) {
+      setPhase("form");
+      return;
+    }
+
+    // Mark visited so sequence never replays
+    localStorage.setItem("psy_visited", "1");
+
+    const sequence = [
+      { delay: 400, fn: () => setPhase("wordmark") },
+      { delay: 1400, fn: () => setPhase("dots") },
+      { delay: 2600, fn: () => setPhase("tagline") },
+      { delay: 3800, fn: () => setPhase("form") },
+    ];
+
+    const timers = sequence.map(({ delay, fn }) => setTimeout(fn, delay));
+    return () => timers.forEach(clearTimeout);
+  }, []);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
     try {
-      const authAction = isSignUp 
-        ? createClient().auth.signUp({ email, password })
-        : createClient().auth.signInWithPassword({ email, password });
-        
-      const { data, error } = await authAction;
-      
+      const { data, error } = isSignUp
+        ? await createClient().auth.signUp({ email, password })
+        : await createClient().auth.signInWithPassword({ email, password });
+
       if (error) {
         setError(error.message);
         setIsLoading(false);
       } else {
-        if (isSignUp) {
-          router.push("/onboarding");
-        } else {
-          router.push("/");
-        }
+        router.push(isSignUp ? "/onboarding" : "/");
       }
     } catch (err: any) {
-      console.error("Auth Exception:", err);
-      setError(err.message || "An unexpected error occurred during authentication.");
+      setError(err.message || "An unexpected error occurred.");
       setIsLoading(false);
     }
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px", background: "var(--bg-canvas)" }}>
-      
-      {/* Container */}
-      <div 
-        className="animate-enter"
-        style={{
-          width: "100%", maxWidth: "420px",
-          background: "var(--bg-surface)",
-          border: "1px solid var(--border-subtle)",
-          borderRadius: "24px",
-          padding: "48px 40px",
-          boxShadow: "var(--shadow-float)",
-          position: "relative",
-          overflow: "hidden"
-        }}
-      >
-        {/* Decorative Top Bar */}
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "4px", background: "linear-gradient(90deg, var(--accent), var(--green), var(--amber))", opacity: 0.8 }} />
+    <div style={{
+      minHeight: "100vh",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "#07080c",
+      position: "relative",
+      overflow: "hidden",
+    }}>
 
-        {/* Header */}
-        <div style={{ textAlign: "center", marginBottom: "40px" }}>
-          <div 
-            style={{
-              width: "48px", height: "48px", margin: "0 auto 24px",
-              background: "var(--bg-canvas)", border: "1px solid var(--border-strong)",
-              borderRadius: "14px", display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: "var(--shadow-sm)", color: "var(--text-primary)"
-            }}
-          >
-            {getEcosystemIcon("Metaphor", 24, "var(--text-primary)")}
-          </div>
-          <h1 className="font-serif-title" style={{ fontSize: "32px", color: "var(--text-primary)", margin: "0 0 8px", lineHeight: 1.2 }}>
-            Pseudonym ID
-          </h1>
-          <p style={{ fontSize: "14px", color: "var(--text-secondary)", margin: 0, lineHeight: 1.5 }}>
-            {isSignUp ? "Create your sovereign company account." : "Sign in to your sovereign company account."}
-          </p>
+      {/* ── Wordmark ────────────────────────────────────────────────── */}
+      <div style={{
+        textAlign: "center",
+        marginBottom: phase === "form" ? "48px" : "0px",
+        transition: "margin 600ms cubic-bezier(0.16, 1, 0.3, 1)",
+      }}>
+        <h1 style={{
+          fontSize: "42px",
+          fontWeight: 300,
+          color: "rgba(240,240,240,0.95)",
+          letterSpacing: "0.14em",
+          fontFamily: "'Inter', sans-serif",
+          margin: 0,
+          opacity: phase === "black" ? 0 : 1,
+          transform: phase === "black" ? "translateY(8px)" : "translateY(0)",
+          transition: "opacity 900ms ease-out, transform 900ms ease-out",
+        }}>
+          pseudonyms
+        </h1>
+
+        {/* ── Five app dots ─────────────────────────────────────────── */}
+        <div style={{
+          display: "flex",
+          gap: "20px",
+          justifyContent: "center",
+          marginTop: "24px",
+          opacity: phase === "black" || phase === "wordmark" ? 0 : 1,
+          transition: "opacity 600ms ease-out",
+        }}>
+          {APP_DOTS.map((dot, i) => (
+            <div
+              key={dot.label}
+              title={dot.label}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "6px",
+                opacity: phase === "dots" || phase === "tagline" || phase === "form" ? 1 : 0,
+                transform: phase === "dots" || phase === "tagline" || phase === "form"
+                  ? "scale(1)"
+                  : "scale(0.6)",
+                transition: `opacity 400ms ease-out ${i * 80}ms, transform 400ms cubic-bezier(0.16,1,0.3,1) ${i * 80}ms`,
+              }}
+            >
+              <div style={{
+                width: "8px",
+                height: "8px",
+                borderRadius: "50%",
+                backgroundColor: dot.color,
+                boxShadow: `0 0 10px ${dot.color}80`,
+              }} />
+              <span style={{
+                fontSize: "9px",
+                color: "rgba(255,255,255,0.3)",
+                letterSpacing: "0.1em",
+                fontFamily: "'IBM Plex Mono', monospace",
+              }}>
+                {dot.label}
+              </span>
+            </div>
+          ))}
         </div>
 
+        {/* ── Tagline ───────────────────────────────────────────────── */}
+        <p style={{
+          marginTop: "28px",
+          fontSize: "13px",
+          color: "rgba(255,255,255,0.3)",
+          letterSpacing: "0.06em",
+          fontFamily: "'Inter', sans-serif",
+          fontWeight: 300,
+          opacity: phase === "tagline" || phase === "form" ? 1 : 0,
+          transition: "opacity 500ms ease-out",
+        }}>
+          your cognitive os. one session. five surfaces.
+        </p>
+      </div>
+
+      {/* ── Auth form ─────────────────────────────────────────────── */}
+      <div style={{
+        width: "100%",
+        maxWidth: "400px",
+        padding: "0 24px",
+        opacity: phase === "form" ? 1 : 0,
+        transform: phase === "form" ? "translateY(0)" : "translateY(16px)",
+        transition: "opacity 500ms ease-out, transform 500ms cubic-bezier(0.16,1,0.3,1)",
+        pointerEvents: phase === "form" ? "auto" : "none",
+      }}>
+        {/* Error */}
         {error && (
-          <div className="animate-enter" style={{ display: "flex", alignItems: "center", gap: "10px", padding: "12px 16px", background: "rgba(239, 68, 68, 0.08)", border: "1px solid rgba(239, 68, 68, 0.2)", borderRadius: "12px", marginBottom: "24px" }}>
-            <AlertCircle size={16} color="var(--red)" />
-            <span style={{ fontSize: "13px", color: "var(--red)", fontWeight: 500 }}>{error}</span>
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            padding: "12px 16px",
+            background: "rgba(236, 72, 153, 0.08)",
+            border: "1px solid rgba(236, 72, 153, 0.2)",
+            borderRadius: "10px",
+            marginBottom: "20px",
+          }}>
+            <AlertCircle size={15} color="#ec4899" />
+            <span style={{ fontSize: "13px", color: "#ec4899" }}>{error}</span>
           </div>
         )}
 
-
-        {/* Email Form */}
-        <form onSubmit={handleEmailAuth} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+        <form onSubmit={handleEmailAuth} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+          {/* Email */}
           <div style={{ position: "relative" }}>
-            <div style={{ position: "absolute", left: "16px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }}>
-              <Mail size={16} />
-            </div>
+            <Mail size={15} style={{ position: "absolute", left: "16px", top: "50%", transform: "translateY(-50%)", color: "rgba(255,255,255,0.25)", pointerEvents: "none" }} />
             <input
               type="email"
               required
-              placeholder="Email address"
+              placeholder="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               style={{
-                width: "100%", padding: "14px 16px 14px 44px",
-                background: "var(--bg-canvas)", border: "1px solid var(--border-strong)",
-                borderRadius: "14px", fontSize: "14px", color: "var(--text-primary)",
-                fontFamily: "var(--font-sans)", outline: "none",
-                transition: "all 0.2s var(--ease-out)", boxShadow: "var(--shadow-sm)"
+                width: "100%",
+                padding: "14px 16px 14px 44px",
+                background: "#10131b",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: "12px",
+                fontSize: "14px",
+                color: "rgba(240,240,240,0.9)",
+                fontFamily: "'Inter', sans-serif",
+                fontWeight: 300,
+                outline: "none",
+                letterSpacing: "0.01em",
+                boxSizing: "border-box",
+                transition: "border-color 200ms ease",
               }}
-              onFocus={(e) => e.target.style.borderColor = "var(--accent)"}
-              onBlur={(e) => e.target.style.borderColor = "var(--border-strong)"}
+              onFocus={(e) => (e.target.style.borderColor = "rgba(255,255,255,0.22)")}
+              onBlur={(e) => (e.target.style.borderColor = "rgba(255,255,255,0.08)")}
             />
           </div>
 
+          {/* Password */}
           <div style={{ position: "relative" }}>
-            <div style={{ position: "absolute", left: "16px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }}>
-              <KeyRound size={16} />
-            </div>
+            <KeyRound size={15} style={{ position: "absolute", left: "16px", top: "50%", transform: "translateY(-50%)", color: "rgba(255,255,255,0.25)", pointerEvents: "none" }} />
             <input
               type="password"
               required
-              placeholder="Password"
+              placeholder="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               style={{
-                width: "100%", padding: "14px 16px 14px 44px",
-                background: "var(--bg-canvas)", border: "1px solid var(--border-strong)",
-                borderRadius: "14px", fontSize: "14px", color: "var(--text-primary)",
-                fontFamily: "var(--font-sans)", outline: "none",
-                transition: "all 0.2s var(--ease-out)", boxShadow: "var(--shadow-sm)"
+                width: "100%",
+                padding: "14px 16px 14px 44px",
+                background: "#10131b",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: "12px",
+                fontSize: "14px",
+                color: "rgba(240,240,240,0.9)",
+                fontFamily: "'Inter', sans-serif",
+                fontWeight: 300,
+                outline: "none",
+                letterSpacing: "0.02em",
+                boxSizing: "border-box",
+                transition: "border-color 200ms ease",
               }}
-              onFocus={(e) => e.target.style.borderColor = "var(--accent)"}
-              onBlur={(e) => e.target.style.borderColor = "var(--border-strong)"}
+              onFocus={(e) => (e.target.style.borderColor = "rgba(255,255,255,0.22)")}
+              onBlur={(e) => (e.target.style.borderColor = "rgba(255,255,255,0.08)")}
             />
           </div>
 
+          {/* Submit */}
           <button
             type="submit"
             disabled={isLoading}
             style={{
-              width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-              padding: "16px", background: "var(--text-primary)", border: "none",
-              borderRadius: "14px", fontSize: "15px", fontWeight: 500, color: "var(--bg-canvas)",
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              padding: "15px",
+              background: "rgba(240,240,240,0.95)",
+              border: "none",
+              borderRadius: "12px",
+              fontSize: "14px",
+              fontWeight: 500,
+              color: "#07080c",
               cursor: isLoading ? "not-allowed" : "pointer",
-              transition: "all 0.2s var(--ease-out)", boxShadow: "var(--shadow-md)",
-              fontFamily: "var(--font-sans)", marginTop: "8px", opacity: isLoading ? 0.7 : 1
+              fontFamily: "'Inter', sans-serif",
+              letterSpacing: "0.02em",
+              marginTop: "6px",
+              opacity: isLoading ? 0.6 : 1,
+              transition: "opacity 200ms ease, transform 200ms ease",
             }}
-            onMouseEnter={(e) => {
-              if (!isLoading) {
-                e.currentTarget.style.transform = "translateY(-2px)";
-                e.currentTarget.style.boxShadow = "var(--shadow-lg)";
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isLoading) {
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "var(--shadow-md)";
-              }
-            }}
+            onMouseEnter={(e) => { if (!isLoading) e.currentTarget.style.transform = "translateY(-1px)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; }}
           >
-            {isLoading ? <Loader2 size={18} className="animate-spin" /> : (isSignUp ? "Create Account" : "Sign In to Pseudonym")}
-            {!isLoading && <ArrowRight size={16} />}
+            {isLoading ? (
+              <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
+            ) : (
+              <>
+                {isSignUp ? "create account" : "enter"}
+                <ArrowRight size={15} />
+              </>
+            )}
           </button>
         </form>
 
-        <p style={{ textAlign: "center", fontSize: "14px", color: "var(--text-secondary)", marginTop: "24px", fontFamily: "var(--font-sans)" }}>
-          {isSignUp ? "Already have an account? " : "Don't have an account? "}
-          <button 
+        <p style={{
+          textAlign: "center",
+          fontSize: "13px",
+          color: "rgba(255,255,255,0.22)",
+          marginTop: "20px",
+          fontFamily: "'Inter', sans-serif",
+          fontWeight: 300,
+        }}>
+          {isSignUp ? "already a member? " : "new here? "}
+          <button
             type="button"
             onClick={() => setIsSignUp(!isSignUp)}
-            style={{ background: "none", border: "none", color: "var(--accent)", cursor: "pointer", fontWeight: 500, padding: 0 }}
+            style={{
+              background: "none", border: "none",
+              color: "rgba(255,255,255,0.5)",
+              cursor: "pointer",
+              fontWeight: 400,
+              padding: 0,
+              fontSize: "13px",
+              fontFamily: "'Inter', sans-serif",
+              textDecoration: "underline",
+              textDecorationColor: "rgba(255,255,255,0.2)",
+            }}
           >
-            {isSignUp ? "Sign In" : "Sign Up"}
+            {isSignUp ? "sign in" : "create account"}
           </button>
-        </p>
-
-        <p style={{ textAlign: "center", fontSize: "12px", color: "var(--text-muted)", marginTop: "32px", fontFamily: "var(--font-sans)" }}>
-          Secured by Supabase Core
         </p>
       </div>
     </div>
