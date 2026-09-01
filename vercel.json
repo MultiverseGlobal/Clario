@@ -1,0 +1,6 @@
+{
+  "buildCommand": "cd Clario && npm run build",
+  "outputDirectory": "Clario/dist",
+  "installCommand": "cd Clario && npm ci",
+  "framework": null
+}
