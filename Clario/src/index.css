@@ -1,164 +1,258 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,400&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Clario — PDS-v5
+ * Font: Vanguard (display) + Athelas (body)
+ * Personality: The editor's studio. Cinematic. Frame-accurate. Editorial impact.
+ * Mode: Light by default. Dark via .dark class on <html>.
+ * ─────────────────────────────────────────────────────────────────────────── */
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* ─── $1M Architectural Identity (Metaphor Light + Orion Typography) ────── */
+@layer base {
 
-:root {
-  /* Foundation — Metaphor Porcelain/Obsidian */
-  --bg-canvas: #F8F7F4;       /* Porcelain */
-  --bg-surface: #FFFFFF;      /* Pure White Surface */
-  --bg-surface-2: #F1F0EC;    /* Slightly recessed */
-  --bg-hover: #EBEBE6;
+  /* ── @font-face declarations ─────────────────────────────────────────────
+   * Vanguard — display. Requires licensed font in /public/fonts/
+   * Fallback: Impact, Oswald (system/web fallback)
+   * Athelas — body. Apple system serif, wide availability.
+   * Fallback: Georgia, Times New Roman
+   */
+  @font-face {
+    font-family: 'Vanguard';
+    src: local('Vanguard'), local('Vanguard-Bold');
+    font-weight: 700 900;
+    font-style: normal;
+    font-display: swap;
+  }
 
-  /* Text & Borders */
-  --text-primary: #111318;    /* Obsidian */
-  --text-secondary: #6B7280;  /* Slate */
-  --text-muted: #9CA3AF;
-  
-  --border-subtle: #EBEAE5;
-  --border-strong: #D1D1CB;
+  @font-face {
+    font-family: 'Athelas';
+    src: local('Athelas'), local('Athelas-Regular');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
 
-  /* Accents */
-  --accent: #4E6CF2;          /* Metaphor Context Blue */
-  --accent-dim: rgba(78, 108, 242, 0.08);
-  --accent-glow: rgba(78, 108, 242, 0.15);
+  @font-face {
+    font-family: 'Athelas';
+    src: local('Athelas Bold'), local('Athelas-Bold');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+  }
 
-  /* Status Colors */
-  --green: #10B981;
-  --amber: #C5A059;
-  --red: #EF4444;
+  /* ── Light Mode (:root default) ──────────────────────────────────────── */
+  :root {
+    --pds-canvas:    #F8F7F4;
+    --pds-surface-1: #FFFFFF;
+    --pds-surface-2: #F1F0EC;
+    --pds-surface-3: #EBEBE6;
+    --pds-surface-4: #E3E2DC;
 
-  /* Typography Scale - Orion Style */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-serif: 'Cormorant Garamond', serif;
-  --font-mono: 'JetBrains Mono', monospace;
+    --pds-border-subtle: rgba(17, 19, 24, 0.06);
+    --pds-border-mid:    rgba(17, 19, 24, 0.12);
+    --pds-border-strong: rgba(17, 19, 24, 0.20);
 
-  /* Architectural Shadows (Apple / Linear) */
-  --shadow-sm: 0 1px 2px rgba(17, 19, 24, 0.04);
-  --shadow-md: 0 4px 12px rgba(17, 19, 24, 0.05), 0 1px 3px rgba(17, 19, 24, 0.03);
-  --shadow-lg: 0 16px 32px rgba(17, 19, 24, 0.06), 0 4px 8px rgba(17, 19, 24, 0.03);
-  --shadow-float: 0 24px 48px rgba(17, 19, 24, 0.08), 0 8px 16px rgba(17, 19, 24, 0.04);
+    --pds-text-primary:   #111318;
+    --pds-text-secondary: #6B7280;
+    --pds-text-muted:     #9CA3AF;
+    --pds-text-disabled:  #D1D5DB;
 
-  /* Motion */
-  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.05);
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --fast: 150ms;
-  --base: 300ms;
+    --pds-accent:     #111318;
+    --pds-accent-inv: #F8F7F4;
+    --pds-accent-dim: rgba(17, 19, 24, 0.06);
+    --pds-accent-glow: rgba(17, 19, 24, 0.12);
+
+    --pds-shadow-sm:    0 1px 2px rgba(17, 19, 24, 0.04);
+    --pds-shadow-md:    0 4px 12px rgba(17, 19, 24, 0.06), 0 1px 3px rgba(17, 19, 24, 0.03);
+    --pds-shadow-lg:    0 16px 32px rgba(17, 19, 24, 0.08), 0 4px 8px rgba(17, 19, 24, 0.04);
+    --pds-shadow-float: 0 24px 48px rgba(17, 19, 24, 0.10), 0 8px 16px rgba(17, 19, 24, 0.05);
+    --pds-shadow-glow:  none;
+
+    --pds-ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.05);
+    --pds-ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+    --pds-t-fast:  150ms;
+    --pds-t-base:  300ms;
+    --pds-t-slow:  500ms;
+
+    --pds-success: #22c55e;
+    --pds-warning: #f59e0b;
+    --pds-danger:  #ef4444;
+    --pds-info:    #38bdf8;
+
+    /* Clario-specific: status colors for visual system */
+    --emerald: #10B981;
+    --amber:   #C5A059;
+    --red:     #EF4444;
+  }
+
+  /* ── Dark Mode (.dark on <html>) ──────────────────────────────────────── */
+  .dark {
+    --pds-canvas:    #07080c;
+    --pds-surface-1: rgba(14, 16, 24, 0.60);
+    --pds-surface-2: rgba(20, 23, 32, 0.75);
+    --pds-surface-3: rgba(27, 31, 44, 0.85);
+    --pds-surface-4: rgba(35, 40, 55, 0.95);
+
+    --pds-border-subtle: rgba(255, 255, 255, 0.055);
+    --pds-border-mid:    rgba(255, 255, 255, 0.10);
+    --pds-border-strong: rgba(255, 255, 255, 0.18);
+
+    --pds-text-primary:   #eef0f8;
+    --pds-text-secondary: rgba(238, 240, 248, 0.60);
+    --pds-text-muted:     rgba(238, 240, 248, 0.40);
+    --pds-text-disabled:  rgba(238, 240, 248, 0.20);
+
+    --pds-accent:     #ffffff;
+    --pds-accent-inv: #07080c;
+    --pds-accent-dim: rgba(255, 255, 255, 0.10);
+    --pds-accent-glow: rgba(255, 255, 255, 0.15);
+
+    --pds-shadow-sm:    0 1px 2px rgba(0, 0, 0, 0.40), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    --pds-shadow-md:    0 4px 12px rgba(0, 0, 0, 0.50), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    --pds-shadow-lg:    0 16px 32px rgba(0, 0, 0, 0.60), 0 0 0 1px rgba(255, 255, 255, 0.10);
+    --pds-shadow-float: 0 24px 48px rgba(0, 0, 0, 0.70), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    --pds-shadow-glow:  0 0 24px -4px rgba(255, 255, 255, 0.15);
+  }
+
+  /* ── Reset & Base ─────────────────────────────────────────────────────── */
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    background-color: var(--pds-canvas);
+  }
+
+  body {
+    background-color: var(--pds-canvas);
+    color: var(--pds-text-primary);
+    /* Clario body: Athelas — refined editorial serif */
+    font-family: 'Athelas', Georgia, 'Times New Roman', serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    line-height: 1.65;
+    margin: 0;
+  }
+
+  /* Clario display: Vanguard — cinematic editorial impact */
+  h1, h2, h3, h4, h5, h6, .font-display {
+    font-family: 'Vanguard', Impact, Oswald, sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.05;
+  }
+
+  /* UI elements, labels, nav: use clean sans */
+  .font-ui, input, button, select, textarea, label, nav, header {
+    font-family: 'Inter', -apple-system, system-ui, sans-serif;
+  }
+
+  ::selection {
+    background: var(--pds-accent-dim);
+    color: var(--pds-text-primary);
+  }
 }
 
-/* ─── Reset & Base ───────────────────────────────────────────────────────── */
-
-*, *::before, *::after { box-sizing: border-box; }
-
-html {
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-}
-
-body {
-  background-color: var(--bg-canvas);
-  color: var(--text-primary);
-  font-family: var(--font-sans);
-  min-height: 100vh;
-  overflow-x: hidden;
-  line-height: 1.6;
-  margin: 0;
-}
-
-::selection {
-  background: var(--accent-dim);
-  color: var(--accent);
-}
-
-/* ─── Custom Scrollbar ───────────────────────────────────────────────────── */
+/* ── Custom Scrollbar ────────────────────────────────────────────────────── */
 
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 9999px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+::-webkit-scrollbar-thumb { background: var(--pds-border-strong); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--pds-text-muted); }
 
-/* ─── Glass & Surfaces ───────────────────────────────────────────────────── */
+/* ── Glass & Surfaces ────────────────────────────────────────────────────── */
 
 .surface {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  box-shadow: var(--shadow-sm);
+  background: var(--pds-surface-1);
+  border: 1px solid var(--pds-border-subtle);
+  box-shadow: var(--pds-shadow-sm);
   border-radius: 12px;
 }
 
-.glass-panel {
-  background: rgba(255, 255, 255, 0.65);
+.pds-glass {
+  background: rgba(255, 255, 255, 0.70);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border: 1px solid var(--border-subtle);
-  box-shadow: var(--shadow-md);
+  border: 1px solid var(--pds-border-subtle);
+  box-shadow: var(--pds-shadow-md);
 }
 
+.dark .pds-glass {
+  background: var(--pds-surface-1);
+}
+
+.pds-glass-elevated {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  border: 1px solid var(--pds-border-mid);
+  box-shadow: var(--pds-shadow-lg);
+}
+
+.dark .pds-glass-elevated {
+  background: var(--pds-surface-3);
+}
+
+/* ── Interactive Cards ───────────────────────────────────────────────────── */
+
 .interactive-card {
-  transition: transform var(--base) var(--ease-out), box-shadow var(--base) var(--ease-out), border-color var(--base) var(--ease-out);
+  transition:
+    transform var(--pds-t-base) var(--pds-ease-out),
+    box-shadow var(--pds-t-base) var(--pds-ease-out),
+    border-color var(--pds-t-base) var(--pds-ease-out);
 }
 
 .interactive-card:hover {
   transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
-  border-color: var(--border-strong);
+  box-shadow: var(--pds-shadow-md);
+  border-color: var(--pds-border-mid);
 }
 
-/* ─── Status Dots & Pings ────────────────────────────────────────────────── */
+/* ── Status Dots ─────────────────────────────────────────────────────────── */
 
 .status-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
-  transition: background-color var(--base) var(--ease-out);
+  transition: background-color var(--pds-t-base) var(--pds-ease-out);
 }
 
 .status-dot.active {
-  background: var(--green);
+  background: var(--emerald);
   box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
   animation: pulse-green 2.5s infinite;
 }
 
-.status-dot.inactive {
-  background: var(--text-muted);
-}
+.status-dot.inactive { background: var(--pds-text-muted); }
 
 @keyframes pulse-green {
   0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
-  50% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  50%       { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
 }
 
-/* ─── Typography Utils (Orion Style) ─────────────────────────────────────── */
-
-.font-serif-title {
-  font-family: var(--font-serif);
-  font-weight: 400;
-  letter-spacing: -0.02em;
-}
+/* ── Typography Utils ────────────────────────────────────────────────────── */
 
 .label-mono {
-  font-family: var(--font-mono);
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
   font-size: 10px;
   font-weight: 500;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: var(--pds-text-muted);
 }
 
-/* ─── Animations (Clerk / Apple style) ───────────────────────────────────── */
+/* ── Animations ──────────────────────────────────────────────────────────── */
 
 @keyframes slideUpFade {
-  from { opacity: 0; transform: translateY(12px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; transform: translateY(12px) scale(0.98); filter: blur(4px); }
+  to   { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
 }
 
 .animate-enter {
-  animation: slideUpFade 0.5s var(--ease-spring) both;
+  animation: slideUpFade 0.5s var(--pds-ease-spring) both;
 }
 
 .delay-1 { animation-delay: 50ms; }
@@ -168,9 +262,9 @@ body {
 
 @keyframes blurIn {
   from { opacity: 0; filter: blur(8px); }
-  to { opacity: 1; filter: blur(0); }
+  to   { opacity: 1; filter: blur(0); }
 }
 
 .animate-blur-in {
-  animation: blurIn 0.6s var(--ease-out) both;
+  animation: blurIn 0.6s var(--pds-ease-out) both;
 }

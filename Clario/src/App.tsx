@@ -7,9 +7,11 @@ import { harvestVideoProject, harvestSlideProject } from './lib/extractor';
 import { saveProject, listProjects, getVaultAssetsCount, type ClarioProject } from './lib/projectStore';
 import { checkServerHealth, uploadToWorker, pollJobStatus } from './lib/apiClient';
 import { getApiKey, setApiKey } from './lib/gemini';
-import { AppShell } from './components/layout/AppShell';
+import { AppShell, type ClarioPhase } from './components/layout/AppShell';
 import { BrandKitPanel } from './components/ui/BrandKitPanel';
 import { syncProjectHarvested } from './lib/metaphorSync';
+import { ReferenceLibraryPanel } from './components/workbenches/ReferenceLibraryPanel';
+import { ScriptAnalysisWorkbench } from './components/workbenches/ScriptAnalysisWorkbench';
 
 export default function App() {
   const [mode, _setMode] = useState<HarvesterMode>('video_harvester');
@@ -18,6 +20,7 @@ export default function App() {
   const [isHarvesting, setIsHarvesting] = useState<boolean>(false);
   const [progress, setProgress] = useState<{ msg: string; pct: number }>({ msg: '', pct: 0 });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [currentPhase, setCurrentPhase] = useState<ClarioPhase>('workspace');
 
   // Shell modals
   const [brandKitOpen, setBrandKitOpen] = useState(false);
@@ -77,6 +80,13 @@ export default function App() {
         await saveProject(serverProject);
         setCurrentProject(serverProject);
         syncProjectHarvested(serverProject.name, mode, serverProject.shots?.length || 0);
+        if ((window as any).__crossAppBusPublish) {
+          (window as any).__crossAppBusPublish({
+            from: 'clario',
+            type: 'clario:job_complete',
+            payload: { projectId: serverProject.id }
+          });
+        }
       } else {
         if (mode === 'video_harvester') {
           const { project, contactSheetUrl: sheetUrl } = await harvestVideoProject(
@@ -88,6 +98,13 @@ export default function App() {
           await saveProject(project);
           setCurrentProject(project);
           setContactSheetUrl(sheetUrl);
+          if ((window as any).__crossAppBusPublish) {
+            (window as any).__crossAppBusPublish({
+              from: 'clario',
+              type: 'clario:job_complete',
+              payload: { projectId: project.id }
+            });
+          }
         } else {
           const { project } = await harvestSlideProject(
             files,
@@ -96,6 +113,13 @@ export default function App() {
           );
           await saveProject(project);
           setCurrentProject(project);
+          if ((window as any).__crossAppBusPublish) {
+            (window as any).__crossAppBusPublish({
+              from: 'clario',
+              type: 'clario:job_complete',
+              payload: { projectId: project.id }
+            });
+          }
         }
       }
       await refreshProjectList();
@@ -127,13 +151,16 @@ export default function App() {
     }, 1000);
   };
 
+  const handleNavigatePhase = (p: ClarioPhase) => {
+    setCurrentPhase(p);
+    if (p === 'home' || p === 'vault') setCurrentProject(null);
+  };
+
   return (
     <AppShell
       currentProject={currentProject}
-      currentPhase="workspace"
-      onNavigatePhase={p => {
-        if (p === 'home' || p === 'vault') setCurrentProject(null);
-      }}
+      currentPhase={currentPhase}
+      onNavigatePhase={handleNavigatePhase}
       onOpenBrandKit={() => setBrandKitOpen(true)}
       onOpenApiKeyModal={() => setShowApiKeyModal(true)}
       vaultCount={vaultCount}
@@ -370,12 +397,31 @@ export default function App() {
       )}
 
       {/* ── UNIFIED WORKSPACE ─────────────────────────────────────────────── */}
-      <WorkspaceEditor
-        project={currentProject}
-        onUpdateProject={handleUpdateProject}
-        onHarvestFiles={handleHarvestFiles}
-        onExportPack={() => console.log('Export triggered')}
-      />
+      {currentPhase === 'reference_library' ? (
+        <>
+          {/* Script Analysis Workbench is shown when a project is active */}
+          {currentProject ? (
+            <ScriptAnalysisWorkbench
+              userId={currentProject.id || 'local'}
+              serverBase="/api/v1"
+              geminiApiKey={getApiKey() || undefined}
+            />
+          ) : (
+            <ReferenceLibraryPanel
+              userId="local"
+              serverBase="/api/v1"
+              geminiApiKey={getApiKey() || undefined}
+            />
+          )}
+        </>
+      ) : (
+        <WorkspaceEditor
+          project={currentProject}
+          onUpdateProject={handleUpdateProject}
+          onHarvestFiles={handleHarvestFiles}
+          onExportPack={() => console.log('Export triggered')}
+        />
+      )}
     </AppShell>
   );
 }

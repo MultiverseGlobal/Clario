@@ -1,59 +1,69 @@
 @import "tailwindcss";
 
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,400&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Metaphor — PDS-v5
+ * Font: Times New Roman MT (display) + Inter (body)
+ * Personality: The writer's canvas. Canonical literary serif. Wide margins. Distraction-free.
+ * Mode: Light by default. Dark via .dark class on <html>.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @theme {
-  --color-background: #07080d;
-  --color-foreground: #f0f2f8;
-  
-  --color-surface-1: rgba(14, 16, 24, 0.95);
-  --color-surface-2: rgba(22, 25, 38, 0.9);
-  --color-surface-3: rgba(32, 36, 54, 0.85);
+  /* ── Light Mode Tokens ────────────────────────────────────────────────── */
+  --color-background: #F8F7F4;
+  --color-foreground: #111318;
 
-  --color-border-subtle: rgba(255,255,255,0.065);
-  --color-border-strong: rgba(255,255,255,0.14);
+  --color-surface-1: #FFFFFF;
+  --color-surface-2: #F1F0EC;
+  --color-surface-3: #EBEBE6;
 
-  --color-brand-50: #f5f3ff;
-  --color-brand-100: #ede9fe;
-  --color-brand-200: #ddd6fe;
-  --color-brand-300: #c4b5fd;
-  --color-brand-400: #a78bfa;
-  --color-brand-500: #8b5cf6;
-  --color-brand-600: #7c3aed;
-  --color-brand-700: #6d28d9;
-  --color-brand-800: #5b21b6;
-  --color-brand-900: #4c1d95;
+  --color-border-subtle: rgba(17, 19, 24, 0.06);
+  --color-border-mid:    rgba(17, 19, 24, 0.12);
+  --color-border-strong: rgba(17, 19, 24, 0.20);
 
-  --color-neon-cyan: #22d3ee;
-  --color-neon-emerald: #34d399;
-  --color-neon-violet: #a78bfa;
-  --color-neon-amber: #fbbf24;
-  --color-neon-pink: #f472b6;
+  --color-muted: #9CA3AF;
 
-  --color-muted: rgba(148, 163, 184, 1);
+  /* PDS unified ink accent (light canvas) */
+  --color-accent:     #111318;
+  --color-accent-dim: rgba(17, 19, 24, 0.06);
 
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
-  --font-display: 'Inter', sans-serif;
+  /* Status */
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-danger:  #ef4444;
+  --color-info:    #38bdf8;
 
+  /* ── Typography ────────────────────────────────────────────────────────── */
+  /* Metaphor display: Times New Roman MT — canonical literary serif */
+  --font-display: 'Times New Roman MT', 'Times New Roman', Times, serif;
+  /* Metaphor body/UI: Inter — modern clean UI shell */
+  --font-sans:    'Inter', -apple-system, system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', 'Courier New', monospace;
+
+  /* ── Tracking ─────────────────────────────────────────────────────────── */
   --tracking-tightest: -0.04em;
-  --tracking-tighter: -0.03em;
-  --tracking-tight: -0.02em;
+  --tracking-tighter:  -0.03em;
+  --tracking-tight:    -0.025em;
+  --tracking-ui:       -0.015em;
 
+  /* ── Sizing ───────────────────────────────────────────────────────────── */
   --text-2xs: 0.625rem;
   --text-2xs--line-height: 0.875rem;
 
-  --shadow-glow: 0 0 40px -10px rgba(139, 92, 246, 0.4);
-  --shadow-glow-sm: 0 0 20px -6px rgba(139, 92, 246, 0.3);
-  --shadow-glow-cyan: 0 0 40px -10px rgba(34, 211, 238, 0.3);
-  --shadow-glow-em: 0 0 30px -8px rgba(52, 211, 153, 0.3);
-  --shadow-card: 0 1px 3px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.06);
-  --shadow-card-hover: 0 8px 32px -8px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.1);
+  /* ── Shadows (light mode — ink-tone, no purple glow) ─────────────────── */
+  --shadow-sm:    0 1px 2px rgba(17, 19, 24, 0.04);
+  --shadow-card:  0 1px 2px rgba(17, 19, 24, 0.04), 0 0 0 1px rgba(17, 19, 24, 0.06);
+  --shadow-card-hover: 0 4px 12px rgba(17, 19, 24, 0.08), 0 0 0 1px rgba(17, 19, 24, 0.10);
+  --shadow-md:    0 4px 12px rgba(17, 19, 24, 0.06), 0 1px 3px rgba(17, 19, 24, 0.03);
+  --shadow-lg:    0 16px 32px rgba(17, 19, 24, 0.08), 0 4px 8px rgba(17, 19, 24, 0.04);
+  --shadow-float: 0 24px 48px rgba(17, 19, 24, 0.10), 0 8px 16px rgba(17, 19, 24, 0.05);
+  --shadow-glow:  none; /* No glow in light mode */
 
-  --animate-fade-in: fadeIn 0.25s ease-out;
-  --animate-slide-up: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  /* ── Animations ───────────────────────────────────────────────────────── */
+  --animate-fade-in:    fadeIn 0.25s ease-out;
+  --animate-slide-up:   slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  --animate-shimmer: shimmer 2s linear infinite;
+  --animate-shimmer:    shimmer 2s linear infinite;
 
   @keyframes fadeIn {
     from { opacity: 0; }
@@ -67,54 +77,65 @@
     from { background-position: -200% 0; }
     to { background-position: 200% 0; }
   }
+  @keyframes slideUpFade {
+    from { opacity: 0; transform: translateY(12px) scale(0.98); filter: blur(4px); }
+    to   { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+  }
 }
 
-/* ─── $1M Architectural Identity (Metaphor Light + Orion Typography) ────── */
+/* ── Dark Mode Overrides (.dark class on <html>) ─────────────────────────── */
+
+.dark {
+  --color-background: #07080c;
+  --color-foreground: #eef0f8;
+
+  --color-surface-1: rgba(14, 16, 24, 0.60);
+  --color-surface-2: rgba(20, 23, 32, 0.75);
+  --color-surface-3: rgba(27, 31, 44, 0.85);
+
+  --color-border-subtle: rgba(255, 255, 255, 0.055);
+  --color-border-mid:    rgba(255, 255, 255, 0.10);
+  --color-border-strong: rgba(255, 255, 255, 0.18);
+
+  --color-muted: rgba(238, 240, 248, 0.40);
+
+  --color-accent:     #ffffff;
+  --color-accent-dim: rgba(255, 255, 255, 0.10);
+
+  --shadow-card:       0 1px 3px rgba(0,0,0,0.40), 0 0 0 1px rgba(255,255,255,0.06);
+  --shadow-card-hover: 0 8px 32px -8px rgba(0,0,0,0.60), 0 0 0 1px rgba(255,255,255,0.10);
+  --shadow-glow:       0 0 24px -4px rgba(255,255,255,0.15);
+}
+
+/* ── PDS Token aliases (for compatibility with shared components) ──────────── */
 
 :root {
-  /* Foundation — Metaphor Porcelain/Obsidian */
-  --bg-canvas: #F8F7F4;       /* Porcelain */
-  --bg-surface: #FFFFFF;      /* Pure White Surface */
-  --bg-surface-2: #F1F0EC;    /* Slightly recessed */
-  --bg-hover: #EBEBE6;
-
-  /* Text & Borders */
-  --text-primary: #111318;    /* Obsidian */
-  --text-secondary: #6B7280;  /* Slate */
-  --text-muted: #9CA3AF;
-  
-  --border-subtle: #EBEAE5;
-  --border-strong: #D1D1CB;
-
-  /* Accents */
-  --accent: #4E6CF2;          /* Metaphor Context Blue */
-  --accent-dim: rgba(78, 108, 242, 0.08);
-  --accent-glow: rgba(78, 108, 242, 0.15);
-
-  /* Status Colors */
-  --green: #10B981;
-  --amber: #C5A059;
-  --red: #EF4444;
-
-  /* Typography Scale - Orion Style */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-serif: 'Cormorant Garamond', serif;
-  --font-mono: 'JetBrains Mono', monospace;
-
-  /* Architectural Shadows (Apple / Linear) */
-  --shadow-sm: 0 1px 2px rgba(17, 19, 24, 0.04);
-  --shadow-md: 0 4px 12px rgba(17, 19, 24, 0.05), 0 1px 3px rgba(17, 19, 24, 0.03);
-  --shadow-lg: 0 16px 32px rgba(17, 19, 24, 0.06), 0 4px 8px rgba(17, 19, 24, 0.03);
-  --shadow-float: 0 24px 48px rgba(17, 19, 24, 0.08), 0 8px 16px rgba(17, 19, 24, 0.04);
-
-  /* Motion */
-  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.05);
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --fast: 150ms;
-  --base: 300ms;
+  --pds-canvas:    var(--color-background);
+  --pds-surface-1: var(--color-surface-1);
+  --pds-surface-2: var(--color-surface-2);
+  --pds-surface-3: var(--color-surface-3);
+  --pds-border-subtle: var(--color-border-subtle);
+  --pds-border-mid:    var(--color-border-mid, rgba(17, 19, 24, 0.12));
+  --pds-border-strong: var(--color-border-strong);
+  --pds-text-primary:   var(--color-foreground);
+  --pds-text-secondary: #6B7280;
+  --pds-text-muted:     var(--color-muted);
+  --pds-accent:     var(--color-accent);
+  --pds-accent-dim: var(--color-accent-dim);
+  --pds-shadow-sm:    var(--shadow-sm);
+  --pds-shadow-md:    var(--shadow-md);
+  --pds-shadow-lg:    var(--shadow-lg);
+  --pds-ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.05);
+  --pds-ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --pds-t-fast:  150ms;
+  --pds-t-base:  300ms;
+  --pds-t-slow:  500ms;
+  --pds-success: #22c55e;
+  --pds-warning: #f59e0b;
+  --pds-danger:  #ef4444;
 }
 
-/* ─── Reset & Base ───────────────────────────────────────────────────────── */
+/* ── Reset & Base ────────────────────────────────────────────────────────────── */
 
 *, *::before, *::after { box-sizing: border-box; }
 
@@ -122,120 +143,130 @@ html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  background-color: var(--color-background);
 }
 
 body {
-  background-color: var(--bg-canvas);
-  color: var(--text-primary);
-  font-family: var(--font-sans);
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  /* Metaphor body: Inter — clean UI shell, lets the writing breathe */
+  font-family: 'Inter', -apple-system, system-ui, sans-serif;
   min-height: 100vh;
   overflow-x: hidden;
   line-height: 1.6;
   margin: 0;
+  letter-spacing: -0.015em;
+}
+
+/* Metaphor display: Times New Roman MT — the canonical writer's typeface */
+h1, h2, h3, h4, h5, h6, .font-display {
+  font-family: 'Times New Roman MT', 'Times New Roman', Times, serif;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+}
+
+/* Editorial body text (document body, reader view) */
+.prose, .document-body, .editor-content {
+  font-family: 'Times New Roman MT', 'Times New Roman', Times, serif;
+  font-size: 16px;
+  line-height: 1.8;
+  letter-spacing: 0.005em;
+  color: var(--color-foreground);
 }
 
 ::selection {
-  background: var(--accent-dim);
-  color: var(--accent);
+  background: var(--color-accent-dim);
+  color: var(--color-foreground);
 }
 
-/* ─── Custom Scrollbar ───────────────────────────────────────────────────── */
+/* ── Custom Scrollbar ────────────────────────────────────────────────────────── */
 
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 9999px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+::-webkit-scrollbar-thumb { background: var(--color-border-strong); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-muted); }
 
-/* ─── Glass & Surfaces ───────────────────────────────────────────────────── */
+/* ── Glass Surfaces ──────────────────────────────────────────────────────────── */
 
-.surface {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  box-shadow: var(--shadow-sm);
-  border-radius: 12px;
-}
-
-.glass-panel {
-  background: rgba(255, 255, 255, 0.65);
+.pds-glass {
+  background: rgba(255, 255, 255, 0.70);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border: 1px solid var(--border-subtle);
-  box-shadow: var(--shadow-md);
+  border: 1px solid var(--color-border-subtle);
+  box-shadow: var(--shadow-card);
 }
 
+.dark .pds-glass {
+  background: var(--color-surface-1);
+}
+
+.pds-glass-elevated {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  border: 1px solid var(--color-border-mid, rgba(17, 19, 24, 0.12));
+  box-shadow: var(--shadow-lg);
+}
+
+.dark .pds-glass-elevated {
+  background: var(--color-surface-3);
+}
+
+/* ── Interactive Cards ───────────────────────────────────────────────────────── */
+
 .interactive-card {
-  transition: transform var(--base) var(--ease-out), box-shadow var(--base) var(--ease-out), border-color var(--base) var(--ease-out);
+  transition:
+    transform 300ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 300ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 300ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .interactive-card:hover {
   transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
-  border-color: var(--border-strong);
+  box-shadow: var(--shadow-card-hover);
 }
 
-/* ─── Status Dots & Pings ────────────────────────────────────────────────── */
+/* ── Status Dots ─────────────────────────────────────────────────────────────── */
 
 .status-dot {
-  width: 6px;
-  height: 6px;
+  width: 6px; height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
-  transition: background-color var(--base) var(--ease-out);
 }
 
 .status-dot.active {
-  background: var(--green);
-  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+  background: var(--color-success);
   animation: pulse-green 2.5s infinite;
 }
 
-.status-dot.inactive {
-  background: var(--text-muted);
-}
-
 @keyframes pulse-green {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
-  50% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+  50%       { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
 }
 
-/* ─── Typography Utils (Orion Style) ─────────────────────────────────────── */
-
-.font-serif-title {
-  font-family: var(--font-serif);
-  font-weight: 400;
-  letter-spacing: -0.02em;
-}
+/* ── Typography Utils ────────────────────────────────────────────────────────── */
 
 .label-mono {
-  font-family: var(--font-mono);
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
   font-size: 10px;
   font-weight: 500;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: var(--color-muted);
 }
 
-/* ─── Animations (Clerk / Apple style) ───────────────────────────────────── */
-
-@keyframes slideUpFade {
-  from { opacity: 0; transform: translateY(12px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
+/* ── Animations ──────────────────────────────────────────────────────────────── */
 
 .animate-enter {
-  animation: slideUpFade 0.5s var(--ease-spring) both;
+  animation: slideUpFade 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.05) both;
+}
+
+.pds-animate-enter {
+  animation: slideUpFade 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.05) both;
 }
 
 .delay-1 { animation-delay: 50ms; }
 .delay-2 { animation-delay: 100ms; }
 .delay-3 { animation-delay: 150ms; }
 .delay-4 { animation-delay: 200ms; }
-
-@keyframes blurIn {
-  from { opacity: 0; filter: blur(8px); }
-  to { opacity: 1; filter: blur(0); }
-}
-
-.animate-blur-in {
-  animation: blurIn 0.6s var(--ease-out) both;
-}

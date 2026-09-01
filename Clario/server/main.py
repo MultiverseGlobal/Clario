@@ -436,6 +436,327 @@ async def export_project_zip(project_id: str):
 
     return FileResponse(zip_path, filename=f"{project.name.replace(' ', '_')}_pack.zip")
 
+
+# ── Reference Library Endpoints ──────────────────────────────────────────────
+
+class ReferenceIngestUrlRequest(BaseModel):
+    url: str
+    user_id: str | None = None
+    gemini_api_key: str | None = None
+
+class ScriptMatchRequest(BaseModel):
+    script_text: str
+    user_id: str
+    top_k: int = 8
+    gemini_api_key: str | None = None
+
+
+def _get_gemini_embedding(text: str, api_key: str | None = None) -> list[float] | None:
+    """Get a 768-dim embedding from Gemini text-embedding-004."""
+    try:
+        import google.generativeai as genai
+        key = api_key or os.getenv("GEMINI_API_KEY", "")
+        if not key:
+            return None
+        genai.configure(api_key=key)
+        result = genai.embed_content(
+            model="models/text-embedding-004",
+            content=text,
+            task_type="RETRIEVAL_DOCUMENT",
+        )
+        return result["embedding"]
+    except Exception as e:
+        print(f"Embedding error: {e}")
+        return None
+
+
+async def _process_reference_ingest(
+    job_id: str,
+    video_path: str,
+    source_url: str,
+    source_type: str,
+    user_id: str,
+    gemini_api_key: str | None,
+):
+    """Background worker: scene detect → keyframes → vision → embed → upsert to Supabase."""
+    project_id = f"ref_{uuid.uuid4().hex[:10]}"
+    project_dir = os.path.join(MEDIA_ROOT, project_id)
+    os.makedirs(project_dir, exist_ok=True)
+
+    try:
+        update_job(job_id, {"status": "processing", "progress_pct": 10, "status_msg": "Detecting scenes…"})
+
+        intervals = detect_scenes_ffmpeg(video_path, threshold=0.3)
+        update_job(job_id, {"progress_pct": 25, "status_msg": f"{len(intervals)} shots found. Extracting keyframes…"})
+
+        rows = []
+        for idx, (start_sec, end_sec) in enumerate(intervals):
+            shot_id = f"shot_{str(idx + 1).zfill(3)}"
+            frame_filename = f"{shot_id}.jpg"
+            frame_path = os.path.join(project_dir, frame_filename)
+            mid_sec = round((start_sec + end_sec) / 2.0, 2)
+
+            extract_frame_at_timestamp(video_path, mid_sec, frame_path)
+            intel = analyze_shot_frame(frame_path, shot_id, start_sec, end_sec)
+
+            # Build rich text for embedding: description + content type
+            embed_text = f"{intel['visual_description']} {intel.get('editor_text', '')} {intel.get('content_type', '')}"
+            embedding = _get_gemini_embedding(embed_text, gemini_api_key)
+
+            frame_url = f"/media/{project_id}/{frame_filename}"
+            row = {
+                "user_id": user_id,
+                "source_url": source_url,
+                "source_type": source_type,
+                "title": os.path.basename(video_path),
+                "shot_id": shot_id,
+                "start_sec": start_sec,
+                "end_sec": end_sec,
+                "duration": round(end_sec - start_sec, 2),
+                "frame_url": frame_url,
+                "description": intel["visual_description"],
+                "content_type": intel.get("content_type", ""),
+                "embedding": embedding,
+            }
+            rows.append(row)
+
+            progress = 25 + int(65 * (idx + 1) / len(intervals))
+            update_job(job_id, {"progress_pct": progress, "status_msg": f"Processed shot {idx + 1}/{len(intervals)}"})
+
+        # Upsert to Supabase (filter out rows without embeddings if key missing)
+        if supabase and rows:
+            # pgvector expects embedding as a list; Supabase Python client handles serialization
+            supabase.table("reference_library").insert(rows).execute()
+
+        update_job(job_id, {
+            "status": "completed",
+            "progress_pct": 100,
+            "status_msg": f"Ingested {len(rows)} shots into Reference Library.",
+            "result": {"shot_count": len(rows), "project_id": project_id},
+        })
+
+    except Exception as e:
+        update_job(job_id, {"status": "failed", "status_msg": f"Failed: {str(e)}", "result": {"error": str(e)}})
+    finally:
+        # Clean up downloaded video
+        try:
+            os.unlink(video_path)
+        except Exception:
+            pass
+
+
+@app.post("/api/v1/reference/ingest-url")
+async def reference_ingest_url(
+    background_tasks: BackgroundTasks,
+    req: ReferenceIngestUrlRequest,
+):
+    """
+    Download a YouTube/Instagram/Drive URL via yt-dlp, detect scenes,
+    extract keyframes, generate Gemini embeddings, and store in reference_library.
+    Returns a job_id to poll for status.
+    """
+    if not req.url:
+        raise HTTPException(status_code=400, detail="URL is required")
+
+    user_id = req.user_id or "anonymous"
+    job_id = f"ref_job_{uuid.uuid4().hex[:10]}"
+    unique_prefix = f"clario_ref_{uuid.uuid4().hex}"
+    out_template = os.path.join(tempfile.gettempdir(), f"{unique_prefix}.%(ext)s")
+
+    # Detect source type from URL
+    source_type = "upload"
+    url_lower = req.url.lower()
+    if "youtube.com" in url_lower or "youtu.be" in url_lower:
+        source_type = "youtube"
+    elif "instagram.com" in url_lower:
+        source_type = "instagram"
+    elif "drive.google.com" in url_lower:
+        source_type = "drive"
+
+    update_job(job_id, {
+        "status": "queued",
+        "progress_pct": 0,
+        "status_msg": f"Downloading from {source_type}…",
+        "input_url": req.url,
+    })
+
+    # Download video
+    cmd = [
+        "python", "-m", "yt_dlp",
+        "-f", "best[ext=mp4]/best",
+        "--extractor-args", "youtube:player_client=android",
+        "--no-playlist",
+        "--max-filesize", "500M",
+        "-o", out_template,
+        req.url,
+    ]
+    proc = await asyncio.create_subprocess_exec(
+        *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+    )
+    stdout, stderr = await proc.communicate()
+
+    if proc.returncode != 0:
+        update_job(job_id, {"status": "failed", "status_msg": stderr.decode()[:500]})
+        raise HTTPException(status_code=500, detail=f"Download failed: {stderr.decode()[:300]}")
+
+    tmp_dir = tempfile.gettempdir()
+    downloaded = next((f for f in os.listdir(tmp_dir) if f.startswith(unique_prefix)), None)
+    if not downloaded:
+        raise HTTPException(status_code=404, detail="Downloaded file not found")
+
+    video_path = os.path.join(tmp_dir, downloaded)
+    background_tasks.add_task(
+        _process_reference_ingest,
+        job_id, video_path, req.url, source_type, user_id, req.gemini_api_key,
+    )
+
+    return {"job_id": job_id, "status": "queued", "source_type": source_type}
+
+
+@app.post("/api/v1/reference/ingest-file")
+async def reference_ingest_file(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    user_id: str = Form("anonymous"),
+    gemini_api_key: str = Form(""),
+):
+    """Upload a video file directly into the Reference Library."""
+    job_id = f"ref_job_{uuid.uuid4().hex[:10]}"
+    orig_ext = os.path.splitext(file.filename or "")[1] or ".mp4"
+    tmp_path = os.path.join(tempfile.gettempdir(), f"clario_ref_{uuid.uuid4().hex}{orig_ext}")
+
+    with open(tmp_path, "wb") as buf:
+        shutil.copyfileobj(file.file, buf)
+
+    update_job(job_id, {
+        "status": "queued",
+        "progress_pct": 0,
+        "status_msg": "Upload received. Processing…",
+        "input_url": file.filename,
+    })
+
+    background_tasks.add_task(
+        _process_reference_ingest,
+        job_id, tmp_path, file.filename or "", "upload",
+        user_id, gemini_api_key or None,
+    )
+
+    return {"job_id": job_id, "status": "queued"}
+
+
+@app.get("/api/v1/reference/library")
+async def get_reference_library(
+    user_id: str,
+    page: int = 1,
+    page_size: int = 24,
+):
+    """Return paginated reference library clips for a user."""
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    offset = (page - 1) * page_size
+    res = (
+        supabase.table("reference_library")
+        .select("id, shot_id, title, source_url, source_type, frame_url, description, start_sec, end_sec, duration, content_type, created_at")
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .range(offset, offset + page_size - 1)
+        .execute()
+    )
+    return {"clips": res.data, "page": page, "page_size": page_size}
+
+
+@app.post("/api/v1/script/match")
+async def script_match(req: ScriptMatchRequest):
+    """
+    Match a script against the Reference Library using pgvector cosine similarity.
+    Chunks the script by line/sentence, embeds each chunk via Gemini text-embedding-004,
+    and returns top-k matched clips per chunk plus a global ranked list.
+    """
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    if not req.script_text.strip():
+        raise HTTPException(status_code=400, detail="script_text is required")
+
+    # 1. Chunk script — split on double newlines or single newlines
+    raw_chunks = [c.strip() for c in req.script_text.split("\n") if c.strip()]
+    # Merge very short lines (< 30 chars) with the next chunk
+    chunks: list[str] = []
+    buffer = ""
+    for line in raw_chunks:
+        buffer = (buffer + " " + line).strip() if buffer else line
+        if len(buffer) >= 30:
+            chunks.append(buffer)
+            buffer = ""
+    if buffer:
+        chunks.append(buffer)
+
+    if not chunks:
+        raise HTTPException(status_code=400, detail="No scriptable content found")
+
+    # 2. Embed each chunk and run pgvector match via RPC
+    chunk_results = []
+    seen_clip_ids: dict[str, float] = {}  # clip_id → best similarity (for ranked view)
+
+    for i, chunk in enumerate(chunks):
+        embedding = _get_gemini_embedding(chunk, req.gemini_api_key)
+        if embedding is None:
+            chunk_results.append({
+                "chunk_index": i,
+                "chunk_text": chunk,
+                "matches": [],
+                "error": "Embedding failed — check GEMINI_API_KEY",
+            })
+            continue
+
+        rpc_res = supabase.rpc(
+            "match_reference_library",
+            {
+                "query_embedding": embedding,
+                "match_user_id": req.user_id,
+                "match_count": req.top_k,
+            },
+        ).execute()
+
+        matches = rpc_res.data or []
+        chunk_results.append({
+            "chunk_index": i,
+            "chunk_text": chunk,
+            "matches": matches,
+        })
+
+        for m in matches:
+            clip_id = m.get("id", "")
+            sim = m.get("similarity", 0.0)
+            if clip_id not in seen_clip_ids or seen_clip_ids[clip_id] < sim:
+                seen_clip_ids[clip_id] = sim
+
+    # 3. Build global ranked clip list (deduplicated, sorted by best similarity)
+    ranked_clip_ids = sorted(seen_clip_ids.items(), key=lambda x: x[1], reverse=True)
+    # Fetch full clip records for the ranked list
+    if ranked_clip_ids and supabase:
+        ids = [cid for cid, _ in ranked_clip_ids[: req.top_k * 2]]
+        clips_res = supabase.table("reference_library").select(
+            "id, shot_id, title, source_url, source_type, frame_url, description, start_sec, end_sec, duration"
+        ).in_("id", ids).execute()
+        clips_map = {c["id"]: c for c in (clips_res.data or [])}
+        ranked_clips = [
+            {**clips_map[cid], "similarity": sim}
+            for cid, sim in ranked_clip_ids[: req.top_k * 2]
+            if cid in clips_map
+        ]
+    else:
+        ranked_clips = []
+
+    return {
+        "chunks": chunk_results,
+        "ranked_clips": ranked_clips,
+        "total_chunks": len(chunks),
+        "total_unique_clips": len(ranked_clip_ids),
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+

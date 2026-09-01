@@ -1,14 +1,24 @@
 import { ReactNode } from 'react';
 import type { HarvestProject } from '../../types/assets';
 import { EcosystemSwitcher } from '../ui/EcosystemSwitcher';
-import { CommandPalette } from '@pseudonyms/ui';
+import { CommandPalette, useCrossAppBus } from '@pseudonyms/ui';
+import { supabase } from '../../lib/supabase';
+
+export type ClarioPhase =
+  | 'home'
+  | 'ingest'
+  | 'harvest_studio'
+  | 'export'
+  | 'vault'
+  | 'workspace'
+  | 'reference_library';
 
 interface AppShellProps {
   children: ReactNode;
   currentProject: HarvestProject | null;
-  currentPhase: 'home' | 'ingest' | 'harvest_studio' | 'export' | 'vault' | 'workspace';
+  currentPhase: ClarioPhase;
   activeResultTab?: 'evidence' | 'clean' | 'replacements' | 'provenance';
-  onNavigatePhase: (phase: 'home' | 'ingest' | 'harvest_studio' | 'export' | 'vault' | 'workspace') => void;
+  onNavigatePhase: (phase: ClarioPhase) => void;
   onOpenBrandKit: () => void;
   onOpenApiKeyModal: () => void;
   vaultCount: number;
@@ -28,7 +38,7 @@ export function AppShell({
   projectCount,
   hasApiKey,
 }: AppShellProps) {
-  // Determine current active step (1-4)
+  // Determine current active workflow step (1-4) — Reference Library is separate
   const getActiveStep = (): number => {
     if (currentPhase === 'home' || currentPhase === 'ingest') return 1;
     if (currentPhase === 'export') return 4;
@@ -38,27 +48,36 @@ export function AppShell({
 
   const currentStep = getActiveStep();
 
+  const { publish } = useCrossAppBus(supabase, null);
+  if (typeof window !== 'undefined') {
+    (window as any).__crossAppBusPublish = publish;
+  }
+
+  const isRefLibActive = currentPhase === 'reference_library';
+
   return (
     <div
       style={{
         display: 'flex',
         flexDirection: 'column',
         minHeight: '100vh',
-        background: 'var(--base)',
-        color: 'var(--text-primary)',
-        fontFamily: 'var(--font-sans)',
+        background: 'var(--pds-canvas)',
+        color: 'var(--pds-text-primary)',
+        fontFamily: "'Inter', -apple-system, system-ui, sans-serif",
       }}
     >
-      {/* ── Persistent Navigation Bar ──────────────────────────────────────── */}
+      {/* ── Persistent Navigation Bar ────────────────────────────────────── */}
       <header
         style={{
-          height: 56,
-          borderBottom: '1px solid var(--border)',
-          background: 'var(--panel)',
+          height: 52,
+          borderBottom: '1px solid var(--pds-border-subtle)',
+          background: 'rgba(248, 247, 244, 0.85)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 24px',
+          padding: '0 20px',
           position: 'sticky',
           top: 0,
           zIndex: 100,
@@ -72,17 +91,16 @@ export function AppShell({
             style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
           >
             <div style={{
-              width: 6, height: 6, borderRadius: '50%',
-              backgroundColor: '#ec4899',
-              boxShadow: '0 0 8px rgba(236,72,153,0.7)',
+              width: 5, height: 5, borderRadius: '50%',
+              backgroundColor: 'var(--pds-text-primary)',
             }} />
             <span style={{
               fontSize: 13,
-              fontWeight: 400,
-              letterSpacing: '0.1em',
-              color: 'rgba(240,240,240,0.85)',
-              fontFamily: 'var(--font-sans)',
-              textTransform: 'lowercase',
+              fontWeight: 500,
+              letterSpacing: '0.06em',
+              color: 'var(--pds-text-primary)',
+              fontFamily: "'Vanguard', Impact, Oswald, sans-serif",
+              textTransform: 'uppercase',
             }}>
               clario
             </span>
@@ -90,17 +108,19 @@ export function AppShell({
 
           {currentProject && (
             <>
-              <span style={{ color: 'var(--border)' }}>/</span>
+              <span style={{ color: 'var(--pds-border-mid)', fontSize: 14 }}>/</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span
                   style={{
                     fontSize: 13,
-                    fontWeight: 600,
-                    color: 'var(--text-primary)',
+                    fontWeight: 500,
+                    color: 'var(--pds-text-primary)',
+                    fontFamily: "'Inter', system-ui, sans-serif",
                     maxWidth: 200,
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
+                    letterSpacing: '-0.01em',
                   }}
                 >
                   {currentProject.name}
@@ -108,13 +128,15 @@ export function AppShell({
                 <span
                   style={{
                     fontSize: 9,
-                    fontWeight: 700,
+                    fontWeight: 600,
                     padding: '2px 6px',
-                    borderRadius: 12,
-                    background: 'var(--surface-2)',
-                    color: 'var(--text-secondary)',
-                    fontFamily: 'var(--font-mono)',
+                    borderRadius: 99,
+                    background: 'var(--pds-surface-2)',
+                    color: 'var(--pds-text-muted)',
+                    fontFamily: "'JetBrains Mono', monospace",
                     textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    border: '1px solid var(--pds-border-subtle)',
                   }}
                 >
                   {currentProject.mode === 'video_harvester' ? 'Video' : 'Carousel'}
@@ -124,65 +146,123 @@ export function AppShell({
           )}
         </div>
 
-        {/* Center: 4-Step Workflow Stepper */}
+        {/* Center: Workflow Stepper + Reference Library Tab */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          {/* 4-Step harvest workflow */}
           {[
             { step: 1, label: 'Reference',  phase: 'ingest' as const },
             { step: 2, label: 'Analyze',    phase: 'harvest_studio' as const },
             { step: 3, label: 'Resolve',    phase: 'harvest_studio' as const },
             { step: 4, label: 'Export',     phase: 'export' as const },
           ].map((s, idx) => {
-            const isActive = currentStep === s.step;
-            const isCompleted = currentStep > s.step;
+            const isActive = currentStep === s.step && !isRefLibActive;
+            const isCompleted = currentStep > s.step && !isRefLibActive;
             return (
               <div key={s.step} style={{ display: 'flex', alignItems: 'center' }}>
                 {idx > 0 && (
-                  <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: 10, margin: '0 2px' }}>›</span>
+                  <span style={{ color: 'var(--pds-border-mid)', fontSize: 10, margin: '0 2px' }}>›</span>
                 )}
                 <span
                   onClick={() => { if (currentProject || s.phase === 'ingest') onNavigatePhase(s.phase); }}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 5,
-                    padding: '4px 10px', borderRadius: 8,
+                    padding: '4px 10px', borderRadius: 6,
                     fontSize: 11,
                     fontWeight: isActive ? 500 : 400,
-                    fontFamily: 'var(--font-sans)',
-                    background: isActive ? 'rgba(236,72,153,0.12)' : 'transparent',
-                    border: isActive ? '1px solid rgba(236,72,153,0.3)' : '1px solid transparent',
-                    color: isActive ? '#ec4899' : isCompleted ? 'rgba(240,240,240,0.5)' : 'rgba(255,255,255,0.3)',
+                    fontFamily: "'Inter', system-ui, sans-serif",
+                    letterSpacing: '-0.01em',
+                    background: isActive
+                      ? 'var(--pds-accent-dim)'
+                      : 'transparent',
+                    border: isActive
+                      ? '1px solid var(--pds-border-mid)'
+                      : '1px solid transparent',
+                    color: isActive
+                      ? 'var(--pds-text-primary)'
+                      : isCompleted
+                      ? 'var(--pds-text-secondary)'
+                      : 'var(--pds-text-muted)',
                     cursor: currentProject ? 'pointer' : 'default',
                     transition: 'all 150ms ease',
-                    letterSpacing: '-0.01em',
                   }}
                 >
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, opacity: 0.6 }}>0{s.step}</span>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, opacity: 0.5 }}>0{s.step}</span>
                   {s.label}
                 </span>
               </div>
             );
           })}
+
+          {/* Divider */}
+          <span style={{ width: 1, height: 16, background: 'var(--pds-border-subtle)', margin: '0 8px' }} />
+
+          {/* Reference Library Tab */}
+          <span
+            onClick={() => onNavigatePhase('reference_library')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '4px 10px', borderRadius: 6,
+              fontSize: 11,
+              fontWeight: isRefLibActive ? 500 : 400,
+              fontFamily: "'Inter', system-ui, sans-serif",
+              letterSpacing: '-0.01em',
+              background: isRefLibActive ? 'var(--pds-accent-dim)' : 'transparent',
+              border: isRefLibActive ? '1px solid var(--pds-border-mid)' : '1px solid transparent',
+              color: isRefLibActive ? 'var(--pds-text-primary)' : 'var(--pds-text-muted)',
+              cursor: 'pointer',
+              transition: 'all 150ms ease',
+            }}
+            onMouseEnter={(e) => {
+              if (!isRefLibActive) {
+                e.currentTarget.style.color = 'var(--pds-text-secondary)';
+                e.currentTarget.style.background = 'var(--pds-surface-2)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isRefLibActive) {
+                e.currentTarget.style.color = 'var(--pds-text-muted)';
+                e.currentTarget.style.background = 'transparent';
+              }
+            }}
+          >
+            {/* Small library icon */}
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+              <rect x="0.5" y="1" width="3" height="8" rx="0.5" stroke="currentColor" strokeWidth="0.8"/>
+              <rect x="4.5" y="1" width="3" height="8" rx="0.5" stroke="currentColor" strokeWidth="0.8"/>
+              <line x1="8.5" y1="1" x2="9" y2="9" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round"/>
+            </svg>
+            Ref Library
+          </span>
         </div>
 
-        {/* Right: Tools & System Health Status */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {/* Right: Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button
             onClick={() => onNavigatePhase('vault')}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 6,
-              padding: '5px 10px',
+              gap: 5,
+              padding: '4px 10px',
               borderRadius: 6,
               fontSize: 11,
-              fontWeight: 600,
-              border: '1px solid var(--border)',
-              background: currentPhase === 'vault' ? 'var(--surface-2)' : 'var(--panel)',
-              color: currentPhase === 'vault' ? 'var(--accent)' : 'var(--text-secondary)',
+              fontWeight: 500,
+              fontFamily: "'Inter', system-ui, sans-serif",
+              border: '1px solid var(--pds-border-subtle)',
+              background: currentPhase === 'vault' ? 'var(--pds-surface-2)' : 'transparent',
+              color: currentPhase === 'vault' ? 'var(--pds-text-primary)' : 'var(--pds-text-secondary)',
               cursor: 'pointer',
+              transition: 'all 150ms ease',
             }}
           >
             <span>Vault</span>
-            <span style={{ padding: '1px 5px', borderRadius: 10, background: 'var(--surface-2)', fontSize: 10, fontFamily: 'var(--font-mono)' }}>
+            <span style={{
+              padding: '1px 5px', borderRadius: 99,
+              background: 'var(--pds-surface-2)',
+              border: '1px solid var(--pds-border-subtle)',
+              fontSize: 9, fontFamily: "'JetBrains Mono', monospace",
+              color: 'var(--pds-text-muted)',
+            }}>
               {vaultCount}
             </span>
           </button>
@@ -192,38 +272,52 @@ export function AppShell({
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 6,
-              padding: '5px 10px',
+              gap: 5,
+              padding: '4px 10px',
               borderRadius: 6,
               fontSize: 11,
-              fontWeight: 600,
-              border: '1px solid var(--border)',
-              background: 'var(--panel)',
-              color: 'var(--text-secondary)',
+              fontWeight: 500,
+              fontFamily: "'Inter', system-ui, sans-serif",
+              border: '1px solid var(--pds-border-subtle)',
+              background: 'transparent',
+              color: 'var(--pds-text-secondary)',
               cursor: 'pointer',
             }}
           >
             <span>Projects</span>
-            <span style={{ padding: '1px 5px', borderRadius: 10, background: 'var(--surface-2)', fontSize: 10, fontFamily: 'var(--font-mono)' }}>
+            <span style={{
+              padding: '1px 5px', borderRadius: 99,
+              background: 'var(--pds-surface-2)',
+              border: '1px solid var(--pds-border-subtle)',
+              fontSize: 9, fontFamily: "'JetBrains Mono', monospace",
+              color: 'var(--pds-text-muted)',
+            }}>
               {projectCount}
             </span>
           </button>
 
+          {/* Primary CTA: obsidian fill on porcelain canvas */}
           <button
             onClick={() => onNavigatePhase('ingest')}
             style={{
-              padding: '6px 14px', borderRadius: 8,
-              fontSize: 12, fontWeight: 500,
-              border: '1px solid rgba(236,72,153,0.4)',
-              background: 'rgba(236,72,153,0.1)',
-              color: '#ec4899',
-              cursor: 'pointer',
-              fontFamily: 'var(--font-sans)',
+              padding: '5px 14px', borderRadius: 7,
+              fontSize: 11, fontWeight: 500,
+              fontFamily: "'Inter', system-ui, sans-serif",
               letterSpacing: '-0.01em',
-              transition: 'background 150ms ease',
+              border: '1px solid var(--pds-accent)',
+              background: 'var(--pds-accent)',
+              color: 'var(--pds-accent-inv)',
+              cursor: 'pointer',
+              transition: 'opacity 150ms ease, transform 150ms ease',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(236,72,153,0.18)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(236,72,153,0.1)'; }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '0.85';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '1';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
           >
             + new harvest
           </button>
@@ -231,13 +325,14 @@ export function AppShell({
           <button
             onClick={onOpenBrandKit}
             style={{
-              padding: '5px 10px',
+              padding: '4px 10px',
               borderRadius: 6,
-              fontSize: 12,
-              fontWeight: 600,
-              border: '1px solid var(--border)',
-              background: 'var(--panel)',
-              color: 'var(--text-secondary)',
+              fontSize: 11,
+              fontWeight: 500,
+              fontFamily: "'Inter', system-ui, sans-serif",
+              border: '1px solid var(--pds-border-subtle)',
+              background: 'transparent',
+              color: 'var(--pds-text-secondary)',
               cursor: 'pointer',
             }}
           >
@@ -250,48 +345,50 @@ export function AppShell({
               display: 'flex',
               alignItems: 'center',
               gap: 6,
-              padding: '5px 10px',
+              padding: '4px 10px',
               borderRadius: 6,
               fontSize: 11,
-              fontWeight: 600,
-              border: '1px solid var(--border)',
-              background: hasApiKey ? 'rgba(16, 185, 129, 0.08)' : 'var(--panel)',
-              color: hasApiKey ? 'var(--emerald)' : 'var(--text-secondary)',
+              fontWeight: 500,
+              fontFamily: "'Inter', system-ui, sans-serif",
+              border: '1px solid var(--pds-border-subtle)',
+              background: hasApiKey ? 'rgba(16, 185, 129, 0.06)' : 'transparent',
+              color: hasApiKey ? 'var(--pds-success)' : 'var(--pds-text-secondary)',
               cursor: 'pointer',
             }}
           >
             <div
               style={{
-                width: 6,
-                height: 6,
+                width: 5,
+                height: 5,
                 borderRadius: '50%',
-                background: hasApiKey ? 'var(--emerald)' : 'var(--amber)',
+                background: hasApiKey ? 'var(--pds-success)' : 'var(--pds-warning)',
               }}
             />
             <span>{hasApiKey ? 'Gemini 2.0' : 'Local WASM'}</span>
           </button>
 
-          {/* Google-Style 9-Dot Ecosystem Waffle Switcher */}
+          {/* 9-Dot Waffle Ecosystem Switcher */}
           <EcosystemSwitcher />
         </div>
       </header>
 
-      {/* ── Main Workspace Body ────────────────────────────────────────────── */}
+      {/* ── Main Workspace Body ─────────────────────────────────────────── */}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         {children}
       </main>
 
-      {/* ── CommandPalette (⌘K) ─────────────────────────────────────────────── */}
+      {/* ── CommandPalette (⌘K) ─────────────────────────────────────────── */}
       <CommandPalette
         currentApp="clario"
         extraCommands={[{
           id: 'clario-actions',
           label: 'Clario',
-          accent: '#ec4899',
+          accent: 'var(--pds-accent)',
           commands: [
-            { id: 'new-harvest', label: 'New Harvest',   accent: '#ec4899', action: () => onNavigatePhase('ingest') },
-            { id: 'vault',      label: 'Open Vault',    accent: '#ec4899', action: () => onNavigatePhase('vault') },
-            { id: 'projects',   label: 'All Projects',  accent: '#ec4899', action: () => onNavigatePhase('home') },
+            { id: 'new-harvest',      label: 'New Harvest',      accent: 'var(--pds-accent)', action: () => onNavigatePhase('ingest') },
+            { id: 'vault',            label: 'Open Vault',       accent: 'var(--pds-accent)', action: () => onNavigatePhase('vault') },
+            { id: 'projects',         label: 'All Projects',     accent: 'var(--pds-accent)', action: () => onNavigatePhase('home') },
+            { id: 'reference-library',label: 'Reference Library',accent: 'var(--pds-accent)', action: () => onNavigatePhase('reference_library') },
           ],
         }]}
       />
