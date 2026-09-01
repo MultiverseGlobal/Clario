@@ -1,0 +1,26 @@
+{
+  "name": "pseudonyms-ecosystem",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test"
+  },
+  "workspaces": [
+    "Atlas io",
+    "Clario",
+    "Metaphor/frontend",
+    "Orion/apps/*",
+    "Orion/packages/*",
+    "PseudonymsID",
+    "Weave",
+    "packages/*"
+  ],
+  "devDependencies": {
+    "turbo": "^2.5.0"
+  }
+}
+
