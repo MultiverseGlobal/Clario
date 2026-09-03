@@ -268,3 +268,171 @@
 .animate-blur-in {
   animation: blurIn 0.6s var(--pds-ease-out) both;
 }
+
+/* ── Reduced Motion ────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .animate-enter, .animate-blur-in, .pds-animate-enter {
+    animation: none;
+    opacity: 1;
+    filter: none;
+    transform: none;
+  }
+}
+
+/* ── Component Layer ─────────────────────────────────────────────────────────── */
+
+/* Navigation glass bar */
+.nav-glass {
+  background: rgba(248, 247, 244, 0.88);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-bottom: 1px solid var(--pds-border-subtle);
+}
+.dark .nav-glass {
+  background: rgba(7, 8, 12, 0.82);
+}
+
+/* Card surface */
+.pds-card {
+  background: var(--pds-surface-1);
+  border: 1px solid var(--pds-border-subtle);
+  border-radius: 16px;
+  box-shadow: var(--pds-shadow-sm);
+}
+
+/* Data card — left-border accent signature */
+.pds-data-card {
+  background: var(--pds-surface-1);
+  border: 1px solid var(--pds-border-subtle);
+  border-left: 2px solid var(--pds-accent);
+  border-radius: 12px;
+  box-shadow: var(--pds-shadow-sm);
+  transition: box-shadow var(--pds-t-fast) var(--pds-ease-out);
+}
+.pds-data-card:hover {
+  box-shadow: var(--pds-shadow-md);
+}
+
+/* Fix interactive-card: no translateY lift — box-shadow shift only */
+.interactive-card:hover {
+  transform: none;
+  box-shadow: var(--pds-shadow-md);
+}
+
+/* Primary CTA button */
+.pds-btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 20px;
+  background: var(--pds-accent);
+  color: var(--pds-accent-inv);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: opacity var(--pds-t-fast) var(--pds-ease-out);
+}
+.pds-btn-primary:hover:not(:disabled) { opacity: 0.88; }
+.pds-btn-primary:active:not(:disabled) { opacity: 0.75; }
+.pds-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.pds-btn-primary:focus-visible {
+  outline: 2px solid var(--pds-border-strong);
+  outline-offset: 2px;
+}
+
+/* Ghost / secondary button */
+.pds-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
+  background: var(--pds-surface-2);
+  color: var(--pds-text-primary);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--pds-border-subtle);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background var(--pds-t-fast) var(--pds-ease-out),
+              border-color var(--pds-t-fast) var(--pds-ease-out);
+}
+.pds-btn-ghost:hover:not(:disabled) {
+  background: var(--pds-surface-3);
+  border-color: var(--pds-border-mid);
+}
+.pds-btn-ghost:focus-visible {
+  outline: 2px solid var(--pds-border-strong);
+  outline-offset: 2px;
+}
+
+/* Text / tertiary button */
+.pds-btn-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: var(--pds-text-secondary);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 0;
+  transition: color var(--pds-t-fast) var(--pds-ease-out);
+}
+.pds-btn-text:hover { color: var(--pds-text-primary); }
+
+/* Eyebrow / data label */
+.pds-label {
+  display: block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--pds-text-muted);
+  margin-bottom: 6px;
+}
+
+/* Status badge */
+.pds-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pds-text-muted);
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--pds-border-subtle);
+  background: var(--pds-surface-2);
+}
+.pds-status-badge.active {
+  color: var(--emerald);
+  border-color: rgba(16, 185, 129, 0.25);
+  background: rgba(16, 185, 129, 0.06);
+}
+
+/* Status dot */
+.pds-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--pds-text-muted);
+  flex-shrink: 0;
+}
+.pds-status-dot.active {
+  background: var(--emerald);
+  animation: pulse-green 2.5s infinite;
+}

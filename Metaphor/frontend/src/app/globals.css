@@ -270,3 +270,164 @@ h1, h2, h3, h4, h5, h6, .font-display {
 .delay-2 { animation-delay: 100ms; }
 .delay-3 { animation-delay: 150ms; }
 .delay-4 { animation-delay: 200ms; }
+
+/* ── Reduced Motion ────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .animate-enter, .pds-animate-enter, .animate-blur-in {
+    animation: none;
+    opacity: 1;
+    filter: none;
+    transform: none;
+  }
+}
+
+/* ── Component Layer ─────────────────────────────────────────────────────────── */
+
+/* Navigation glass bar */
+.nav-glass {
+  background: rgba(248, 247, 244, 0.88);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.dark .nav-glass {
+  background: rgba(7, 8, 12, 0.82);
+}
+
+/* Card surface */
+.pds-card {
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 16px;
+  box-shadow: var(--shadow-card);
+}
+
+/* Data card — left-border accent signature (no gradient, no glow) */
+.pds-data-card {
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border-subtle);
+  border-left: 2px solid var(--color-accent);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.pds-data-card:hover {
+  box-shadow: var(--shadow-card-hover);
+}
+
+/* Primary CTA button */
+.pds-btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 20px;
+  background: var(--color-accent);
+  color: var(--color-background);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: opacity 150ms ease;
+}
+.pds-btn-primary:hover:not(:disabled) { opacity: 0.88; }
+.pds-btn-primary:active:not(:disabled) { opacity: 0.75; }
+.pds-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.pds-btn-primary:focus-visible {
+  outline: 2px solid var(--color-border-strong);
+  outline-offset: 2px;
+}
+
+/* Ghost / secondary button */
+.pds-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
+  background: var(--color-surface-2);
+  color: var(--color-foreground);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+.pds-btn-ghost:hover:not(:disabled) {
+  background: var(--color-surface-3);
+  border-color: var(--color-border-mid);
+}
+.pds-btn-ghost:focus-visible {
+  outline: 2px solid var(--color-border-strong);
+  outline-offset: 2px;
+}
+
+/* Text / tertiary button */
+.pds-btn-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: var(--color-muted);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 0;
+  transition: color 150ms ease;
+}
+.pds-btn-text:hover { color: var(--color-foreground); }
+
+/* Eyebrow / data label */
+.pds-label {
+  display: block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  margin-bottom: 6px;
+}
+
+/* Status badge */
+.pds-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-2);
+}
+.pds-status-badge.active {
+  color: var(--color-success);
+  border-color: rgba(34, 197, 94, 0.25);
+  background: rgba(34, 197, 94, 0.06);
+}
+
+/* Status dot */
+.pds-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-muted);
+  flex-shrink: 0;
+}
+.pds-status-dot.active {
+  background: var(--color-success);
+  animation: pulse-green 2.5s infinite;
+}

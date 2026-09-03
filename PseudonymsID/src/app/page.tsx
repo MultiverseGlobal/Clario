@@ -71,116 +71,55 @@ export default function OverviewPage() {
   ];
 
   return (
-    <div style={{ maxWidth: "720px", margin: "0 auto", padding: "80px 24px 120px" }}>
+    <div className="max-w-[680px] mx-auto px-6 pt-20 pb-32">
       
       {/* Hero Section */}
-      <div className="animate-enter" style={{ marginBottom: "64px", textAlign: "center" }}>
-        <span className="label-mono" style={{ display: "inline-block", marginBottom: "16px" }}>
+      <div className="pds-animate-fade mb-16">
+        <span className="pds-label mb-4 inline-block">
           Pseudonyms Sovereign ID
         </span>
-        <h1 
-          className="font-serif-title"
-          style={{
-            fontSize: "48px",
-            color: "var(--text-primary)",
-            margin: "0 0 16px",
-            lineHeight: 1.1,
-          }}
-        >
+        <h1 className="pds-title text-4xl mb-4">
           {user ? `Welcome back, ${user.user_metadata?.username || user.email?.split("@")[0]}.` : "Initializing Workspace..."}
         </h1>
-        <p
-          style={{
-            fontSize: "16px",
-            color: "var(--text-secondary)",
-            maxWidth: "480px",
-            margin: "0 auto",
-            lineHeight: 1.6,
-          }}
-        >
+        <p className="text-base text-[var(--pds-text-secondary)] leading-relaxed">
           The central cognitive context and identity layer across your entire multi-agent ecosystem.
         </p>
       </div>
 
       {/* Feature Cards Grid */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+      <div className="flex flex-col gap-6">
         {features.map((f, i) => (
           <div
             key={f.index}
-            className={`animate-enter delay-${i + 1} glass-panel interactive-card`}
-            style={{
-              padding: "32px",
-              display: "grid",
-              gridTemplateColumns: "auto 1fr auto",
-              gap: "24px",
-              alignItems: "start",
-              borderRadius: "16px",
-            }}
+            className={`pds-animate-slide-up pds-feature-card ${f.status ? 'active' : 'inactive'} p-6 flex flex-col gap-3 delay-${Math.min(i + 1, 5)}`}
           >
-            {/* Index Badge */}
-            <div
-              style={{
-                width: "40px",
-                height: "40px",
-                borderRadius: "10px",
-                background: "var(--bg-canvas)",
-                border: "1px solid var(--border-strong)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--text-primary)",
-              }}
-            >
-              <span className="label-mono">{f.index}</span>
-            </div>
-
-            {/* Content */}
-            <div style={{ padding: "4px 0 0" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" }}>
-                <h2 style={{ fontSize: "16px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
-                  {f.title}
-                </h2>
-                
-                {/* Status Pill */}
-                <div style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  padding: "4px 8px",
-                  borderRadius: "20px",
-                  background: f.status ? "rgba(16, 185, 129, 0.1)" : "var(--bg-canvas)",
-                  border: `1px solid ${f.status ? "rgba(16, 185, 129, 0.2)" : "var(--border-strong)"}`,
-                }}>
-                  <div className={`status-dot ${f.status ? "active" : "inactive"}`} />
-                  <span className="label-mono" style={{ color: f.status ? "var(--green)" : "var(--text-muted)" }}>
-                    {f.statusLabel}
-                  </span>
-                </div>
-              </div>
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-[15px] font-semibold text-[var(--pds-text-primary)] m-0">
+                {f.title}
+              </h2>
               
-              <p style={{ fontSize: "14px", color: "var(--text-secondary)", lineHeight: 1.6, margin: 0 }}>
-                {f.body}
-              </p>
+              {/* Status Pill */}
+              <div className={`pds-status-badge ${f.status ? 'active' : ''}`}>
+                <div className={`pds-status-dot ${f.status ? 'active' : ''}`} />
+                {f.statusLabel}
+              </div>
+            </div>
+            
+            <p className="text-[14px] text-[var(--pds-text-secondary)] leading-relaxed m-0">
+              {f.body}
+            </p>
 
-              {f.href && f.cta && (
+            {f.href && f.cta && (
+              <div className="mt-2">
                 <Link
                   href={f.href}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    marginTop: "16px",
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    color: "var(--accent)",
-                    textDecoration: "none",
-                  }}
+                  className="pds-btn-text no-underline"
                 >
                   {f.cta}
                   <ArrowRight size={14} />
                 </Link>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         ))}
       </div>

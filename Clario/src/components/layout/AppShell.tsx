@@ -312,11 +312,9 @@ export function AppShell({
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.opacity = '0.85';
-              e.currentTarget.style.transform = 'translateY(-1px)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.opacity = '1';
-              e.currentTarget.style.transform = 'translateY(0)';
             }}
           >
             + new harvest

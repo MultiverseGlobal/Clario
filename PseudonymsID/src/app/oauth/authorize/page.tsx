@@ -43,67 +43,66 @@ function AuthorizeForm() {
 
   return (
     <div className="min-h-[75vh] flex items-center justify-center px-4">
-      <div className="w-full max-w-md glass-panel rounded-2xl p-6 sm:p-8 border border-border-subtle shadow-2xl space-y-6">
+      <div className="w-full max-w-[480px] pds-card p-8 space-y-6">
         
         {/* App connection header */}
         <div className="text-center space-y-3">
-          <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-brand-600 to-neon-cyan p-[1px] shadow-glow">
-            <div className="w-full h-full rounded-2xl bg-slate-900 flex items-center justify-center">
-              <Shield className="w-7 h-7 text-white" />
-            </div>
+          <div className="w-12 h-12 mx-auto rounded-xl bg-[var(--pds-surface-2)] border border-[var(--pds-border-strong)] flex items-center justify-center">
+             <Shield className="w-6 h-6 text-[var(--pds-text-primary)]" />
           </div>
 
           <div>
-            <h1 className="text-lg font-bold text-white">Authorize Access</h1>
-            <p className="text-xs text-slate-400 font-mono mt-1">
-              <span className="text-white font-semibold">{app.name}</span> wants to connect to your Master Pseudonyms ID
+            <h1 className="pds-title text-2xl mb-1">Authorize Access</h1>
+            <p className="text-[13px] text-[var(--pds-text-secondary)] font-mono">
+              <span className="text-[var(--pds-text-primary)] font-semibold">{app.name}</span> wants to connect to your Master Pseudonyms ID
             </p>
           </div>
         </div>
 
         {/* Master account info */}
-        <div className="p-3.5 rounded-xl bg-surface-2 border border-border-subtle flex items-center justify-between">
+        <div className="p-4 rounded-xl bg-[var(--pds-surface-2)] border border-[var(--pds-border-subtle)] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-brand-500 flex items-center justify-center font-bold text-xs text-white">
+            <div className="w-8 h-8 rounded-full bg-[var(--pds-accent)] flex items-center justify-center font-bold text-xs text-[var(--pds-accent-inv)] font-mono">
               {user?.email?.slice(0, 2).toUpperCase() ?? "??"}
             </div>
             <div>
-              <p className="text-xs font-semibold text-white">{user?.email?.split("@")[0] ?? "—"}</p>
-              <p className="text-[10px] text-slate-400 font-mono">{user?.email ?? "—"}</p>
+              <p className="text-[13px] font-semibold text-[var(--pds-text-primary)]">{user?.email?.split("@")[0] ?? "—"}</p>
+              <p className="text-[11px] text-[var(--pds-text-muted)] font-mono">{user?.email ?? "—"}</p>
             </div>
           </div>
-          <span className="text-[10px] font-mono text-neon-emerald px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20">
+          <div className="pds-status-badge active">
+            <div className="pds-status-dot active" />
             Sovereign
-          </span>
+          </div>
         </div>
 
         {/* Permissions list */}
-        <div className="space-y-2">
-          <p className="text-xs font-mono uppercase text-slate-400 tracking-wider">Requested Privileges:</p>
-          <div className="space-y-1.5">
+        <div className="space-y-3">
+          <p className="pds-label mb-0">Requested Privileges</p>
+          <div className="space-y-2">
             {app.permissions.map((perm) => (
-              <div key={perm} className="flex items-center gap-2 text-xs text-slate-300">
-                <Check className="w-3.5 h-3.5 text-neon-cyan shrink-0" />
-                <span className="font-mono text-[11px]">{perm}</span>
+              <div key={perm} className="flex items-center gap-2.5 text-[13px] text-[var(--pds-text-secondary)]">
+                <Check className="w-4 h-4 text-[var(--pds-text-primary)] shrink-0" />
+                <span className="font-mono">{perm}</span>
               </div>
             ))}
           </div>
         </div>
 
         {/* Consent Buttons */}
-        <div className="space-y-2 pt-2">
+        <div className="space-y-3 pt-4 border-t border-[var(--pds-border-subtle)]">
           <button
             onClick={handleApprove}
             disabled={approving}
-            className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-brand-600 to-neon-cyan text-white text-xs font-semibold shadow-glow hover:opacity-90 active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            className="pds-btn-primary"
           >
-            <span>{approving ? "Exchanging Tokens..." : "Allow & Unlock Application"}</span>
-            <ArrowRight className="w-4 h-4" />
+            {approving ? "Exchanging Tokens..." : "Allow & Unlock Application"}
           </button>
 
           <button
             onClick={() => router.push("/")}
-            className="w-full py-2.5 text-xs text-slate-400 hover:text-white transition-colors"
+            disabled={approving}
+            className="pds-btn-text w-full justify-center"
           >
             Deny Access & Return
           </button>

@@ -13,13 +13,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" className="light">
+      <body className="flex flex-col min-h-screen bg-[var(--pds-canvas)] text-[var(--pds-text-primary)] font-['Archivo',sans-serif] antialiased">
         <Navigation />
-        <main style={{ flex: 1, width: "100%" }}>
+        <main className="flex-1 w-full flex flex-col items-center">
           {children}
         </main>
       </body>
     </html>
   );
 }
+

@@ -175,7 +175,7 @@ export default function LinearLayout({
                   window.location.href = "/login";
                 }}
 
-                className="p-1 text-muted hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors cursor-pointer"
+                className="p-1.5 rounded-md text-[var(--color-muted)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-foreground)] transition-colors cursor-pointer"
                 title="Sign Out"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -190,7 +190,7 @@ export default function LinearLayout({
       <div className="flex-1 flex flex-col relative min-w-0 bg-background h-full overflow-hidden">
         
         {/* Topbar Header */}
-        <header className="h-12 px-4 border-b border-border-subtle flex items-center justify-between bg-surface-1/40 backdrop-blur-md shrink-0 z-30">
+        <header className="nav-glass h-12 px-4 flex items-center justify-between shrink-0 z-30">
           <div className="flex items-center gap-3">
             <button 
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -208,10 +208,10 @@ export default function LinearLayout({
             {/* Weave Panel Toggle */}
             <button
               onClick={() => setIsWeavePanelOpen(o => !o)}
-              className={`p-1.5 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${
+              className={`p-1.5 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-strong)] ${
                 isWeavePanelOpen
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted hover:bg-surface-2 hover:text-foreground'
+                  ? 'bg-[var(--color-accent-dim)] text-[var(--color-foreground)] border border-[var(--color-border-mid)]'
+                  : 'text-[var(--color-muted)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-foreground)]'
               }`}
               title="Toggle Weave Intelligence Panel"
             >
@@ -234,8 +234,8 @@ export default function LinearLayout({
               minWidth: isWeavePanelOpen ? 340 : 0,
               overflow: 'hidden',
               transition: 'all 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
-              borderLeft: isWeavePanelOpen ? '1px solid var(--border-subtle, rgba(17,19,24,0.07))' : 'none',
-              background: 'var(--surface-1, #fff)',
+              borderLeft: isWeavePanelOpen ? '1px solid var(--color-border-subtle)' : 'none',
+              background: 'var(--color-surface-1)',
             }}
           >
             {isWeavePanelOpen && (
@@ -271,16 +271,15 @@ function NavItem({
   return (
     <Link 
       href={href}
-      className={`group flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${
+      className={`group flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-strong)] transition-colors ${
         active 
-          ? "bg-surface-1 shadow-sm text-foreground ring-1 ring-border-subtle" 
-          : "text-muted hover:bg-surface-2 hover:text-foreground"
+          ? "bg-[var(--color-accent-dim)] border border-[var(--color-border-mid)] text-[var(--color-foreground)]" 
+          : "text-[var(--color-muted)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-foreground)]"
       }`}
-      style={{ transition: 'all var(--transition-fast)' }}
     >
       <div className="flex items-center gap-3">
         {React.cloneElement(icon as React.ReactElement, { 
-          className: `w-4 h-4 ${active ? "text-primary" : "opacity-70 group-hover:opacity-100 group-focus:opacity-100"} group-hover:scale-110 group-focus:scale-110 transition-all duration-200` 
+          className: `w-4 h-4 ${active ? "text-[var(--color-foreground)]" : "opacity-60 group-hover:opacity-100"} transition-opacity duration-150` 
         })}
         <span className="font-medium text-[13px] tracking-tight">{label}</span>
       </div>

@@ -42,90 +42,99 @@ export default function OnboardingPage() {
     router.push("/");
   };
 
-  if (!user) return <div className="min-h-screen bg-[var(--bg-canvas)]" />;
+  if (!user) return <div className="min-h-screen bg-[var(--pds-canvas)]" />;
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px", background: "var(--bg-canvas)" }}>
-      <div 
-        className="animate-enter"
-        style={{
-          width: "100%", maxWidth: "500px",
-          background: "var(--bg-surface)",
-          border: "1px solid var(--border-subtle)",
-          borderRadius: "24px",
-          padding: "48px 40px",
-          boxShadow: "var(--shadow-float)",
-        }}
+    <div className="min-h-screen flex items-center justify-center px-6 auth-bg">
+      <div
+        className="pds-animate-enter w-full max-w-[480px] auth-card p-12"
       >
-        <div style={{ display: "flex", gap: "8px", marginBottom: "40px", justifyContent: "center" }}>
+        {/* Progress steps */}
+        <div className="flex gap-2 mb-10 justify-center">
           {[1, 2, 3].map(i => (
-            <div key={i} style={{ width: "32px", height: "4px", borderRadius: "2px", background: step >= i ? "var(--accent)" : "var(--border-strong)" }} />
+            <div
+              key={i}
+              className={`h-1 w-8 rounded-full transition-all duration-300 ${step >= i ? "bg-[var(--pds-accent)]" : "bg-[var(--pds-border-mid)]"}`}
+            />
           ))}
         </div>
 
         {step === 1 && (
-          <div className="animate-enter">
-            <div style={{ textAlign: "center", marginBottom: "32px" }}>
-              <div style={{ width: "48px", height: "48px", margin: "0 auto 24px", background: "var(--bg-canvas)", border: "1px solid var(--border-strong)", borderRadius: "14px", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--accent)" }}>
+          <div className="pds-animate-fade">
+            <div className="text-center mb-8">
+              <div className="w-12 h-12 mx-auto mb-6 bg-[var(--pds-surface-2)] border border-[var(--pds-border-strong)] rounded-2xl flex items-center justify-center text-[var(--pds-text-primary)]">
                 <User size={24} />
               </div>
-              <h1 className="font-serif-title" style={{ fontSize: "28px", color: "var(--text-primary)", marginBottom: "8px" }}>Claim your Pseudonym</h1>
-              <p style={{ fontSize: "14px", color: "var(--text-secondary)" }}>Choose the handle you'll use across the ecosystem.</p>
+              <h1 className="pds-title text-3xl mb-2">Claim your Pseudonym</h1>
+              <p className="text-[14px] text-[var(--pds-text-secondary)]">Choose the handle you'll use across the ecosystem.</p>
             </div>
             
             <input
               type="text"
+              autoFocus
               placeholder="e.g. Satoshi"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              style={{
-                width: "100%", padding: "14px 16px", background: "var(--bg-canvas)", border: "1px solid var(--border-strong)", borderRadius: "14px", fontSize: "14px", color: "var(--text-primary)", outline: "none", marginBottom: "24px"
-              }}
+              onKeyDown={(e) => { if (e.key === "Enter" && username && !isLoading) handleSaveProfile(); }}
+              className="pds-input mb-6"
             />
             
-            <button onClick={handleSaveProfile} disabled={!username || isLoading} style={{ width: "100%", padding: "14px", background: "var(--text-primary)", color: "var(--bg-canvas)", border: "none", borderRadius: "12px", fontSize: "14px", fontWeight: 600, display: "flex", justifyContent: "center", alignItems: "center", gap: "8px", cursor: (!username || isLoading) ? "not-allowed" : "pointer", opacity: (!username || isLoading) ? 0.7 : 1 }}>
+            <button
+              onClick={handleSaveProfile}
+              disabled={!username || isLoading}
+              className="pds-btn-primary"
+            >
               Continue <ArrowRight size={16} />
             </button>
           </div>
         )}
 
         {step === 2 && (
-          <div className="animate-enter">
-            <div style={{ textAlign: "center", marginBottom: "32px" }}>
-              <div style={{ width: "48px", height: "48px", margin: "0 auto 24px", background: "var(--bg-canvas)", border: "1px solid var(--border-strong)", borderRadius: "14px", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--accent)" }}>
+          <div className="pds-animate-fade">
+            <div className="text-center mb-8">
+              <div className="w-12 h-12 mx-auto mb-6 bg-[var(--pds-surface-2)] border border-[var(--pds-border-strong)] rounded-2xl flex items-center justify-center text-[var(--pds-text-primary)]">
                 <Key size={24} />
               </div>
-              <h1 className="font-serif-title" style={{ fontSize: "28px", color: "var(--text-primary)", marginBottom: "8px" }}>Sovereign AI Config</h1>
-              <p style={{ fontSize: "14px", color: "var(--text-secondary)" }}>Add your Gemini API key to power Clario and Metaphor. Stored securely in your profile metadata.</p>
+              <h1 className="pds-title text-3xl mb-2">Sovereign AI Config</h1>
+              <p className="text-[14px] text-[var(--pds-text-secondary)]">Add your Gemini API key to power Clario and Metaphor. Stored securely in your profile metadata.</p>
             </div>
             
             <input
               type="password"
+              autoFocus
               placeholder="AIzaSy..."
               value={geminiKey}
               onChange={(e) => setGeminiKey(e.target.value)}
-              style={{
-                width: "100%", padding: "14px 16px", background: "var(--bg-canvas)", border: "1px solid var(--border-strong)", borderRadius: "14px", fontSize: "14px", color: "var(--text-primary)", outline: "none", marginBottom: "24px", fontFamily: "monospace"
-              }}
+              onKeyDown={(e) => { if (e.key === "Enter" && !isLoading) handleSaveKeys(); }}
+              className="pds-input mono mb-6"
             />
             
-            <button onClick={handleSaveKeys} disabled={isLoading} style={{ width: "100%", padding: "14px", background: "var(--text-primary)", color: "var(--bg-canvas)", border: "none", borderRadius: "12px", fontSize: "14px", fontWeight: 600, display: "flex", justifyContent: "center", alignItems: "center", gap: "8px", cursor: isLoading ? "not-allowed" : "pointer", opacity: isLoading ? 0.7 : 1 }}>
+            <button
+              onClick={handleSaveKeys}
+              disabled={isLoading}
+              className="pds-btn-primary"
+            >
               {geminiKey ? "Save Keys" : "Skip for now"} <ArrowRight size={16} />
             </button>
           </div>
         )}
 
         {step === 3 && (
-          <div className="animate-enter" style={{ textAlign: "center" }}>
-            <div style={{ width: "64px", height: "64px", margin: "0 auto 32px", background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.2)", borderRadius: "16px", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--green)" }}>
+          <div className="pds-animate-fade text-center">
+            <div className="w-16 h-16 mx-auto mb-8 bg-[var(--pds-status-active-bg)] border border-[var(--pds-status-active-border)] rounded-2xl flex items-center justify-center text-[var(--pds-success)]">
               <CheckCircle size={32} />
             </div>
-            <h1 className="font-serif-title" style={{ fontSize: "28px", color: "var(--text-primary)", marginBottom: "8px" }}>You're all set!</h1>
-            <p style={{ fontSize: "14px", color: "var(--text-secondary)", marginBottom: "32px", lineHeight: 1.6 }}>
+            <h1 className="pds-title text-3xl mb-2">You're all set!</h1>
+            <p className="text-[14px] text-[var(--pds-text-secondary)] mb-8 leading-relaxed">
               Your sovereign profile is ready. You can now use Atlas, Metaphor, and Orion securely.
             </p>
             
-            <button onClick={finishOnboarding} style={{ width: "100%", padding: "14px", background: "var(--text-primary)", color: "var(--bg-canvas)", border: "none", borderRadius: "12px", fontSize: "14px", fontWeight: 600 }}>
+            <button
+              onClick={finishOnboarding}
+              autoFocus
+              onKeyDown={(e) => { if (e.key === "Enter") finishOnboarding(); }}
+              className="pds-btn-primary"
+            >
               Enter Ecosystem
             </button>
           </div>

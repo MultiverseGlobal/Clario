@@ -47,70 +47,57 @@ export default function SettingsPage() {
   ];
 
   return (
-    <div style={{ maxWidth: "600px", margin: "0 auto", padding: "80px 24px 120px" }}>
+    <div className="max-w-[600px] mx-auto px-6 pt-20 pb-32">
       
       {/* Header */}
-      <div className="animate-enter" style={{ marginBottom: "56px" }}>
-        <span className="label-mono" style={{ display: "inline-block", marginBottom: "16px" }}>
+      <div className="pds-animate-fade mb-14">
+        <span className="pds-label mb-4 inline-block">
           Preferences
         </span>
-        <h1 
-          className="font-serif-title"
-          style={{ fontSize: "48px", color: "var(--text-primary)", margin: "0 0 16px", lineHeight: 1.1 }}
-        >
+        <h1 className="pds-title text-4xl mb-4">
           Ecosystem Identity & Keys
         </h1>
-        <p style={{ fontSize: "16px", color: "var(--text-secondary)", lineHeight: 1.6 }}>
+        <p className="text-base text-[var(--pds-text-secondary)] leading-relaxed">
           Set your username and API keys once here. They are securely encrypted in your Supabase profile and dynamically loaded by Metaphor, Orion, and Atlas.
         </p>
       </div>
 
       {/* Form */}
-      <div className="animate-enter delay-1 glass-panel" style={{ padding: "40px 32px", borderRadius: "16px" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: "24px", marginBottom: "40px" }}>
+      <div className="pds-animate-slide-up pds-card p-8 sm:p-10">
+        <div className="flex flex-col gap-6 mb-10">
           
           {/* Username Field */}
           <div>
             <label 
               htmlFor="username" 
-              className="label-mono"
-              style={{ display: "block", marginBottom: "12px", color: "var(--text-primary)" }}
+              className="pds-label"
             >
               Global Username
             </label>
-            <div style={{ position: "relative" }}>
+            <div className="relative">
               <input
                 id="username"
                 type="text"
                 placeholder="e.g. Theo"
                 value={keys.username}
                 onChange={(e) => setKeys((prev) => ({ ...prev, username: e.target.value }))}
-                style={{
-                  width: "100%", padding: "14px 16px",
-                  background: "var(--bg-canvas)", border: "1px solid var(--border-strong)",
-                  borderRadius: "12px", fontSize: "14px", color: "var(--text-primary)",
-                  fontFamily: "var(--font-sans)", outline: "none",
-                  transition: "all 0.2s var(--ease-out)", boxShadow: "var(--shadow-sm)"
-                }}
-                onFocus={(e) => e.target.style.borderColor = "var(--accent)"}
-                onBlur={(e) => e.target.style.borderColor = "var(--border-strong)"}
+                className="pds-input"
               />
             </div>
           </div>
 
-          <div style={{ height: "1px", background: "var(--border-subtle)", margin: "8px 0" }} />
+          <div className="pds-divider my-2" />
 
           {providers.map((p) => (
             <div key={p.id}>
               <label 
                 htmlFor={p.id} 
-                className="label-mono"
-                style={{ display: "block", marginBottom: "12px", color: "var(--text-primary)" }}
+                className="pds-label"
               >
                 {p.label} API Key
               </label>
-              <div style={{ position: "relative" }}>
-                <div style={{ position: "absolute", left: "16px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }}>
+              <div className="relative">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--pds-text-muted)]">
                   <Key size={16} />
                 </div>
                 <input
@@ -119,57 +106,27 @@ export default function SettingsPage() {
                   placeholder={p.placeholder}
                   value={keys[p.id]}
                   onChange={(e) => setKeys((prev) => ({ ...prev, [p.id]: e.target.value }))}
-                  style={{
-                    width: "100%", padding: "14px 16px 14px 44px",
-                    background: "var(--bg-canvas)", border: "1px solid var(--border-strong)",
-                    borderRadius: "12px", fontSize: "14px", color: "var(--text-primary)",
-                    fontFamily: "var(--font-mono)", outline: "none",
-                    transition: "all 0.2s var(--ease-out)", boxShadow: "var(--shadow-sm)"
-                  }}
-                  onFocus={(e) => e.target.style.borderColor = "var(--accent)"}
-                  onBlur={(e) => e.target.style.borderColor = "var(--border-strong)"}
+                  className="pds-input mono icon"
                 />
               </div>
             </div>
           ))}
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "24px", borderTop: "1px solid var(--border-subtle)" }}>
-          <div style={{ fontSize: "13px", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "6px" }}>
-            {status === "saved" && <><CheckCircle2 size={16} color="var(--green)" /> <span style={{ color: "var(--green)" }}>Synced securely</span></>}
-            {status === "error" && <><AlertCircle size={16} color="var(--red)" /> <span style={{ color: "var(--red)" }}>Update failed</span></>}
-            {status === "saving" && <span>Encrypting...</span>}
-          </div>
-          
+        <div className="flex flex-col gap-3 pt-6 border-t border-[var(--pds-border-subtle)]">
           <button
             onClick={handleSave}
             disabled={status === "saving"}
-            style={{
-              display: "inline-flex", alignItems: "center", gap: "8px",
-              padding: "12px 24px", background: "var(--text-primary)",
-              border: "1px solid var(--text-primary)", borderRadius: "30px",
-              fontSize: "14px", fontWeight: 500, color: "var(--bg-canvas)",
-              cursor: status === "saving" ? "not-allowed" : "pointer", 
-              transition: "all 0.2s var(--ease-out)",
-              boxShadow: "var(--shadow-md)", fontFamily: "var(--font-sans)",
-              opacity: status === "saving" ? 0.7 : 1
-            }}
-            onMouseEnter={(e) => {
-              if (status !== "saving") {
-                e.currentTarget.style.transform = "translateY(-2px)";
-                e.currentTarget.style.boxShadow = "var(--shadow-lg)";
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (status !== "saving") {
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "var(--shadow-md)";
-              }
-            }}
+            className="pds-btn-primary"
           >
             <Save size={16} />
             {status === "saving" ? "Saving..." : "Save Configuration"}
           </button>
+          <div className="min-h-[20px] flex justify-center">
+            {status === "saved" && <div className="pds-feedback success"><CheckCircle2 size={16} /> Synced securely</div>}
+            {status === "error" && <div className="pds-feedback error"><AlertCircle size={16} /> Update failed</div>}
+            {status === "saving" && <div className="pds-feedback loading"><div className="pds-spinner" /> Encrypting...</div>}
+          </div>
         </div>
       </div>
     </div>

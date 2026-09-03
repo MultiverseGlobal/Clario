@@ -59,43 +59,28 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
 
   return (
     <div
-      className="animate-blur-in"
-      style={{
-        position: "fixed", inset: 0, zIndex: 100,
-        background: "rgba(248, 247, 244, 0.4)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
-        display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: "12vh"
-      }}
+      className="pds-animate-fade fixed inset-0 z-[100] bg-[rgba(7,8,12,0.6)] backdrop-blur-md flex items-start justify-center pt-[12vh]"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div
-        className="animate-enter"
-        style={{
-          width: "100%", maxWidth: "560px",
-          background: "var(--bg-surface)", border: "1px solid var(--border-strong)",
-          borderRadius: "16px", boxShadow: "var(--shadow-float)", overflow: "hidden"
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid var(--border-subtle)" }}>
-          <Search size={18} color="var(--text-muted)" style={{ flexShrink: 0 }} />
+      <div className="pds-animate-slide-up auth-card w-full max-w-lg overflow-hidden">
+        <div className="flex items-center px-5 py-4 border-b border-[var(--pds-border-subtle)]">
+          <Search size={18} className="text-[var(--pds-text-muted)] shrink-0" />
           <input
             autoFocus
             value={query}
             onChange={(e) => { setQuery(e.target.value); setSelectedIndex(0); }}
             onKeyDown={handleKeyDown}
             placeholder="Type a command or search..."
-            style={{
-              width: "100%", background: "transparent", border: "none", outline: "none",
-              fontSize: "16px", color: "var(--text-primary)", padding: "0 16px", fontFamily: "var(--font-sans)"
-            }}
+            className="w-full bg-transparent border-none outline-none text-base text-[var(--pds-text-primary)] px-4 font-sans"
           />
-          <div style={{ display: "flex", gap: "4px" }}>
-            <span style={{ fontSize: "10px", padding: "4px 6px", background: "var(--bg-canvas)", border: "1px solid var(--border-subtle)", borderRadius: "4px", color: "var(--text-muted)" }}>ESC</span>
+          <div className="flex gap-1">
+            <span className="text-[10px] px-1.5 py-1 bg-[var(--pds-surface-2)] border border-[var(--pds-border-subtle)] rounded text-[var(--pds-text-muted)]">ESC</span>
           </div>
         </div>
 
-        <div style={{ maxHeight: "360px", overflowY: "auto", padding: "8px" }}>
+        <div className="max-h-[360px] overflow-y-auto p-2">
           {commands.length === 0 ? (
-            <div style={{ padding: "32px", textAlign: "center", color: "var(--text-muted)", fontSize: "14px" }}>
+            <div className="py-8 text-center text-sm text-[var(--pds-text-muted)]">
               No commands found.
             </div>
           ) : (
@@ -106,25 +91,24 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                   key={cmd.id}
                   onClick={() => cmd.action()}
                   onMouseEnter={() => setSelectedIndex(i)}
-                  style={{
-                    width: "100%", display: "flex", alignItems: "center", gap: "12px",
-                    padding: "12px 16px", background: isSelected ? "var(--bg-hover)" : "transparent",
-                    border: "none", borderRadius: "10px", cursor: "pointer",
-                    textAlign: "left", transition: "background 0.1s"
-                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors text-left cursor-pointer ${
+                    isSelected
+                      ? "bg-[var(--pds-surface-2)] border-[var(--pds-border-subtle)]"
+                      : "bg-transparent border-transparent"
+                  }`}
                 >
-                  <div style={{ width: "24px", height: "24px", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-secondary)" }}>
+                  <div className="w-6 h-6 flex items-center justify-center text-[var(--pds-text-muted)]">
                     {cmd.icon}
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <span style={{ display: "block", fontSize: "14px", fontWeight: 500, color: isSelected ? "var(--accent)" : "var(--text-primary)" }}>
+                  <div className="flex-1">
+                    <span className={`block text-[13px] font-medium transition-colors ${isSelected ? "text-[var(--pds-accent)]" : "text-[var(--pds-text-primary)]"}`}>
                       {cmd.label}
                     </span>
-                    <span className="label-mono" style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "2px", display: "block" }}>
+                    <span className="font-mono text-[10px] uppercase tracking-widest text-[var(--pds-text-muted)] mt-0.5 block">
                       {cmd.category}
                     </span>
                   </div>
-                  {isSelected && <ArrowRight size={14} color="var(--accent)" />}
+                  {isSelected && <ArrowRight size={14} className="text-[var(--pds-accent)]" />}
                 </button>
               );
             })
