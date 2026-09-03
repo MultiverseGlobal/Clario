@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import { COLOR, APPS, AppId } from "./tokens";
+import { useState, useEffect, useRef } from "react";
+import { APPS, AppId } from "./tokens";
 
 /**
  * EcosystemSwitcher — The 9-dot waffle present in every web app header.

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { COLOR, APPS, AppId } from "./tokens";
 
 /**
@@ -57,12 +57,12 @@ function useRecent() {
   return { getRecent, addRecent };
 }
 
-export function CommandPalette({ extraCommands = [], currentApp }: CommandPaletteProps) {
+export function CommandPalette({ extraCommands = [] }: CommandPaletteProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIdx, setActiveIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
-  const { getRecent, addRecent } = useRecent();
+  const { addRecent } = useRecent();
 
   // Global ⌘K / Ctrl+K listener
   useEffect(() => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Grip, Map, Video, BookOpen, Fingerprint, Mic } from 'lucide-react';
 
 const APPS = [
