@@ -19,6 +19,7 @@
     "react-dom": ">=18.0.0"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.115.0",
     "cmdk": "^1.0.0",
     "lucide-react": "^0.462.0",
     "tailwind-merge": "^2.6.0"
@@ -28,4 +29,3 @@
     "typescript": "^5.3.3"
   }
 }
-

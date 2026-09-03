@@ -1,4 +1,5 @@
 // ─── Clario Harvester AI & Intelligence Engine (Gemini 2.0 Flash) ──────────
+import { supabase } from './supabase';
 
 import type {
   ShotRecord,
@@ -14,20 +15,59 @@ import type {
 
 export const GEMINI_MODEL = "gemini-2.0-flash";
 
+let memoryApiKey: string | null = null;
 let geminiAvailable = true;
 
 export function getApiKey(): string {
-  return (
-    (typeof import.meta !== "undefined" && import.meta.env?.VITE_GEMINI_API_KEY) ||
-    localStorage.getItem("clario_gemini_api_key") ||
-    localStorage.getItem("gemini_api_key") ||
-    ""
-  );
+  if (typeof import.meta !== "undefined" && import.meta.env?.VITE_GEMINI_API_KEY) {
+    return import.meta.env.VITE_GEMINI_API_KEY;
+  }
+  return memoryApiKey || "";
 }
 
-export function setApiKey(key: string): void {
-  localStorage.setItem("clario_gemini_api_key", key.trim());
+export async function fetchApiKeyFromDb(): Promise<void> {
+  try {
+    const { data: userAuth } = await supabase.auth.getUser();
+    if (userAuth.user) {
+      const { data } = await supabase
+        .from('clario_user_settings')
+        .select('gemini_api_key')
+        .eq('user_id', userAuth.user.id)
+        .maybeSingle();
+      if (data?.gemini_api_key) {
+        memoryApiKey = data.gemini_api_key;
+        return;
+      }
+    }
+  } catch (err) {
+    console.error("Failed to fetch API key from DB:", err);
+  }
+  
+  // Fallback migration from local storage
+  try {
+    const custom = localStorage.getItem("clario_gemini_api_key") || localStorage.getItem("gemini_api_key");
+    if (custom) {
+      memoryApiKey = custom;
+      await setApiKey(custom); // migrate
+      localStorage.removeItem("clario_gemini_api_key");
+      localStorage.removeItem("gemini_api_key");
+    }
+  } catch {}
+}
+
+export async function setApiKey(key: string): Promise<void> {
+  memoryApiKey = key.trim();
   geminiAvailable = true;
+  try {
+    const { data: userAuth } = await supabase.auth.getUser();
+    if (userAuth.user) {
+      await supabase
+        .from('clario_user_settings')
+        .upsert({ user_id: userAuth.user.id, gemini_api_key: memoryApiKey as any }, { onConflict: 'user_id' });
+    }
+  } catch (err) {
+    console.error("Failed to save API key to DB:", err);
+  }
 }
 
 export function isGeminiAvailable(): boolean {

@@ -25,6 +25,7 @@ export default function ProfilePage() {
   const handleSignOut = () => {
     localStorage.removeItem("metaphor_api_key");
     localStorage.removeItem("metaphor_token");
+    import("@/lib/settings").then(m => m.pushSettingsToCloud());
     router.push("/");
   };
 

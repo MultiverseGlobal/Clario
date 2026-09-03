@@ -3,11 +3,12 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Network, Database, Key, Plug, Settings, Sidebar, User, ChevronDown, Layers, Terminal, Inbox, LogOut, Folder, Activity } from "lucide-react";
+import { Network, Database, Key, Plug, Settings, Sidebar, User, ChevronDown, Layers, Terminal, Inbox, LogOut, Folder, Activity, Zap } from "lucide-react";
 
 import { Kbd } from "@/components/ui/Kbd";
 import { MetaphorLogo } from "@/components/ui/MetaphorLogo";
 import { EcosystemSwitcher } from "@/components/ui/EcosystemSwitcher";
+import { WeavePanel } from "@/components/WeavePanel";
 
 export default function LinearLayout({
   children,
@@ -15,6 +16,7 @@ export default function LinearLayout({
   children: React.ReactNode;
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isWeavePanelOpen, setIsWeavePanelOpen] = useState(false);
   const [user, setUser] = useState<{ name: string; email: string } | null>(null);
   const pathname = usePathname();
 
@@ -55,8 +57,14 @@ export default function LinearLayout({
       }
     }
     fetchUser();
+    
+    // Cloud Sync
+    import("@/lib/settings").then(m => m.pullSettingsFromCloud());
 
-    const handleProfileUpdate = () => fetchUser();
+    const handleProfileUpdate = () => {
+      fetchUser();
+      import("@/lib/settings").then(m => m.pushSettingsToCloud());
+    };
     window.addEventListener("user-profile-updated", handleProfileUpdate);
     return () => window.removeEventListener("user-profile-updated", handleProfileUpdate);
   }, []);
@@ -196,14 +204,46 @@ export default function LinearLayout({
           </div>
 
           {/* Google-Style 9-Dot Ecosystem Waffle Switcher */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {/* Weave Panel Toggle */}
+            <button
+              onClick={() => setIsWeavePanelOpen(o => !o)}
+              className={`p-1.5 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${
+                isWeavePanelOpen
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted hover:bg-surface-2 hover:text-foreground'
+              }`}
+              title="Toggle Weave Intelligence Panel"
+            >
+              <Zap className="w-4 h-4" />
+            </button>
             <EcosystemSwitcher />
           </div>
         </header>
 
         {/* Workspace Void */}
-        <div className="flex-1 overflow-y-auto relative z-10">
-          {children}
+        <div className="flex-1 overflow-hidden relative z-10 flex">
+          <div className="flex-1 overflow-y-auto">
+            {children}
+          </div>
+
+          {/* Weave Panel — collapsible right column */}
+          <div
+            style={{
+              width: isWeavePanelOpen ? 340 : 0,
+              minWidth: isWeavePanelOpen ? 340 : 0,
+              overflow: 'hidden',
+              transition: 'all 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
+              borderLeft: isWeavePanelOpen ? '1px solid var(--border-subtle, rgba(17,19,24,0.07))' : 'none',
+              background: 'var(--surface-1, #fff)',
+            }}
+          >
+            {isWeavePanelOpen && (
+              <div style={{ width: 340, height: '100%', overflowY: 'auto' }}>
+                <WeavePanel />
+              </div>
+            )}
+          </div>
         </div>
       </div>
       

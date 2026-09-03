@@ -5,10 +5,11 @@ import type { HarvesterMode, HarvestProject } from './types/assets';
 import { WorkspaceEditor } from './components/layout/WorkspaceEditor';
 import { harvestVideoProject, harvestSlideProject } from './lib/extractor';
 import { saveProject, listProjects, getVaultAssetsCount, type ClarioProject } from './lib/projectStore';
-import { checkServerHealth, uploadToWorker, pollJobStatus } from './lib/apiClient';
-import { getApiKey, setApiKey } from './lib/gemini';
+import { checkServerHealth, uploadToWorker, pollJobStatus, fetchApiBaseFromDb } from './lib/apiClient';
+import { getApiKey, setApiKey, fetchApiKeyFromDb } from './lib/gemini';
 import { AppShell, type ClarioPhase } from './components/layout/AppShell';
 import { BrandKitPanel } from './components/ui/BrandKitPanel';
+import { fetchBrandKitFromDb } from './lib/brandKit';
 import { syncProjectHarvested } from './lib/metaphorSync';
 import { ReferenceLibraryPanel } from './components/workbenches/ReferenceLibraryPanel';
 import { ScriptAnalysisWorkbench } from './components/workbenches/ScriptAnalysisWorkbench';
@@ -25,10 +26,22 @@ export default function App() {
   // Shell modals
   const [brandKitOpen, setBrandKitOpen] = useState(false);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
-  const [apiKeyInput, setApiKeyInput] = useState(getApiKey());
+  const [apiKeyInput, setApiKeyInput] = useState("");
   const [savedKeySuccess, setSavedKeySuccess] = useState(false);
   const [allProjects, setAllProjects] = useState<ClarioProject[]>([]);
   const [vaultCount, setVaultCount] = useState<number>(0);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+
+  useEffect(() => {
+    Promise.all([
+      fetchApiKeyFromDb(),
+      fetchApiBaseFromDb(),
+      fetchBrandKitFromDb()
+    ]).finally(() => {
+      setApiKeyInput(getApiKey());
+      setSettingsLoaded(true);
+    });
+  }, []);
 
   const ffmpegRef = useState(() => new FFmpeg())[0];
 
@@ -155,6 +168,10 @@ export default function App() {
     setCurrentPhase(p);
     if (p === 'home' || p === 'vault') setCurrentProject(null);
   };
+
+  if (!settingsLoaded) {
+    return <div className="h-screen w-screen flex items-center justify-center bg-background text-muted">Loading settings...</div>;
+  }
 
   return (
     <AppShell

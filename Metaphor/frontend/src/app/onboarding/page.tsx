@@ -33,6 +33,7 @@ function OnboardingContent() {
       localStorage.setItem("metaphor_projects", JSON.stringify(projects));
     }
     
+    import("@/lib/settings").then(m => m.pushSettingsToCloud());
     router.push("/dashboard");
   };
 

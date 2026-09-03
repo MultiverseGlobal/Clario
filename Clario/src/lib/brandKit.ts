@@ -1,8 +1,9 @@
 // ── Brand Kit: persistent brand identity across Clario sessions ───────────────
 // Stores brand colors, fonts, and logo in localStorage.
 // Used by EditorPhase to auto-apply brand defaults to new slides.
+import { supabase } from './supabase';
 
-const BRAND_KEY = 'clario-brand-kit';
+const BRAND_KEY = 'clario-brand-kit'; // legacy key, can be ignored or migrated
 
 export interface BrandKit {
   primaryColor: string;
@@ -25,23 +26,65 @@ export const DEFAULT_BRAND: BrandKit = {
   name: '',
 };
 
+let memoryBrandKit: BrandKit = { ...DEFAULT_BRAND };
+
 export function getBrandKit(): BrandKit {
+  return memoryBrandKit;
+}
+
+export async function fetchBrandKitFromDb(): Promise<void> {
+  try {
+    const { data: userAuth } = await supabase.auth.getUser();
+    if (userAuth.user) {
+      const { data } = await supabase
+        .from('clario_user_settings')
+        .select('brand_kit')
+        .eq('user_id', userAuth.user.id)
+        .maybeSingle();
+      if (data?.brand_kit) {
+        memoryBrandKit = { ...DEFAULT_BRAND, ...(data.brand_kit as any) };
+        return;
+      }
+    }
+  } catch (err) {
+    console.error("Failed to fetch brand kit from DB:", err);
+  }
+  
+  // Fallback migration from local storage
   try {
     const raw = localStorage.getItem(BRAND_KEY);
-    if (!raw) return { ...DEFAULT_BRAND };
-    return { ...DEFAULT_BRAND, ...JSON.parse(raw) };
-  } catch {
-    return { ...DEFAULT_BRAND };
+    if (raw) {
+      memoryBrandKit = { ...DEFAULT_BRAND, ...JSON.parse(raw) };
+      await saveBrandKit(memoryBrandKit); // migrate
+      localStorage.removeItem(BRAND_KEY);
+    }
+  } catch {}
+}
+
+export async function saveBrandKit(kit: Partial<BrandKit>): Promise<BrandKit> {
+  memoryBrandKit = { ...memoryBrandKit, ...kit };
+  try {
+    const { data: userAuth } = await supabase.auth.getUser();
+    if (userAuth.user) {
+      await supabase
+        .from('clario_user_settings')
+        .upsert({ user_id: userAuth.user.id, brand_kit: memoryBrandKit as any }, { onConflict: 'user_id' });
+    }
+  } catch (err) {
+    console.error("Failed to save brand kit to DB:", err);
   }
+  return memoryBrandKit;
 }
 
-export function saveBrandKit(kit: Partial<BrandKit>): BrandKit {
-  const current = getBrandKit();
-  const updated = { ...current, ...kit };
-  localStorage.setItem(BRAND_KEY, JSON.stringify(updated));
-  return updated;
-}
-
-export function clearBrandKit(): void {
-  localStorage.removeItem(BRAND_KEY);
+export async function clearBrandKit(): Promise<void> {
+  memoryBrandKit = { ...DEFAULT_BRAND };
+  try {
+    const { data: userAuth } = await supabase.auth.getUser();
+    if (userAuth.user) {
+      await supabase
+        .from('clario_user_settings')
+        .update({ brand_kit: memoryBrandKit as any })
+        .eq('user_id', userAuth.user.id);
+    }
+  } catch {}
 }

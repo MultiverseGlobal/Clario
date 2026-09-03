@@ -1,4 +1,5 @@
 import { db, type DexieProjectRecord, type DexieVaultAssetRecord } from './dexieDb';
+import { supabase } from './supabase';
 import {
   type HarvestProject,
   type HarvesterMode,
@@ -365,6 +366,29 @@ export async function saveProject(project: ClarioProject | HarvestProject): Prom
 
   // Index all outputs in global Vault
   await syncProjectToVault(harvestData);
+
+  // Sync metadata to Supabase Cloud
+  try {
+    const { data: userAuth } = await supabase.auth.getUser();
+    if (userAuth.user) {
+      await supabase.from('clario_projects').upsert({
+        id: dexieRecord.id,
+        user_id: userAuth.user.id,
+        name: dexieRecord.name,
+        mode: dexieRecord.mode,
+        script_text: (project as ClarioProject).scriptText || '',
+        metadata: {
+          slides: (project as ClarioProject).slides || [],
+          trackItems: (project as ClarioProject).trackItems || [],
+          selectedAssets: (project as ClarioProject).selectedAssets || [],
+        },
+        thumbnail: (project as ClarioProject).thumbnail || harvestData.shots?.[0]?.frame_url || harvestData.slides?.[0]?.image_url || null,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'id' });
+    }
+  } catch (err) {
+    console.warn("Failed to sync project metadata to Supabase:", err);
+  }
 }
 
 /**
@@ -552,6 +576,16 @@ export async function deleteProject(id: string): Promise<void> {
   await db.jobs.where('project_id').equals(id).delete();
   await db.vaultAssets.where('projectId').equals(id).delete();
   await db.vaultAssets.where('project_id').equals(id).delete();
+
+  // Sync deletion to Supabase Cloud
+  try {
+    const { data: userAuth } = await supabase.auth.getUser();
+    if (userAuth.user) {
+      await supabase.from('clario_projects').delete().eq('id', id).eq('user_id', userAuth.user.id);
+    }
+  } catch (err) {
+    console.warn("Failed to delete project from Supabase:", err);
+  }
 }
 
 /**

@@ -92,6 +92,7 @@ export default function SettingsPage() {
         name: userName,
         settings: newSettings
       }, "PUT");
+      import("@/lib/settings").then(m => m.pushSettingsToCloud());
     } catch (e) {
       console.error("Failed to save settings", e);
     }
