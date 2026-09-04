@@ -4,6 +4,7 @@ import { InterventionDrawer } from "../components/InterventionDrawer";
 import { AtlasCommandPalette } from "../components/AtlasCommandPalette";
 import { SpatialCanvas } from "../components/SpatialCanvas";
 import { EcosystemSwitcher } from "../components/atlas/EcosystemSwitcher";
+import { LogoMark } from "../components/atlas/Logo";
 import { 
   Search, Sparkles, Zap, Shield, ArrowUpRight, Radio, Compass, 
   Sun, Moon, Volume2, VolumeX, CheckCircle2 
@@ -272,15 +273,46 @@ export default function Index() {
             : "bg-[#F8F7F4]/80 border-b border-black/[0.06] shadow-sm"
         }`}
       >
-        {/* Left: Brand & Engine status */}
-        <div className="flex items-center gap-3">
-          <span className="font-display text-base tracking-wider uppercase font-bold">
-            Atlas
-          </span>
-          <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 font-mono text-[10px] uppercase tracking-wider">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping" />
-            <span>Spatial Engine</span>
+        {/* Left: Brand Identity & Unified Navigation */}
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2.5">
+            <div className={`h-8 w-8 rounded-xl border flex items-center justify-center transition-colors ${
+              isDark ? "bg-white/[0.04] border-white/10 text-white" : "bg-white border-neutral-200 text-neutral-900 shadow-sm"
+            }`}>
+              <LogoMark size={16} />
+            </div>
+            <span className="font-display text-base tracking-wider uppercase font-bold">
+              Atlas
+            </span>
           </div>
+
+          {/* Central Workspace Navigation Tabs */}
+          <nav className="hidden md:flex items-center gap-1 p-1 rounded-xl border bg-[var(--pds-surface-1)] border-[var(--pds-border-subtle)]">
+            <button
+              onClick={() => {}}
+              className={`px-3 py-1 rounded-lg text-xs font-mono font-semibold transition-all ${
+                isDark ? "bg-white/10 text-white" : "bg-neutral-200 text-neutral-900"
+              }`}
+            >
+              Command Studio
+            </button>
+            <button
+              onClick={() => navigate("/hq/engine")}
+              className={`px-3 py-1 rounded-lg text-xs font-mono transition-all hover:text-[var(--pds-text-primary)] cursor-pointer ${
+                isDark ? "text-white/60 hover:text-white" : "text-neutral-500 hover:text-neutral-900"
+              }`}
+            >
+              Pipeline & Deals
+            </button>
+            <button
+              onClick={() => navigate("/hq/settings")}
+              className={`px-3 py-1 rounded-lg text-xs font-mono transition-all hover:text-[var(--pds-text-primary)] cursor-pointer ${
+                isDark ? "text-white/60 hover:text-white" : "text-neutral-500 hover:text-neutral-900"
+              }`}
+            >
+              Settings
+            </button>
+          </nav>
         </div>
 
         {/* Right: Controls, ⌘K Command Palette, and Ecosystem Waffle Switcher */}

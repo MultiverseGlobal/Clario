@@ -74,7 +74,6 @@ const App = () => (
             <Route path="/hq/partnerships" element={<Navigate to="/hq/engine" replace />} />
             <Route path="/hq/media-jobs" element={<Navigate to="/hq/engine" replace />} />
             <Route path="/hq/proposal" element={<Navigate to="/hq/engine" replace />} />
-            <Route path="/landing" element={<Navigate to="/hq/engine" replace />} />
             <Route path="/start" element={<Navigate to="/hq/engine" replace />} />
             <Route path="/map/starter" element={<Navigate to="/hq/engine" replace />} />
             <Route path="/app" element={<Navigate to="/hq/engine" replace />} />
