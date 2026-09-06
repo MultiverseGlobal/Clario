@@ -1,0 +1,94 @@
+Starting video analysis...
+Submitting video analysis task...
+Task submitted (ID: video-analysis-72c447ea-605d-4fe3-9bc2-a9fe893e1be3)
+[8s] Status: Analyzing video content with AI...
+[33s] Still processing, please wait...
+[1m3s] Still processing, please wait...
+[1m30s] Status: Analysis completed
+[1m30s] Analysis completed!
+Full analysis result saved to: /home/ubuntu/video_uMb4M7VCRCE_analysis_20260901_165841.md
+Note: This tool performs AI-based visual and audio analysis, not verbatim transcription. For detailed speech transcription, use `manus-speech-to-text` instead.
+Analysis result:
+
+### Speaker Profile
+**Nils Wiere**
+*   **Role:** Freelance Design System Consultant.
+*   **Background:** Front-end development and UI/UX design.
+*   **Specialization:** Focus on usability, performance, and accessibility.
+*   **Community Role:** Host of the "Dev & Design Meetup."
+
+---
+
+### Direct Quotes
+1.  "A design token is an information associated with a name, at minimum a name/value pair." (W3C Design Tokens Community Group)
+2.  "Design tokens are a methodology for expressing design decisions in a platform-agnostic way so that they can be shared across different disciplines, tools, and technologies." (W3C Design Tokens Community Group)
+3.  "Subatomic particles = the smallest pieces of a design." (Brad Frost)
+4.  "The human aspects of your system are more complicated than the tooling. Spend more time on creating a shared language and less time on tools." (Yesenia Perez-Cruz, Senior UX Manager at Shopify)
+5.  "Design tokens are an invitation for developers & designers to work closer together."
+6.  "Don't work in silos. Learn from each other."
+7.  "Individuals and interactions over processes and tools." (Agile Manifesto)
+8.  "Tokens are the glue that holds everything together [in a design system]."
+9.  "Keeping design across teams, tools & platforms manually in sync costs time and may lead to errors."
+10. "Raw values don't provide a semantic meaning."
+
+---
+
+### Data Points and Named Concepts
+
+#### Token Tiers and Naming Conventions
+*   **Generic Tokens (Tier 1):** Also known as Global, Option, Core, Base, Fundamental, Definition, Primitive, or Reference tokens. These contain the raw values (e.g., `indigo-500: #6759FF`).
+*   **Semantic Tokens (Tier 2):** Also known as Alias, Decision, Theme, or System tokens. These communicate intent (e.g., `text-accent` points to `indigo-500`).
+*   **Component Tokens:** Specific to UI elements (e.g., `button-primary-background` points to `text-accent`).
+*   **Composite Tokens:** Tokens whose value is made up of multiple named child values (e.g., Typography tokens containing font-family, size, weight, and line-height).
+
+#### Concrete Examples
+*   **Spotify (2015 Rebrand):** It took several months to propagate a new green color across all platforms due to manual updates.
+*   **Spotify (2018):** Managed 45 platforms, 22 design systems, 200 designers, and 2,000 engineers using tokens.
+*   **Condé Nast (Brad Frost Inventory):** An interface inventory revealed dozens of slightly different red buttons for the same brand.
+*   **Lyft:** An internal inventory found 15 different variants of a similar pink tone.
+*   **Aliasing Examples:** `text-primary` (Slate-100), `text-secondary` (Slate-200), `bg-secondary` (Slate-900), `text-accent` (Indigo-500).
+
+#### Tools and Frameworks
+*   **Transformation:** Style Dictionary (most popular), Supernova, Tokens Studio.
+*   **Design:** Figma (Variables, REST API), Tokens Studio plugin, Penpot (native token support coming).
+*   **Documentation:** Supernova, Zeroheight.
+*   **Code:** CSS Custom Properties, Sass/Less, Tailwind (prefers generic names but can be customized).
+
+---
+
+### Key Arguments
+*   **Single Source of Truth:** Moving design decisions into a platform-agnostic repository (typically JSON) outside of specific tools.
+*   **Efficiency and Scalability:** Automating the sync between design tools and code across multiple platforms (Web, iOS, Android).
+*   **Improved Collaboration:** Establishing a common vocabulary between designers and developers to reduce miscommunication.
+*   **Consistency:** Reducing "cognitive load" for users by ensuring a uniform UI across different parts of a product.
+*   **Theming Power:** Aliasing allows for global control of multiple themes (Dark Mode, High Contrast, White Labeling) from one source.
+
+---
+
+### Counterarguments and Risks
+*   **No Official Standard:** While the W3C is working on a format, it is not yet a final official standard.
+*   **Added Complexity:** Requires significant setup in terms of tooling and build processes.
+*   **Over-engineering:** For small projects with single teams/platforms, tokens may be overkill.
+*   **Naming is Hard:** Developing a naming convention that satisfies all stakeholders is a significant time investment.
+*   **Creativity Constraints:** Designers may feel restricted if every decision is strictly tokenized.
+
+---
+
+### Actionable Rules for a Design System
+
+#### 1. Implementation Pipeline
+*   **Storage:** Store tokens in a central, versioned repository (e.g., GitHub) as JSON files.
+*   **Transformation:** Use a transformer (like Style Dictionary) to convert JSON into platform-specific code (CSS variables, Swift, XML, TypeScript).
+*   **Distribution:** Distribute transformed tokens via NPM, CDN, or API.
+
+#### 2. Naming and Aliasing Rules
+*   **Never use raw values** in the final UI code; always reference a semantic token.
+*   **Use Aliasing:** Map generic color options (e.g., `blue-500`) to semantic intents (e.g., `action-color`).
+*   **Namespace Tokens:** Use prefixes for the company or design system name to avoid collisions in third-party platforms.
+*   **Include Metadata:** Add `$type`, `$description`, and `$deprecated` properties to JSON definitions for better documentation.
+
+#### 3. Workflow Recommendations
+*   **Designer-to-Code Sync:** Use plugins like Tokens Studio to allow designers to push token changes directly to the code repository.
+*   **Semantic Layering:** Build a robust semantic layer to allow for easy rebranding or theme switching without touching the component markup.
+*   **Human-Centric Design:** Prioritize the creation of a shared language over the technical implementation of tools.
+*   **Progressive Adoption:** Start with colors and typography before moving to more complex composite tokens like shadows or animations.

@@ -18,7 +18,7 @@ interface EcosystemSwitcherProps {
   currentApp?: AppId;
 }
 
-const GRID_ORDER: AppId[] = ["orion", "atlas", "clario", "metaphor", "weave", "id"];
+const GRID_ORDER: AppId[] = ["orion", "atlas", "clario", "metaphor", "id"];
 
 export function EcosystemSwitcher({ currentApp }: EcosystemSwitcherProps) {
   const [open, setOpen] = useState(false);

@@ -15,6 +15,7 @@ import HqRevenueEngine from "./pages/hq/HqRevenueEngine";
 import HqLeadDetail from "./pages/hq/HqLeadDetail";
 import HqProposal from "./pages/hq/HqProposal";
 import HqSettings from "./pages/hq/HqSettings";
+import Objectives from "./pages/Objectives";
 import PublicProfile from "./pages/PublicProfile";
 import Landing from "./pages/Landing";
 import Index from "./pages/Index";
@@ -37,8 +38,9 @@ const App = () => (
         <SovereignSyncWrapper>
           <AuthProvider>
           <Routes>
-            {/* ── Home: Autonomous Command Center ──────────────────────── */}
+            {/* ── Atlas V1 Core Surfaces ───────────────────────────────── */}
             <Route path="/" element={<Index />} />
+            <Route path="/objectives" element={<Objectives />} />
             <Route path="/workspace" element={<Index />} />
             <Route path="/command" element={<Index />} />
             <Route path="/landing" element={<Landing />} />
