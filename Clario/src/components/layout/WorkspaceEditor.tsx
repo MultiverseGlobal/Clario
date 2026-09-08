@@ -29,7 +29,7 @@ export function WorkspaceEditor({
   const selectedShot = project?.shots.find(s => s.shot_id === selectedShotId) ?? null;
 
   return (
-    <div className="flex-1 flex overflow-hidden pt-20">
+    <div className="flex-1 flex overflow-hidden">
 
       {/* ── LEFT SIDEBAR: Asset Library ────────────────────────────────────── */}
       <aside

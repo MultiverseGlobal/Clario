@@ -187,7 +187,7 @@ export function ReferenceLibraryPanel({
       style={{
         display: 'grid',
         gridTemplateColumns: '340px 1fr',
-        height: 'calc(100vh - 52px)',
+        height: '100%',
         background: 'var(--pds-canvas)',
         overflow: 'hidden',
       }}
