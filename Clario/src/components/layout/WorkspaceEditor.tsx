@@ -35,7 +35,7 @@ export function WorkspaceEditor({
       <aside
         onDragOver={handleDragOver}
         onDrop={handleDrop}
-        className="w-72 shrink-0 border-r border-border-subtle bg-surface-1 flex flex-col pt-20"
+        className="w-72 shrink-0 clario-glass-panel border-y-0 border-l-0 border-r border-border-subtle flex flex-col pt-20"
       >
         {/* Sidebar header */}
         <div className="px-4 py-3 border-b border-border-subtle">
@@ -143,11 +143,11 @@ export function WorkspaceEditor({
               </div>
             </div>
           ) : (
-            <div className="clario-ambient-glow flex flex-col items-center gap-4 text-center px-8 py-16 rounded-2xl">
-              <div className="w-12 h-12 rounded-xl bg-surface-2 border border-border-subtle flex items-center justify-center shadow-sm">
-                <Film className="h-5 w-5 text-muted-foreground" />
+            <div className="clario-ambient-glow clario-glass-card flex flex-col items-center gap-4 text-center px-8 py-16 rounded-2xl shadow-sm">
+              <div className="w-12 h-12 rounded-xl bg-surface-1 border border-border-subtle flex items-center justify-center shadow-sm">
+                <Film className="h-5 w-5 text-foreground" />
               </div>
-              <p className="text-[13px] text-muted-foreground font-medium">
+              <p className="text-[14px] text-foreground font-semibold">
                 {project ? 'Select a shot from the library to preview.' : 'Harvest a video to get started.'}
               </p>
             </div>
@@ -184,7 +184,7 @@ export function WorkspaceEditor({
       </div>
 
       {/* ── RIGHT PANEL: Intelligence & Export ─────────────────────────────── */}
-      <aside className="w-80 shrink-0 border-l border-border-subtle bg-surface-1 flex flex-col pt-20">
+      <aside className="w-80 shrink-0 clario-glass-panel border-y-0 border-r-0 border-l border-border-subtle flex flex-col pt-20">
 
         {/* Panel header */}
         <div className="px-4 py-3 border-b border-border-subtle flex items-center justify-between">
@@ -232,11 +232,11 @@ export function WorkspaceEditor({
               </button>
             </div>
           ) : (
-            <div className="clario-ambient-glow flex flex-col items-center justify-center gap-3 text-center py-16 rounded-xl">
-              <div className="w-8 h-8 rounded-lg bg-surface-2 border border-border-subtle flex items-center justify-center">
-                <Film className="h-3.5 w-3.5 text-muted-foreground" />
+            <div className="clario-ambient-glow clario-glass-card flex flex-col items-center justify-center gap-3 text-center py-16 rounded-xl shadow-sm">
+              <div className="w-8 h-8 rounded-lg bg-surface-1 border border-border-subtle flex items-center justify-center shadow-sm">
+                <Film className="h-4 w-4 text-foreground" />
               </div>
-              <p className="text-[12px] text-muted-foreground leading-relaxed max-w-[180px]">
+              <p className="text-[13px] text-foreground font-semibold leading-relaxed max-w-[180px]">
                 Select a shot to view AI intelligence, transcripts, and rights resolution.
               </p>
             </div>
