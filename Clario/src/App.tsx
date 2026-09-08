@@ -181,8 +181,6 @@ export default function App() {
       onNavigatePhase={handleNavigatePhase}
       onOpenBrandKit={() => setBrandKitOpen(true)}
       onOpenApiKeyModal={() => setShowApiKeyModal(true)}
-
-      projectCount={allProjects.length}
       hasApiKey={Boolean(getApiKey())}
     >
       {/* ── Global Processing / Loading Modal ───────────────────────────────── */}

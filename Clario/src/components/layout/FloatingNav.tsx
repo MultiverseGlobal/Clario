@@ -21,7 +21,6 @@ import { ClarioPhase } from "./AppShell";
 
 interface FloatingNavProps {
   currentPhase: ClarioPhase;
-  projectCount: number;
   hasApiKey: boolean;
   theme: "light" | "dark";
   toggleTheme: () => void;
@@ -42,7 +41,6 @@ const WORKFLOW_STEPS: { step: string; label: string; phase: ClarioPhase }[] = [
 
 export function FloatingNav({
   currentPhase,
-  projectCount,
   hasApiKey,
   theme,
   toggleTheme,

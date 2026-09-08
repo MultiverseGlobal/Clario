@@ -1,9 +1,7 @@
 import { ReactNode, useEffect, useState } from 'react';
 import type { HarvestProject } from '../../types/assets';
-import { EcosystemSwitcher } from '../ui/EcosystemSwitcher';
 import { CommandPalette, useCrossAppBus } from '@pseudonyms/ui';
 import { supabase } from '../../lib/supabase';
-import { ChevronRight, Moon, Sun, FolderOpen, Database, Palette, Settings } from 'lucide-react';
 import { FloatingNav } from './FloatingNav';
 
 export type ClarioPhase =
@@ -22,16 +20,10 @@ interface AppShellProps {
   onNavigatePhase: (phase: ClarioPhase) => void;
   onOpenBrandKit: () => void;
   onOpenApiKeyModal: () => void;
-  projectCount: number;
   hasApiKey: boolean;
 }
 
-const WORKFLOW_STEPS: { step: string; label: string; phase: ClarioPhase }[] = [
-  { step: '01', label: 'Reference',  phase: 'ingest' },
-  { step: '02', label: 'Analyze',    phase: 'harvest_studio' },
-  { step: '03', label: 'Resolve',    phase: 'harvest_studio' },
-  { step: '04', label: 'Export',     phase: 'export' },
-];
+
 
 export function AppShell({
   children,
@@ -41,7 +33,6 @@ export function AppShell({
   onNavigatePhase,
   onOpenBrandKit,
   onOpenApiKeyModal,
-  projectCount,
   hasApiKey,
 }: AppShellProps) {
   const [theme, setTheme] = useState<'light' | 'dark'>(() =>
@@ -78,7 +69,6 @@ export function AppShell({
 
       <FloatingNav
         currentPhase={currentPhase}
-        projectCount={projectCount}
         hasApiKey={hasApiKey}
         theme={theme}
         toggleTheme={toggleTheme}
