@@ -217,7 +217,7 @@ export function ReferenceLibraryPanel({
               margin: '4px 0 0',
               fontSize: 18,
               fontWeight: 700,
-              fontFamily: "'Vanguard', Impact, Oswald, sans-serif",
+              fontFamily: "'Inter', system-ui, sans-serif",
               letterSpacing: '-0.02em',
               color: 'var(--pds-text-primary)',
               lineHeight: 1.1,
@@ -225,7 +225,7 @@ export function ReferenceLibraryPanel({
           >
             Ingest Reference
           </h2>
-          <p style={{ margin: '6px 0 0', fontSize: 12, fontFamily: "'Athelas', Georgia, serif", color: 'var(--pds-text-secondary)', lineHeight: 1.5 }}>
+          <p style={{ margin: '6px 0 0', fontSize: 12, fontFamily: "'Inter', system-ui, sans-serif", color: 'var(--pds-text-secondary)', lineHeight: 1.5 }}>
             Paste a YouTube, Instagram, or Drive URL — or drop a video file — to add footage to your library.
           </p>
         </div>
@@ -388,7 +388,7 @@ export function ReferenceLibraryPanel({
             <p style={{ margin: 0, fontSize: 9, fontFamily: "'JetBrains Mono', monospace", letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--pds-text-muted)' }}>
               {library.length} clips
             </p>
-            <h2 style={{ margin: '4px 0 0', fontSize: 18, fontWeight: 700, fontFamily: "'Vanguard', Impact, Oswald, sans-serif", letterSpacing: '-0.02em', color: 'var(--pds-text-primary)', lineHeight: 1.1 }}>
+            <h2 style={{ margin: '4px 0 0', fontSize: 18, fontWeight: 700, fontFamily: "'Inter', system-ui, sans-serif", letterSpacing: '-0.02em', color: 'var(--pds-text-primary)', lineHeight: 1.1 }}>
               Your Library
             </h2>
           </div>
@@ -422,7 +422,7 @@ export function ReferenceLibraryPanel({
                 <rect x="17" y="6" width="10" height="28" rx="1.5" stroke="var(--pds-border-mid)" strokeWidth="1.5"/>
                 <line x1="30" y1="6" x2="31.5" y2="34" stroke="var(--pds-border-mid)" strokeWidth="1.5" strokeLinecap="round"/>
               </svg>
-              <p style={{ margin: 0, fontSize: 13, color: 'var(--pds-text-muted)', fontFamily: "'Athelas', Georgia, serif" }}>
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--pds-text-muted)', fontFamily: "'Inter', system-ui, sans-serif" }}>
                 Your library is empty
               </p>
               <p style={{ margin: 0, fontSize: 11, color: 'var(--pds-text-disabled)', fontFamily: "'Inter', system-ui, sans-serif" }}>
@@ -489,7 +489,7 @@ export function ReferenceLibraryPanel({
                         {clip.title || clip.shot_id}
                       </p>
                       {clip.description && (
-                        <p style={{ margin: '3px 0 0', fontSize: 10, fontFamily: "'Athelas', Georgia, serif", color: 'var(--pds-text-secondary)', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                        <p style={{ margin: '3px 0 0', fontSize: 10, fontFamily: "'Inter', system-ui, sans-serif", color: 'var(--pds-text-secondary)', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                           {clip.description}
                         </p>
                       )}

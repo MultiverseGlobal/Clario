@@ -4,7 +4,7 @@ import { toBlobURL } from '@ffmpeg/util';
 import type { HarvesterMode, HarvestProject } from './types/assets';
 import { WorkspaceEditor } from './components/layout/WorkspaceEditor';
 import { harvestVideoProject, harvestSlideProject } from './lib/extractor';
-import { saveProject, listProjects, getVaultAssetsCount, type ClarioProject } from './lib/projectStore';
+import { saveProject, listProjects, type ClarioProject } from './lib/projectStore';
 import { checkServerHealth, uploadToWorker, pollJobStatus, fetchApiBaseFromDb } from './lib/apiClient';
 import { getApiKey, setApiKey, fetchApiKeyFromDb } from './lib/gemini';
 import { AppShell, type ClarioPhase } from './components/layout/AppShell';
@@ -30,7 +30,7 @@ export default function App() {
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [savedKeySuccess, setSavedKeySuccess] = useState(false);
   const [allProjects, setAllProjects] = useState<ClarioProject[]>([]);
-  const [vaultCount, setVaultCount] = useState<number>(0);
+
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   useEffect(() => {
@@ -50,8 +50,7 @@ export default function App() {
     try {
       const list = await listProjects();
       setAllProjects(list);
-      const vCount = await getVaultAssetsCount();
-      setVaultCount(vCount);
+
     } catch (err) {
       console.warn('Failed to list projects:', err);
     }
@@ -167,7 +166,7 @@ export default function App() {
 
   const handleNavigatePhase = (p: ClarioPhase) => {
     setCurrentPhase(p);
-    if (p === 'home' || p === 'vault') setCurrentProject(null);
+    if (p === 'home') setCurrentProject(null);
   };
 
   if (!settingsLoaded) {
@@ -182,7 +181,7 @@ export default function App() {
       onNavigatePhase={handleNavigatePhase}
       onOpenBrandKit={() => setBrandKitOpen(true)}
       onOpenApiKeyModal={() => setShowApiKeyModal(true)}
-      vaultCount={vaultCount}
+
       projectCount={allProjects.length}
       hasApiKey={Boolean(getApiKey())}
     >
