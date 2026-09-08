@@ -1,6 +1,8 @@
 // @ts-nocheck
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
+import { createClient } from "jsr:@supabase/supabase-js@2";
+
 declare const Deno: any;
 
 const corsHeaders = {
@@ -25,6 +27,33 @@ function extractJson(raw: string): any {
   }
   if (end === -1) throw new Error("Unterminated JSON object in AI response");
   return JSON.parse(text.slice(start, end + 1));
+}
+
+// ── Call OpenAI (Custom Key) ───────────────────────────────────────────────────
+async function callOpenAI(systemPrompt: string, userPrompt: string, apiKey: string): Promise<any> {
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`,
+    },
+    signal: AbortSignal.timeout(45000),
+    body: JSON.stringify({
+      model: "gpt-4o",
+      temperature: 0.4,
+      max_tokens: 2048,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`OpenAI error: ${res.status} ${err}`);
+  }
+  const data = await res.json();
+  return extractJson(data.choices[0].message.content);
 }
 
 // ── Call Kimi AI (primary LLM) ───────────────────────────────────────────────
@@ -100,7 +129,29 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    const authHeader = req.headers.get("authorization");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    
+    const isServiceCall = authHeader === `Bearer ${supabaseServiceKey}`;
+    const userClient = isServiceCall
+      ? createClient(supabaseUrl, supabaseServiceKey)
+      : createClient(supabaseUrl, supabaseAnonKey, {
+          global: { headers: { Authorization: authHeader || "" } },
+        });
+
     const body = await req.json();
+    
+    let dbSettings: any = null;
+    if (!isServiceCall && authHeader) {
+      const { data: { user } } = await userClient.auth.getUser();
+      if (user) {
+        const { data } = await userClient.from("atlas_user_settings").select("*").eq("user_id", user.id).single();
+        dbSettings = data;
+      }
+    }
+
     const {
       company,
       founder_name,
@@ -133,6 +184,7 @@ Deno.serve(async (req: Request) => {
 
     const kimiApiKey = Deno.env.get("KIMI_API_KEY") || Deno.env.get("MOONSHOT_API_KEY");
     const groqApiKey = Deno.env.get("GROQ_API_KEY");
+    const customApiKey = body.custom_api_key || dbSettings?.openai_api_key;
 
     const systemPrompt = `You are an expert B2B sales copywriter for an AI automation agency.
 Your job is to write outreach messages that sound like a curious, intelligent human — NOT a sales robot.
@@ -144,9 +196,10 @@ Core rules (non-negotiable):
 - The tone is: peer-to-peer, direct, brief, warm
 - Never use: "unlock", "empower", "synergy", "seamless", "leverage", "game-changer"
 - Never pitch a product or price in the first message
-- For email: max 120 words in the body
+- For email: max 130 words in the body (including the Clario video reference line)
 - For LinkedIn DM: max 60 words — casual, conversational
-- For Loom script: write what ${sender_name} will SAY in a 60-second personalised video — punchy, specific, visual
+- The email must end with a line referencing a short screen recording that shows exactly how the prospect's specific problem has already been solved. Leave the placeholder {{CLARIO_VIDEO_URL}} exactly as-is — it will be replaced automatically with the real video URL when the recording is ready.
+- For Loom/Clario script: write what ${sender_name} will SAY in a 90-second personalised screen recording — walk through the specific bottleneck, show the fix, and end with a call to action.
 
 The sender's name is ${sender_name}.`;
 
@@ -160,11 +213,13 @@ Bottleneck area: ${bottleneckArea}
 Hypothesis: ${hypothesis}
 Approach angle: ${approachAngle}
 
+IMPORTANT: At the very end of the email body, after your closing line, add exactly one natural sentence inviting them to watch a personalised screen recording we built for them. Use the literal token {{CLARIO_VIDEO_URL}} as the hyperlink target in markdown format. Example: "I put together a 60-second walkthrough specifically for ${company} — [watch it here]({{CLARIO_VIDEO_URL}})."
+
 Return ONLY this JSON (no markdown, no explanation):
 {
   "email": {
     "subject": "compelling, specific subject line (max 8 words)",
-    "body": "the full email body (plain text, no HTML, max 120 words)"
+    "body": "the full email body (plain text, no HTML, max 130 words, ending with the Clario recording CTA using {{CLARIO_VIDEO_URL}})"
   },
   "linkedin_dm": "the full LinkedIn DM (max 60 words, casual tone)",
   "loom_script": "what ${sender_name} says in the 60-second Loom video (spoken word style, specific to their bottleneck)"
@@ -172,7 +227,15 @@ Return ONLY this JSON (no markdown, no explanation):
 
     let result: any = null;
 
-    if (kimiApiKey) {
+    if (customApiKey) {
+      try {
+        result = await callOpenAI(systemPrompt, userPrompt, customApiKey);
+      } catch (e: any) {
+        console.warn("OpenAI failed:", e.message);
+      }
+    }
+
+    if (!result && kimiApiKey) {
       try {
         result = await callKimi(systemPrompt, userPrompt, kimiApiKey);
       } catch (e: any) {
@@ -188,13 +251,16 @@ Return ONLY this JSON (no markdown, no explanation):
       }
     }
 
-    // Hard fallback — always return something usable
     if (!result || !result.email) {
-      console.warn("Both LLMs failed — using fallback templates");
-      result = buildFallback(company, founderName, bottleneckArea, hypothesis);
+      throw new Error("All AI models failed to generate valid outreach copy.");
     }
 
-    return new Response(JSON.stringify(result), {
+    return new Response(JSON.stringify({
+      ...result,
+      // Signal to the frontend that this draft is ready to be paired with a Clario video
+      clario_placeholder_present: typeof result?.email?.body === "string" &&
+        result.email.body.includes("{{CLARIO_VIDEO_URL}}"),
+    }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

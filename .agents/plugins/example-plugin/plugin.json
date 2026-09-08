@@ -1,0 +1,5 @@
+{
+  "name": "example-plugin",
+  "description": "An example plugin demonstrating how to bundle skills, rules, and configurations.",
+  "version": "1.0.0"
+}

@@ -1,4 +1,4 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+﻿import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -43,27 +43,40 @@ interface SourcingRequest {
   field_mappings?: Record<string, string>;
 }
 
-// Scrape helper using Jina AI to bypass Cloudflare
-async function scrapeUrl(url: string): Promise<{ title: string; description: string; content: string }> {
+interface ProxyConfig { url: string; auth?: string; }
+
+// Build fetch init with optional proxy headers (Deno supports HTTP proxies via env or custom headers)
+function buildProxyHeaders(base: Record<string, string>, proxy?: ProxyConfig): Record<string, string> {
+  if (!proxy?.auth) return base;
+  // Encode proxy credentials as Proxy-Authorization header
+  const encoded = btoa(proxy.auth);
+  return { ...base, "Proxy-Authorization": `Basic ${encoded}` };
+}
+
+// Scrape helper using Jina AI — optionally routing through a user-configured proxy
+async function scrapeUrl(
+  url: string,
+  proxy?: ProxyConfig
+): Promise<{ title: string; description: string; content: string }> {
   try {
+    // If proxy is configured, use it as the fetch target and pass original URL as header
     const jinaUrl = `https://r.jina.ai/${url}`;
-    const res = await fetch(jinaUrl, {
+    const headers = buildProxyHeaders({ "Accept": "text/plain" }, proxy);
+    const fetchUrl = proxy?.url ? `${proxy.url}/${jinaUrl}` : jinaUrl;
+
+    const res = await fetch(fetchUrl, {
       signal: AbortSignal.timeout(15000),
-      headers: {
-        "Accept": "text/plain",
-      }
+      headers,
     });
-    
+
     if (!res.ok) {
       throw new Error(`Jina failed: ${res.status} ${res.statusText}`);
     }
-    
+
     const markdown = await res.text();
-    
-    // Extract title if present in Jina's output
     const titleMatch = markdown.match(/^Title:\s*(.+)$/m);
     const title = titleMatch ? titleMatch[1].trim() : url;
-    
+
     return { title, description: "", content: markdown.slice(0, 15000) };
   } catch (err: any) {
     console.error("Scraping error:", err.message);
@@ -71,17 +84,17 @@ async function scrapeUrl(url: string): Promise<{ title: string; description: str
   }
 }
 
-// Search helper to bypass Cloudflare on directories by fetching live profile snippets via DuckDuckGo
-async function searchDuckDuckGo(query: string): Promise<string> {
+// Search helper — DuckDuckGo with optional proxy
+async function searchDuckDuckGo(query: string, proxy?: ProxyConfig): Promise<string> {
   try {
-    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(8000),
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html",
-      }
-    });
+    const targetUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+    const fetchUrl = proxy?.url ? `${proxy.url}/${targetUrl}` : targetUrl;
+    const headers = buildProxyHeaders({
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Accept": "text/html",
+    }, proxy);
+
+    const res = await fetch(fetchUrl, { signal: AbortSignal.timeout(8000), headers });
     if (!res.ok) return "";
     const html = await res.text();
     const matches = html.match(/<a class="result__snippet"[^>]*>([\s\S]*?)<\/a>/gi) || [];
@@ -214,6 +227,33 @@ function sanitizeJsonString(str: string): string {
     }
   }
   return result;
+}
+
+// ── Call OpenAI (Custom Key) ───────────────────────────────────────────────────
+async function callOpenAI(systemPrompt: string, userPrompt: string, apiKey: string, expectArray = false): Promise<any> {
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`,
+    },
+    signal: AbortSignal.timeout(45000),
+    body: JSON.stringify({
+      model: "gpt-4o",
+      temperature: 0.1,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`OpenAI error: ${res.status} ${err}`);
+  }
+  const data = await res.json();
+  return extractJson(data.choices[0].message.content, expectArray);
 }
 
 // Call Kimi AI — model defaults to 8k for single calls; pass 32k + higher maxTokens for bulk arrays
@@ -621,6 +661,20 @@ Deno.serve(async (req: Request) => {
 
     const body: any = await req.json();
 
+    let dbSettings: any = null;
+    if (!isServiceCall) {
+      const { data: { user } } = await userClient.auth.getUser();
+      if (user) {
+        const { data } = await userClient.from("atlas_user_settings").select("*").eq("user_id", user.id).single();
+        dbSettings = data;
+      }
+    }
+
+    // Build proxy config if the user has one saved
+    const proxyConfig: ProxyConfig | undefined = dbSettings?.proxy_url
+      ? { url: dbSettings.proxy_url, auth: dbSettings.proxy_auth ?? undefined }
+      : undefined;
+
     let userId: string;
     if (isServiceCall) {
       userId = body.user_id || "service-role";
@@ -676,7 +730,7 @@ Deno.serve(async (req: Request) => {
 
       if (sourceUrl && (!body.raw_text || isRawTextActuallyUrl)) {
         console.log(`Scraping URL: ${sourceUrl}`);
-        const scraped = await scrapeUrl(sourceUrl);
+        const scraped = await scrapeUrl(sourceUrl, proxyConfig);
         console.log(`Scraped title: ${scraped.title}`);
         contentToAnalyze = `URL: ${sourceUrl}\nTitle: ${scraped.title}\nMeta Description: ${scraped.description}\nPage Content:\n${scraped.content}`;
       } else if (body.raw_text) {
@@ -895,7 +949,7 @@ Return ONLY a valid JSON object matching this exact schema:
             if (isRestricted) {
               throw new Error("Direct scraping of LinkedIn, X, and Product Hunt is disabled.");
             }
-            const scraped = await scrapeUrl(url);
+            const scraped = await scrapeUrl(url, proxyConfig);
             const contentToAnalyze = `URL: ${url}\nTitle: ${scraped.title}\nMeta Description: ${scraped.description}\nPage Content:\n${scraped.content}`;
             return await callAi(singleSystemPrompt, contentToAnalyze);
           })
@@ -1654,7 +1708,7 @@ Return ONLY a valid JSON array:
       try {
         // Search DuckDuckGo for Clutch agency profiles matching the criteria
         const query = `site:clutch.co/profile/ "${industry}"${location} "5 - 49 Employees"`;
-        const snippets = await searchDuckDuckGo(query);
+        const snippets = await searchDuckDuckGo(query, proxyConfig);
 
         if (!snippets.trim()) {
           return new Response(JSON.stringify({ leads: [], rejected: [], total: 0, message: "No agencies found on Clutch matching this criteria." }), {
@@ -1704,7 +1758,7 @@ Return ONLY a valid JSON array:
       
       try {
         const query = `site:upwork.com/agencies/ "${keyword}"`;
-        const snippets = await searchDuckDuckGo(query);
+        const snippets = await searchDuckDuckGo(query, proxyConfig);
 
         if (!snippets.trim()) {
           return new Response(JSON.stringify({ leads: [], rejected: [], total: 0, message: "No agencies found on Upwork matching this criteria." }), {
@@ -2499,8 +2553,8 @@ Respond ONLY with a JSON object using this exact shape:
     // ACTION: discover-leads
     // ─────────────────────────────────────────────
     if (body.action === "discover-leads") {
-      const { source, industry, keyword, custom_url } = body as any;
-      const openaiKey = Deno.env.get("OPENAI_API_KEY");
+      const { source, industry, keyword, custom_url, custom_api_key } = body as any;
+      const openaiKey = custom_api_key || dbSettings?.openai_api_key || Deno.env.get("OPENAI_API_KEY");
 
       let rawContent = "";
       let sourceLabel = source;
@@ -2523,11 +2577,11 @@ Prism Outreach & PR | https://prismoutreach.com | Digital PR, link building, med
       if (source === "clutch") {
         try {
           const ddgQuery = `site:clutch.co/profile ${industry !== "Any" ? industry : "digital marketing"} ${keyword ?? ""}`.trim();
-          const liveSnippets = await searchDuckDuckGo(ddgQuery);
+          const liveSnippets = await searchDuckDuckGo(ddgQuery, proxyConfig);
           if (liveSnippets && liveSnippets.length > 200) {
             rawContent = liveSnippets;
           } else {
-            const scraped = await scrapeUrl("https://clutch.co/agencies/digital-marketing");
+            const scraped = await scrapeUrl("https://clutch.co/agencies/digital-marketing", proxyConfig);
             rawContent = scraped.content.length > 200 ? `${scraped.title}\n\n${scraped.content}`.slice(0, 8000) : CLUTCH_AGENCIES_DATA;
           }
         } catch {
@@ -2538,11 +2592,11 @@ Prism Outreach & PR | https://prismoutreach.com | Digital PR, link building, med
       } else if (source === "designrush") {
         try {
           const ddgQuery = `site:designrush.com/agency ${industry !== "Any" ? industry : "digital marketing"} ${keyword ?? ""}`.trim();
-          const liveSnippets = await searchDuckDuckGo(ddgQuery);
+          const liveSnippets = await searchDuckDuckGo(ddgQuery, proxyConfig);
           if (liveSnippets && liveSnippets.length > 200) {
             rawContent = liveSnippets;
           } else {
-            const scraped = await scrapeUrl("https://www.designrush.com/agency/digital-marketing");
+            const scraped = await scrapeUrl("https://www.designrush.com/agency/digital-marketing", proxyConfig);
             rawContent = scraped.content.length > 200 ? `${scraped.title}\n\n${scraped.content}`.slice(0, 8000) : CLUTCH_AGENCIES_DATA;
           }
         } catch {
@@ -2553,11 +2607,11 @@ Prism Outreach & PR | https://prismoutreach.com | Digital PR, link building, med
       } else if (source === "upcity") {
         try {
           const ddgQuery = `site:upcity.com ${industry !== "Any" ? industry : "digital marketing"} ${keyword ?? ""}`.trim();
-          const liveSnippets = await searchDuckDuckGo(ddgQuery);
+          const liveSnippets = await searchDuckDuckGo(ddgQuery, proxyConfig);
           if (liveSnippets && liveSnippets.length > 200) {
             rawContent = liveSnippets;
           } else {
-            const scraped = await scrapeUrl("https://upcity.com/digital-marketing");
+            const scraped = await scrapeUrl("https://upcity.com/digital-marketing", proxyConfig);
             rawContent = scraped.content.length > 200 ? `${scraped.title}\n\n${scraped.content}`.slice(0, 8000) : CLUTCH_AGENCIES_DATA;
           }
         } catch {
@@ -2605,7 +2659,7 @@ Prism Outreach & PR | https://prismoutreach.com | Digital PR, link building, med
 
       } else if (source === "custom_url" && custom_url) {
         try {
-          const scraped = await scrapeUrl(custom_url);
+          const scraped = await scrapeUrl(custom_url, proxyConfig);
           rawContent = `${scraped.title}\n\n${scraped.content}`.slice(0, 8000);
         } catch {
           rawContent = CLUTCH_AGENCIES_DATA;
@@ -2971,7 +3025,7 @@ Respond ONLY as a JSON object:
       let scrapedContent = "";
       if (website) {
         try {
-          const scraped = await scrapeUrl(website);
+          const scraped = await scrapeUrl(website, proxyConfig);
           scrapedContent = `${scraped.title}\n\n${scraped.description}\n\n${scraped.content}`;
         } catch (e) {
           console.warn("Website scrape error:", e);

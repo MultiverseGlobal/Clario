@@ -156,7 +156,7 @@ export function CommandEngine({
         layout
         initial={{ y: 0 }}
         animate={{
-          y: isRunning ? -140 : 0,
+          y: isRunning ? -60 : 0,
           scale: isRunning ? 0.96 : 1,
         }}
         transition={{ type: "spring", stiffness: 260, damping: 26 }}
@@ -169,7 +169,7 @@ export function CommandEngine({
               isDark
                 ? "bg-gradient-to-r from-white/20 via-emerald-400/20 to-white/10"
                 : "bg-gradient-to-r from-neutral-300/60 via-emerald-500/20 to-neutral-200/50"
-            }`}
+            } ${!isRunning && inputPrompt.length === 0 ? "atlas-animate-breathe" : ""}`}
           />
 
           <div
@@ -180,19 +180,7 @@ export function CommandEngine({
             }`}
           >
             <div className="pl-6 flex items-center gap-3">
-              <div
-                className={`h-10 w-10 rounded-xl border flex items-center justify-center shadow-inner ${
-                  isDark
-                    ? "bg-white/[0.06] border-white/10 text-white/70"
-                    : "bg-neutral-100 border-neutral-200 text-neutral-600"
-                }`}
-              >
-                <ChevronRight
-                  className={`h-5 w-5 transition-all duration-300 ${
-                    isRunning ? "text-emerald-500 animate-pulse" : "text-neutral-400"
-                  }`}
-                />
-              </div>
+              {/* Removed ChevronRight as requested */}
             </div>
 
             <input
@@ -214,16 +202,19 @@ export function CommandEngine({
             {/* Tactical Controls */}
             <div className="pr-4 flex items-center gap-2">
               <AnimatePresence>
-                {inputPrompt.length > 0 && !isRunning && (
+                {!isRunning && (
                   <motion.button
                     initial={{ opacity: 0, scale: 0.85, x: 10 }}
                     animate={{ opacity: 1, scale: 1, x: 0 }}
                     exit={{ opacity: 0, scale: 0.85, x: 10 }}
                     type="submit"
-                    className={`flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition-all active:scale-95 cursor-pointer shadow-md ${
-                      isDark
-                        ? "bg-white text-black hover:bg-white/90 shadow-[0_4px_16px_rgba(255,255,255,0.25)]"
-                        : "bg-neutral-900 text-white hover:bg-neutral-800 shadow-[0_4px_16px_rgba(0,0,0,0.18)]"
+                    disabled={inputPrompt.trim().length === 0}
+                    className={`flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition-all shadow-md whitespace-nowrap flex-shrink-0 ${
+                      inputPrompt.trim().length === 0
+                        ? isDark ? "bg-white/10 text-white/40 cursor-not-allowed" : "bg-neutral-200 text-neutral-400 cursor-not-allowed"
+                        : isDark
+                        ? "bg-white text-black hover:bg-white/90 active:scale-95 shadow-[0_4px_16px_rgba(255,255,255,0.25)] cursor-pointer"
+                        : "bg-neutral-900 text-white hover:bg-neutral-800 active:scale-95 shadow-[0_4px_16px_rgba(0,0,0,0.18)] cursor-pointer"
                     }`}
                   >
                     <span>Initiate Flow</span>
@@ -236,14 +227,14 @@ export function CommandEngine({
                 <button
                   type="button"
                   onClick={handleReset}
-                  className={`flex items-center gap-1.5 rounded-xl border px-3.5 py-2.5 text-xs font-mono transition-all cursor-pointer shadow-sm ${
+                  className={`flex items-center gap-1.5 rounded-xl border px-3.5 py-2.5 text-xs font-mono font-semibold transition-all cursor-pointer shadow-sm ${
                     isDark
-                      ? "border-white/10 bg-white/[0.04] text-white/60 hover:bg-white/10 hover:text-white"
-                      : "border-neutral-200 bg-neutral-100 text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900"
+                      ? "border-white/20 bg-white/[0.08] text-white hover:bg-white/15"
+                      : "border-neutral-300 bg-white text-neutral-900 hover:bg-neutral-50 shadow-md"
                   }`}
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
-                  Reset Flow
+                  Stop & Go Back
                 </button>
               )}
             </div>
@@ -265,11 +256,7 @@ export function CommandEngine({
                   setInputPrompt(preset.query);
                   executePrompt(preset.query);
                 }}
-                className={`px-3.5 py-1.5 rounded-full border text-xs font-mono tracking-tight transition-all cursor-pointer backdrop-blur-md ${
-                  isDark
-                    ? "border-white/[0.08] bg-white/[0.03] text-white/60 hover:bg-white/[0.08] hover:border-white/20 hover:text-white"
-                    : "border-neutral-200 bg-white/70 text-neutral-600 hover:bg-white hover:border-neutral-300 hover:text-neutral-900 shadow-sm"
-                }`}
+                className="px-3.5 py-1.5 rounded-full border text-xs font-mono font-medium tracking-tight transition-all cursor-pointer backdrop-blur-md border-neutral-300 bg-white text-neutral-900 hover:border-neutral-400 hover:bg-neutral-50 shadow-sm hover:shadow-md dark:border-white/20 dark:bg-white/10 dark:text-white dark:hover:bg-white/20 dark:hover:border-white/40 dark:hover:text-white dark:hover:shadow-[0_0_15px_rgba(255,255,255,0.15)]"
               >
                 <span>{preset.label}</span>
               </button>
@@ -289,22 +276,22 @@ export function CommandEngine({
             className="w-full max-w-2xl mx-auto flex items-center justify-between px-6 py-2 my-2 text-xs font-mono"
           >
             <div className="flex items-center gap-2">
-              <span className={`h-2 w-2 rounded-full ${campaignState.leads.length > 0 ? "bg-emerald-500" : "bg-emerald-500 animate-ping"}`} />
-              <span className={campaignState.leads.length > 0 ? "text-[var(--pds-text-primary)] font-semibold" : "text-[var(--pds-text-secondary)]"}>
+              <span className={`h-2 w-2 rounded-full ${campaignState.leads.length > 0 ? "bg-foreground" : "bg-foreground animate-ping"}`} />
+              <span className={campaignState.leads.length > 0 ? "text-foreground font-semibold" : "text-muted-foreground"}>
                 01 Reconnaissance
               </span>
             </div>
-            <div className="h-px flex-1 mx-4 bg-[var(--pds-border-mid)]" />
+            <div className="h-px flex-1 mx-4 bg-border" />
             <div className="flex items-center gap-2">
-              <span className={`h-2 w-2 rounded-full ${campaignState.currentDraft ? "bg-emerald-500" : campaignState.status === "drafting" ? "bg-amber-500 animate-ping" : "bg-[var(--pds-border-strong)]"}`} />
-              <span className={campaignState.currentDraft ? "text-[var(--pds-text-primary)] font-semibold" : "text-[var(--pds-text-muted)]"}>
+              <span className={`h-2 w-2 rounded-full ${campaignState.currentDraft ? "bg-foreground" : campaignState.status === "drafting" ? "bg-foreground opacity-50 animate-ping" : "bg-border"}`} />
+              <span className={campaignState.currentDraft ? "text-foreground font-semibold" : "text-muted-foreground"}>
                 02 Tactical Angle
               </span>
             </div>
-            <div className="h-px flex-1 mx-4 bg-[var(--pds-border-mid)]" />
+            <div className="h-px flex-1 mx-4 bg-border" />
             <div className="flex items-center gap-2">
-              <span className={`h-2 w-2 rounded-full ${campaignState.contactedCount > 0 ? "bg-emerald-500" : "bg-[var(--pds-border-strong)]"}`} />
-              <span className={campaignState.contactedCount > 0 ? "text-[var(--pds-text-primary)] font-semibold" : "text-[var(--pds-text-muted)]"}>
+              <span className={`h-2 w-2 rounded-full ${campaignState.contactedCount > 0 ? "bg-foreground" : "bg-border"}`} />
+              <span className={campaignState.contactedCount > 0 ? "text-foreground font-semibold" : "text-muted-foreground"}>
                 03 Dispatch
               </span>
             </div>
@@ -341,15 +328,13 @@ export function CommandEngine({
               <div className="mt-4 space-y-3">
                 {/* Visual Telemetry Badge */}
                 <div
-                  className={`relative h-12 w-full rounded-xl flex items-center justify-between px-4 border ${
-                    isDark ? "bg-black/30 border-white/5" : "bg-[var(--pds-surface-2)] border-[var(--pds-border-subtle)]"
-                  }`}
+                  className="relative h-12 w-full rounded-xl flex items-center justify-between px-4 border bg-muted border-border"
                 >
-                  <div className="flex items-center gap-2.5 font-mono text-[11px] text-emerald-500">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <div className="flex items-center gap-2.5 font-mono text-[11px] text-foreground">
+                    <span className="h-1.5 w-1.5 rounded-full bg-foreground animate-pulse" />
                     <span className="font-semibold uppercase tracking-wider">{campaignState.channel?.toUpperCase() || "YC / DIRECT"}</span>
                   </div>
-                  <span className="text-[10px] font-mono text-[var(--pds-text-muted)] uppercase truncate max-w-[140px]">
+                  <span className="text-[10px] font-mono text-muted-foreground uppercase truncate max-w-[140px]">
                     {campaignState.keyword || "Active Channel"}
                   </span>
                 </div>
@@ -361,19 +346,15 @@ export function CommandEngine({
                       <button
                         key={idx}
                         onClick={() => setSelectedLeadModal(lead)}
-                        className={`w-full flex items-center justify-between text-xs rounded-lg border px-2.5 py-1.5 font-mono text-left transition-colors cursor-pointer ${
-                          isDark
-                            ? "bg-white/[0.03] border-white/5 hover:bg-white/[0.08] text-white/90"
-                            : "bg-white border-neutral-200 hover:bg-neutral-50 text-neutral-900 shadow-sm"
-                        }`}
+                        className="w-full flex items-center justify-between text-xs rounded-lg border px-2.5 py-1.5 font-mono text-left transition-colors cursor-pointer bg-card border-border hover:bg-muted text-foreground shadow-sm"
                       >
                         <span className="truncate max-w-[150px] font-medium">{lead.company}</span>
-                        <span className="text-[10px] text-emerald-500 font-semibold">{lead.icp_score}% FIT</span>
+                        <span className="text-[10px] text-foreground font-semibold">{lead.icp_score}% FIT</span>
                       </button>
                     ))}
                   </div>
                 ) : (
-                  <div className={`text-center py-2 text-xs font-mono ${isDark ? "text-white/30" : "text-neutral-400"}`}>
+                  <div className="text-center py-2 text-xs font-mono text-muted-foreground">
                     Decomposing query parameters...
                   </div>
                 )}
@@ -409,41 +390,35 @@ export function CommandEngine({
               <div className="mt-4 space-y-3">
                 {campaignState.currentLead ? (
                   <div
-                    className={`rounded-xl border p-3 relative overflow-hidden ${
-                      isDark ? "bg-black/40 border-white/10" : "bg-white border-neutral-200 shadow-sm"
-                    }`}
+                    className="rounded-xl border p-3 relative overflow-hidden bg-card border-border/50 shadow-sm"
                   >
                     <div className="flex items-center justify-between">
-                      <span className={`text-xs font-semibold truncate max-w-[160px] ${isDark ? "text-white" : "text-neutral-900"}`}>
+                      <span className="text-xs font-semibold truncate max-w-[160px] text-foreground">
                         {campaignState.currentLead.founder?.name}
                       </span>
-                      <span className={`text-[10px] font-mono uppercase ${isDark ? "text-white/40" : "text-neutral-400"}`}>
+                      <span className="text-[10px] font-mono uppercase text-muted-foreground">
                         {campaignState.currentLead.company}
                       </span>
                     </div>
                     {campaignState.currentDraft && (
                       <div
-                        className={`mt-2 text-[11px] font-sans italic line-clamp-2 p-2 rounded-lg border ${
-                          isDark
-                            ? "text-white/70 bg-white/[0.02] border-white/5"
-                            : "text-neutral-700 bg-neutral-50 border-neutral-200"
-                        }`}
+                        className="mt-2 text-[11px] font-sans italic line-clamp-2 p-2 rounded-lg border text-foreground bg-muted/50 border-border/50"
                       >
                         "{campaignState.currentDraft.subject}"
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className={`text-center py-4 text-xs font-mono ${isDark ? "text-white/30" : "text-neutral-400"}`}>
+                  <div className="text-center py-4 text-xs font-mono text-muted-foreground">
                     Awaiting target qualification...
                   </div>
                 )}
 
                 {/* Intervention Alert Prompt */}
                 {campaignState.status === "awaiting_approval" && (
-                  <div className="flex items-center justify-between text-xs text-amber-500 font-mono pt-1 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/25 cursor-pointer">
+                  <div className="flex items-center justify-between text-xs text-foreground font-mono pt-1 p-2.5 rounded-lg bg-foreground/5 border border-foreground/20 cursor-pointer">
                     <span className="flex items-center gap-1.5 font-semibold">
-                      <span className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
+                      <span className="h-2 w-2 rounded-full bg-foreground animate-ping" />
                       Intervention Required
                     </span>
                     <span className="underline font-semibold flex items-center gap-0.5">
@@ -465,34 +440,28 @@ export function CommandEngine({
             >
               <div className="mt-4 space-y-3 font-mono text-xs">
                 <div
-                  className={`flex items-center justify-between p-2.5 rounded-xl border ${
-                    isDark
-                      ? "text-white/70 bg-black/30 border-white/5"
-                      : "text-neutral-700 bg-neutral-50 border-neutral-200"
-                  }`}
+                  className="flex items-center justify-between p-2.5 rounded-xl border bg-muted text-foreground border-border"
                 >
-                  <span className={`uppercase text-[10px] ${isDark ? "text-white/40" : "text-neutral-400"}`}>
+                  <span className="uppercase text-[10px] text-muted-foreground">
                     Pipeline Velocity
                   </span>
-                  <span className="text-emerald-500 font-bold text-sm">
+                  <span className="text-foreground font-bold text-sm">
                     £{(campaignState.contactedCount * 1250).toLocaleString()}
                   </span>
                 </div>
 
                 <div className="space-y-1.5">
-                  <div className={`flex items-center justify-between text-[11px] ${isDark ? "text-white/60" : "text-neutral-600"}`}>
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                     <span>Target Quota</span>
-                    <span className={`font-semibold ${isDark ? "text-white" : "text-neutral-900"}`}>
+                    <span className="font-semibold text-foreground">
                       {campaignState.contactedCount} / {campaignState.targetCount} Targets
                     </span>
                   </div>
                   <div
-                    className={`w-full rounded-full h-2 overflow-hidden border p-[1px] ${
-                      isDark ? "bg-black/40 border-white/5" : "bg-neutral-200 border-neutral-300"
-                    }`}
+                    className="w-full rounded-full h-2 overflow-hidden border p-[1px] bg-muted border-border"
                   >
                     <div
-                      className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-700 shadow-sm"
+                      className="bg-foreground h-full rounded-full transition-all duration-700 shadow-sm opacity-80"
                       style={{
                         width: `${Math.min(100, (campaignState.contactedCount / (campaignState.targetCount || 15)) * 100)}%`,
                       }}
@@ -500,23 +469,19 @@ export function CommandEngine({
                   </div>
                 </div>
 
-                <div className={`flex items-center justify-between text-[10px] border-t pt-2 ${
-                  isDark ? "text-white/40 border-white/5" : "text-neutral-400 border-neutral-200"
-                }`}>
+                <div className="flex items-center justify-between text-[10px] border-t pt-2 text-muted-foreground border-border">
                   <div className="flex items-center gap-1.5">
                     <span>Mode:</span>
                     <button
                       type="button"
                       onClick={onToggleAutoPilot}
-                      className={`font-semibold cursor-pointer underline hover:text-emerald-400 transition-colors ${
-                        isAutoPilot ? "text-emerald-400" : isDark ? "text-white/70" : "text-neutral-700"
-                      }`}
+                      className="font-semibold cursor-pointer underline hover:text-foreground transition-colors text-foreground"
                     >
                       {isAutoPilot ? "Auto-Pilot" : "Supervised"}
                     </button>
                   </div>
-                  <span className="text-emerald-500 flex items-center gap-1 font-semibold">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-foreground flex items-center gap-1 font-semibold">
+                    <span className="h-1.5 w-1.5 rounded-full bg-foreground animate-pulse" />
                     Active
                   </span>
                 </div>
@@ -640,25 +605,16 @@ function TiltCard({
         onClick ? "cursor-pointer" : ""
       } ${
         highlight
-          ? "border-amber-400/80 bg-amber-500/[0.04] shadow-[0_0_35px_rgba(245,158,11,0.20)] ring-1 ring-amber-400/50 scale-[1.02] z-20"
-          : isDark
-          ? "border-white/[0.08] bg-[#0c0e15]/85 shadow-[0_16px_40px_rgba(0,0,0,0.6)] hover:border-white/20"
-          : "border-black/[0.08] bg-white/80 shadow-[0_12px_30px_rgba(0,0,0,0.06)] hover:border-black/15"
+          ? "border-foreground/30 bg-foreground/5 shadow-[0_0_30px_rgba(255,255,255,0.05)] ring-1 ring-foreground/20 scale-[1.02] z-20"
+          : "border-border/60 bg-card shadow-[0_16px_40px_rgba(0,0,0,0.4)] hover:border-border"
       }`}
-      style={{
-        boxShadow: highlight
-          ? "0 0 35px rgba(245, 158, 11, 0.20), inset 0 1px 1px 0 rgba(255, 255, 255, 0.15)"
-          : isDark
-          ? "0 20px 45px rgba(0, 0, 0, 0.7), inset 0 1px 1px 0 rgba(255, 255, 255, 0.08)"
-          : "0 12px 30px rgba(0, 0, 0, 0.06), inset 0 1px 1px 0 rgba(255, 255, 255, 0.6)",
-      }}
     >
       {/* Dynamic Specular Glare following Mouse */}
       <div
         className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 hover:opacity-100"
         style={{
           background: `radial-gradient(circle 180px at ${glarePos.x}% ${glarePos.y}%, ${
-            isDark ? "rgba(255, 255, 255, 0.09)" : "rgba(255, 255, 255, 0.5)"
+            isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.05)"
           }, transparent 80%)`,
         }}
       />
@@ -669,12 +625,10 @@ function TiltCard({
           <div
             className={`rounded-xl p-2.5 border transition-colors ${
               highlight
-                ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
+                ? "bg-foreground/10 text-foreground border-foreground/20"
                 : isComplete
-                ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/20"
-                : isDark
-                ? "bg-white/[0.04] text-white/70 border-white/10"
-                : "bg-neutral-100 text-neutral-600 border-neutral-200"
+                ? "bg-foreground/5 text-foreground border-foreground/10"
+                : "bg-muted text-muted-foreground border-border/50"
             }`}
           >
             <Icon className="h-5 w-5" />
@@ -682,18 +636,16 @@ function TiltCard({
           <div>
             <div className="flex items-center gap-1.5">
               <span className={`font-mono text-[9px] uppercase tracking-wider font-bold ${
-                isDark ? "text-white/40" : "text-neutral-400"
+                highlight ? "text-foreground/80" : "text-muted-foreground"
               }`}>
                 PHASE {step}
               </span>
             </div>
-            <h3 className={`font-display text-sm font-semibold tracking-tight ${
-              isDark ? "text-white" : "text-neutral-900"
-            }`}>
+            <h3 className={`font-display text-sm font-semibold tracking-tight text-foreground`}>
               {title}
             </h3>
             <p className={`font-mono text-[10px] uppercase tracking-wider ${
-              isDark ? "text-white/50" : "text-neutral-500"
+              highlight ? "text-foreground/70" : "text-muted-foreground"
             }`}>
               {stage}
             </p>
@@ -704,13 +656,13 @@ function TiltCard({
         <div>
           {highlight ? (
             <span className="relative flex h-3 w-3">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
-              <span className="relative inline-flex h-3 w-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.8)]" />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-foreground opacity-50" />
+              <span className="relative inline-flex h-3 w-3 rounded-full bg-foreground shadow-[0_0_8px_rgba(255,255,255,0.3)]" />
             </span>
           ) : isActive ? (
-            <Cpu className="h-4 w-4 animate-spin text-emerald-500" />
+            <Cpu className="h-4 w-4 animate-spin text-foreground" />
           ) : isComplete ? (
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+            <CheckCircle2 className="h-4 w-4 text-foreground" />
           ) : null}
         </div>
       </div>

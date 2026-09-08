@@ -1,0 +1,12 @@
+{
+  "hooks": [
+    {
+      "trigger": "pre_command",
+      "description": "Example hook that runs before a command is executed",
+      "command": "echo",
+      "args": [
+        "A command is about to run!"
+      ]
+    }
+  ]
+}

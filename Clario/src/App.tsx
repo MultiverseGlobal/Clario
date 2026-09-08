@@ -8,6 +8,7 @@ import { saveProject, listProjects, getVaultAssetsCount, type ClarioProject } fr
 import { checkServerHealth, uploadToWorker, pollJobStatus, fetchApiBaseFromDb } from './lib/apiClient';
 import { getApiKey, setApiKey, fetchApiKeyFromDb } from './lib/gemini';
 import { AppShell, type ClarioPhase } from './components/layout/AppShell';
+import { AuthGate } from './components/layout/AuthGate';
 import { BrandKitPanel } from './components/ui/BrandKitPanel';
 import { fetchBrandKitFromDb } from './lib/brandKit';
 import { syncProjectHarvested } from './lib/metaphorSync';
@@ -174,7 +175,8 @@ export default function App() {
   }
 
   return (
-    <AppShell
+    <AuthGate>
+      <AppShell
       currentProject={currentProject}
       currentPhase={currentPhase}
       onNavigatePhase={handleNavigatePhase}
@@ -440,5 +442,6 @@ export default function App() {
         />
       )}
     </AppShell>
+    </AuthGate>
   );
 }

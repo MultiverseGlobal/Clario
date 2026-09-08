@@ -7,9 +7,27 @@ export function useTheme() {
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window === "undefined") return "clean";
     const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
-    if (stored === "clean" || stored === "paper" || stored === "dark") return stored;
-    return "clean"; // default theme is the clean landing page style
+    // Only restore non-dark stored preferences; light ("clean") is the system default
+    if (stored === "clean" || stored === "paper") return stored;
+    return "clean";
   });
+
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY && e.newValue) {
+        setTheme(e.newValue as Theme);
+      }
+    };
+    const handleCustom = (e: CustomEvent) => {
+      setTheme(e.detail);
+    };
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("theme-change", handleCustom as EventListener);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("theme-change", handleCustom as EventListener);
+    };
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -25,13 +43,13 @@ export function useTheme() {
     }
     
     localStorage.setItem(STORAGE_KEY, theme);
+    window.dispatchEvent(new CustomEvent("theme-change", { detail: theme }));
   }, [theme]);
 
   const cycleTheme = () => {
     setTheme((prev) => {
-      if (prev === "clean") return "paper";
-      if (prev === "paper") return "dark";
-      return "clean";
+      if (prev === "dark") return "clean";
+      return "dark";
     });
   };
 
