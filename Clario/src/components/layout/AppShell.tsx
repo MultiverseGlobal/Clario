@@ -171,14 +171,19 @@ export function AppShell({
             Vault <span className="ml-1 opacity-50 font-mono text-[9px]">{vaultCount}</span>
           </button>
 
-          {/* Command Palette Trigger (Brand Kit / Settings / Gemini) */}
+          {/* Brand Kit */}
           <button
-            onClick={() => {
-              const e = new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true });
-              document.dispatchEvent(e);
-            }}
+            onClick={onOpenBrandKit}
+            className="px-3 py-1.5 rounded-xl text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+          >
+            Brand Kit
+          </button>
+
+          {/* Settings / Gemini */}
+          <button
+            onClick={onOpenApiKeyModal}
             className={['flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-medium transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/80'].join(' ')}
-            title="Open Command Palette"
+            title="Gemini Settings"
           >
             Settings
             <div className={`w-1.5 h-1.5 rounded-full ${hasApiKey ? 'bg-emerald-500' : 'bg-amber-500'}`} />
