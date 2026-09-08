@@ -29,13 +29,13 @@ export function WorkspaceEditor({
   const selectedShot = project?.shots.find(s => s.shot_id === selectedShotId) ?? null;
 
   return (
-    <div className="flex overflow-hidden h-screen">
+    <div className="flex-1 flex overflow-hidden pt-20">
 
       {/* ── LEFT SIDEBAR: Asset Library ────────────────────────────────────── */}
       <aside
         onDragOver={handleDragOver}
         onDrop={handleDrop}
-        className="w-72 shrink-0 clario-glass-panel border-y-0 border-l-0 border-r border-border-subtle flex flex-col pt-20"
+        className="w-72 shrink-0 clario-glass-panel border-y-0 border-l-0 border-r border-border-subtle flex flex-col"
       >
         {/* Sidebar header */}
         <div className="px-4 py-3 border-b border-border-subtle">
@@ -105,7 +105,7 @@ export function WorkspaceEditor({
       </aside>
 
       {/* ── CENTER CANVAS: Preview + Timeline ──────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0 bg-transparent pt-20">
+      <div className="flex-1 flex flex-col min-w-0 bg-transparent">
 
         {/* Canvas header */}
         <div className="px-6 py-4 border-b border-border-subtle flex items-center gap-3">
@@ -184,7 +184,7 @@ export function WorkspaceEditor({
       </div>
 
       {/* ── RIGHT PANEL: Intelligence & Export ─────────────────────────────── */}
-      <aside className="w-80 shrink-0 clario-glass-panel border-y-0 border-r-0 border-l border-border-subtle flex flex-col pt-20">
+      <aside className="w-80 shrink-0 clario-glass-panel border-y-0 border-r-0 border-l border-border-subtle flex flex-col">
 
         {/* Panel header */}
         <div className="px-4 py-3 border-b border-border-subtle flex items-center justify-between">

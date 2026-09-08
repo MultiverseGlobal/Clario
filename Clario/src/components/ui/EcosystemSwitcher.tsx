@@ -173,7 +173,7 @@ export function EcosystemSwitcher() {
           display: 'flex',
           alignItems: 'center',
           gap: 6,
-          padding: '5px 10px',
+          padding: '6px',
           borderRadius: 7,
           border: isOpen
             ? '1px solid var(--pds-text-secondary)'
@@ -189,9 +189,7 @@ export function EcosystemSwitcher() {
         }}
         title="Pseudonyms Sovereign Network (⌘.)"
       >
-        <PseudonymsSovereignMark size={14} color="currentColor" />
-        <span>Hub</span>
-        <span style={{ opacity: 0.4, fontSize: 9 }}>⌘.</span>
+        <PseudonymsSovereignMark size={16} color="currentColor" />
       </button>
 
       {/* Backdrop */}
