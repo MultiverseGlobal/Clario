@@ -9,7 +9,6 @@ import { checkServerHealth, uploadToWorker, pollJobStatus, fetchApiBaseFromDb } 
 import { getApiKey, setApiKey, fetchApiKeyFromDb } from './lib/gemini';
 import { AppShell, type ClarioPhase } from './components/layout/AppShell';
 import { AuthGate } from './components/layout/AuthGate';
-import { BrandKitPanel } from './components/ui/BrandKitPanel';
 import { fetchBrandKitFromDb } from './lib/brandKit';
 import { syncProjectHarvested } from './lib/metaphorSync';
 import { ReferenceLibraryPanel } from './components/workbenches/ReferenceLibraryPanel';
@@ -25,7 +24,6 @@ export default function App() {
   const [currentPhase, setCurrentPhase] = useState<ClarioPhase>('workspace');
 
   // Shell modals
-  const [brandKitOpen, setBrandKitOpen] = useState(false);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [savedKeySuccess, setSavedKeySuccess] = useState(false);
@@ -177,7 +175,6 @@ export default function App() {
       currentProject={currentProject}
       currentPhase={currentPhase}
       onNavigatePhase={handleNavigatePhase}
-      onOpenBrandKit={() => setBrandKitOpen(true)}
       onOpenApiKeyModal={() => setShowApiKeyModal(true)}
       hasApiKey={Boolean(getApiKey())}
     >
@@ -328,7 +325,6 @@ export default function App() {
       )}
 
       {/* ── Brand Kit Drawer / Modal ───────────────────────────────────────── */}
-      {brandKitOpen && <BrandKitPanel onClose={() => setBrandKitOpen(false)} />}
 
       {/* ── API Key Modal ──────────────────────────────────────────────────── */}
       {showApiKeyModal && (

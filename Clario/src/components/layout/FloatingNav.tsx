@@ -6,7 +6,6 @@ import {
   Plus,
   Command,
   FolderOpen,
-  Palette,
   Settings,
   Layers,
   ChevronRight,
@@ -20,7 +19,6 @@ interface FloatingNavProps {
   theme: "light" | "dark";
   toggleTheme: () => void;
   onNavigatePhase: (phase: ClarioPhase) => void;
-  onOpenBrandKit: () => void;
   onOpenApiKeyModal: () => void;
   currentStep: number;
   isRefLibActive: boolean;
@@ -40,7 +38,6 @@ export function FloatingNav({
   theme,
   toggleTheme,
   onNavigatePhase,
-  onOpenBrandKit,
   onOpenApiKeyModal,
   currentStep,
   isRefLibActive,
@@ -197,19 +194,7 @@ export function FloatingNav({
             </span>
           </button>
 
-          {/* Brand Kit */}
-          <button
-            onClick={onOpenBrandKit}
-            title="Brand Kit"
-            className="group flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all duration-300 ease-out text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-          >
-            <Palette className="w-3.5 h-3.5 opacity-70 group-hover:opacity-100 transition-opacity" />
-            <span className="text-[11px] font-semibold font-mono tracking-wide whitespace-nowrap overflow-hidden transition-all duration-300 ease-out max-w-0 opacity-0 group-hover:max-w-24 group-hover:opacity-100 group-hover:ml-2">
-              Brand Kit
-            </span>
-          </button>
 
-          {/* Settings */}
           <button
             onClick={onOpenApiKeyModal}
             title="Settings"

@@ -18,7 +18,6 @@ interface AppShellProps {
   currentPhase: ClarioPhase;
   activeResultTab?: 'evidence' | 'clean' | 'replacements' | 'provenance';
   onNavigatePhase: (phase: ClarioPhase) => void;
-  onOpenBrandKit: () => void;
   onOpenApiKeyModal: () => void;
   hasApiKey: boolean;
 }
@@ -31,7 +30,6 @@ export function AppShell({
   currentPhase,
   activeResultTab = 'evidence',
   onNavigatePhase,
-  onOpenBrandKit,
   onOpenApiKeyModal,
   hasApiKey,
 }: AppShellProps) {
@@ -73,7 +71,6 @@ export function AppShell({
         theme={theme}
         toggleTheme={toggleTheme}
         onNavigatePhase={onNavigatePhase}
-        onOpenBrandKit={onOpenBrandKit}
         onOpenApiKeyModal={onOpenApiKeyModal}
         currentStep={currentStep}
         isRefLibActive={isRefLibActive}
