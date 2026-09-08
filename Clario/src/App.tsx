@@ -4,7 +4,7 @@ import { toBlobURL } from '@ffmpeg/util';
 import type { HarvesterMode, HarvestProject } from './types/assets';
 import { WorkspaceEditor } from './components/layout/WorkspaceEditor';
 import { harvestVideoProject, harvestSlideProject } from './lib/extractor';
-import { saveProject, listProjects, type ClarioProject } from './lib/projectStore';
+import { saveProject, listProjects } from './lib/projectStore';
 import { checkServerHealth, uploadToWorker, pollJobStatus, fetchApiBaseFromDb } from './lib/apiClient';
 import { getApiKey, setApiKey, fetchApiKeyFromDb } from './lib/gemini';
 import { AppShell, type ClarioPhase } from './components/layout/AppShell';
@@ -29,7 +29,7 @@ export default function App() {
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [savedKeySuccess, setSavedKeySuccess] = useState(false);
-  const [allProjects, setAllProjects] = useState<ClarioProject[]>([]);
+
 
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
@@ -48,9 +48,7 @@ export default function App() {
 
   const refreshProjectList = useCallback(async () => {
     try {
-      const list = await listProjects();
-      setAllProjects(list);
-
+      await listProjects();
     } catch (err) {
       console.warn('Failed to list projects:', err);
     }
