@@ -436,3 +436,155 @@
   background: var(--emerald);
   animation: pulse-green 2.5s infinite;
 }
+
+/* ── Clario Glass System ──────────────────────────────────────────────────────
+ * Adapted from Atlas's luminous frosted glass utilities.
+ * Clario palette: warm porcelain light / obsidian dark.
+ * No emerald glows — warm amber or neutral white rim accents only.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/* ── Light-mode glass tokens ─────────────────────────────────────────────── */
+:root {
+  --clario-glass-base:          rgba(255, 255, 255, 0.60);
+  --clario-glass-surface:       rgba(255, 255, 255, 0.75);
+  --clario-glass-raised:        rgba(255, 255, 255, 0.90);
+  --clario-glass-border:        rgba(17, 19, 24, 0.07);
+  --clario-glass-border-subtle: rgba(17, 19, 24, 0.04);
+  --clario-glass-border-hover:  rgba(17, 19, 24, 0.18);
+  --clario-glass-highlight:     inset 0 1px 0 0 rgba(255, 255, 255, 0.96);
+  --clario-glass-shadow:        0 8px 28px -4px rgba(17, 19, 24, 0.06), 0 2px 6px -1px rgba(17, 19, 24, 0.03);
+  --clario-glass-shadow-hover:  0 14px 36px -6px rgba(17, 19, 24, 0.09), 0 2px 8px -1px rgba(17, 19, 24, 0.04);
+  --clario-glass-blur:          22px;
+}
+
+/* ── Dark-mode glass tokens ──────────────────────────────────────────────── */
+.dark {
+  --clario-glass-base:          rgba(14, 16, 24, 0.70);
+  --clario-glass-surface:       rgba(20, 23, 32, 0.80);
+  --clario-glass-raised:        rgba(28, 32, 44, 0.92);
+  --clario-glass-border:        rgba(255, 255, 255, 0.09);
+  --clario-glass-border-subtle: rgba(255, 255, 255, 0.05);
+  --clario-glass-border-hover:  rgba(255, 255, 255, 0.22);
+  --clario-glass-highlight:     inset 0 1px 0 0 rgba(255, 255, 255, 0.10);
+  --clario-glass-shadow:        0 8px 32px 0 rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.28);
+  --clario-glass-shadow-hover:  0 16px 44px -4px rgba(0, 0, 0, 0.65), 0 0 24px -2px rgba(255, 255, 255, 0.08);
+  --clario-glass-blur:          18px;
+}
+
+/* ── Glass Card ──────────────────────────────────────────────────────────── */
+/* Main interactive card surface. No translateY lift (editorial restraint).  */
+.clario-glass-card {
+  background: var(--clario-glass-surface);
+  backdrop-filter: blur(var(--clario-glass-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--clario-glass-blur)) saturate(180%);
+  border: 1px solid var(--clario-glass-border);
+  box-shadow: var(--clario-glass-shadow), var(--clario-glass-highlight);
+  transition:
+    box-shadow 260ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.clario-glass-card:hover {
+  box-shadow: var(--clario-glass-shadow-hover), var(--clario-glass-highlight);
+  border-color: var(--clario-glass-border-hover);
+}
+
+/* ── Glass Nav ───────────────────────────────────────────────────────────── */
+/* Sticky header bar — frosted, with inner white rim highlight.              */
+.clario-glass-nav {
+  background: rgba(248, 247, 244, 0.88);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-bottom: 1px solid var(--clario-glass-border);
+  box-shadow: var(--clario-glass-highlight), 0 1px 0 0 var(--clario-glass-border), 0 4px 16px -4px rgba(17, 19, 24, 0.04);
+}
+.dark .clario-glass-nav {
+  background: rgba(7, 8, 12, 0.88);
+}
+
+/* ── Glass Panel ─────────────────────────────────────────────────────────── */
+/* Side panels — lighter frosted surface.                                    */
+.clario-glass-panel {
+  background: var(--clario-glass-base);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid var(--clario-glass-border-subtle);
+}
+
+/* ── Glass Capsule ───────────────────────────────────────────────────────── */
+/* Pill badges, count chips, keyboard shortcut hints.                        */
+.clario-glass-capsule {
+  background: var(--clario-glass-base);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid var(--clario-glass-border);
+  box-shadow: var(--clario-glass-highlight), 0 1px 4px rgba(17, 19, 24, 0.03);
+}
+
+/* ── Frame Card ──────────────────────────────────────────────────────────── */
+/* Use as a wrapper — adds the specular rim highlight detail from Atlas's    */
+/* TactileOpportunityCard: a 1px gradient line across the top edge.         */
+.clario-frame-card {
+  position: relative;
+}
+.clario-frame-card::before {
+  content: "";
+  position: absolute;
+  inset-inline: 20px;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.80) 40%, rgba(255, 255, 255, 0.80) 60%, transparent);
+  pointer-events: none;
+  z-index: 1;
+}
+.dark .clario-frame-card::before {
+  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.12) 40%, rgba(255, 255, 255, 0.12) 60%, transparent);
+}
+
+/* ── Grid Background ─────────────────────────────────────────────────────── */
+/* Subtle dot-grid pattern for empty states and canvas areas.                */
+.clario-grid-bg {
+  background-color: var(--pds-canvas);
+  background-image: radial-gradient(rgba(17, 19, 24, 0.045) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.dark .clario-grid-bg {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+}
+
+/* ── Ambient Glow ────────────────────────────────────────────────────────── */
+/* Soft radial light behind hero content / empty state art.                 */
+.clario-ambient-glow {
+  background: radial-gradient(circle at 50% -5%, rgba(17, 19, 24, 0.06) 0%, transparent 65%);
+}
+.dark .clario-ambient-glow {
+  background: radial-gradient(circle at 50% -5%, rgba(255, 255, 255, 0.06) 0%, transparent 65%);
+}
+
+/* ── Skeleton Shimmer ────────────────────────────────────────────────────── */
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--pds-surface-2) 25%,
+    var(--pds-surface-3) 50%,
+    var(--pds-surface-2) 75%
+  );
+  background-size: 800px 100%;
+  animation: clarioShimmer 1.8s ease-in-out infinite;
+}
+
+/* ── Breathing Glow ──────────────────────────────────────────────────────── */
+.clario-animate-breathe {
+  animation: clarioBreathe 4s ease-in-out infinite;
+}
+
+/* ── Reduced Transparency Fallback ──────────────────────────────────────── */
+@media (prefers-reduced-transparency: reduce) {
+  .clario-glass-card,
+  .clario-glass-nav,
+  .clario-glass-panel,
+  .clario-glass-capsule {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: var(--pds-surface-1) !important;
+  }
+}

@@ -11,6 +11,8 @@ export default {
         // Map to PDS CSS vars — works in both light and dark via the .dark class
         background: "var(--pds-canvas)",
         foreground: "var(--pds-text-primary)",
+        card:  "var(--pds-surface-1)",
+        panel: "var(--pds-surface-2)",
         surface: {
           1: "var(--pds-surface-1)",
           2: "var(--pds-surface-2)",
@@ -18,9 +20,14 @@ export default {
           4: "var(--pds-surface-4)",
         },
         border: {
+          DEFAULT: "var(--pds-border-mid)",
           subtle: "var(--pds-border-subtle)",
           mid:    "var(--pds-border-mid)",
           strong: "var(--pds-border-strong)",
+        },
+        primary: {
+          DEFAULT:    "var(--pds-accent)",
+          foreground: "var(--pds-accent-inv)",
         },
         accent: {
           DEFAULT: "var(--pds-accent)",
@@ -28,7 +35,23 @@ export default {
           dim:     "var(--pds-accent-dim)",
           glow:    "var(--pds-accent-glow)",
         },
-        muted: "var(--pds-text-muted)",
+        muted: {
+          DEFAULT:    "var(--pds-surface-2)",
+          foreground: "var(--pds-text-muted)",
+        },
+        secondary: {
+          DEFAULT:    "var(--pds-surface-2)",
+          foreground: "var(--pds-text-primary)",
+        },
+        popover: {
+          DEFAULT:    "var(--pds-surface-1)",
+          foreground: "var(--pds-text-primary)",
+        },
+        destructive: {
+          DEFAULT:    "var(--pds-danger)",
+          foreground: "#ffffff",
+        },
+        ring:   "var(--pds-border-strong)",
         status: {
           success: "var(--pds-success)",
           warning: "var(--pds-warning)",
@@ -55,13 +78,13 @@ export default {
       },
       boxShadow: {
         // No purple/neon glows — ink shadows (light) or white glow (dark via .dark)
-        sm:         "var(--pds-shadow-sm)",
-        card:       "var(--pds-shadow-sm)",
+        sm:           "var(--pds-shadow-sm)",
+        card:         "var(--pds-shadow-sm)",
         "card-hover": "var(--pds-shadow-md)",
-        md:         "var(--pds-shadow-md)",
-        lg:         "var(--pds-shadow-lg)",
-        float:      "var(--pds-shadow-float)",
-        glow:       "var(--pds-shadow-glow)",
+        md:           "var(--pds-shadow-md)",
+        lg:           "var(--pds-shadow-lg)",
+        float:        "var(--pds-shadow-float)",
+        glow:         "var(--pds-shadow-glow)",
       },
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
@@ -80,14 +103,32 @@ export default {
         "enter":      "slideUpFade 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.05) both",
         "blur-in":    "blurIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) both",
         "pulse-slow": "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        "breathe":    "clarioBreathe 4s ease-in-out infinite",
+        "shimmer":    "clarioShimmer 1.8s ease-in-out infinite",
       },
       keyframes: {
-        fadeIn:      { from: { opacity: "0" }, to: { opacity: "1" } },
-        slideUp:     { from: { opacity: "0", transform: "translateY(8px)" }, to: { opacity: "1", transform: "translateY(0)" } },
-        slideUpFade: { from: { opacity: "0", transform: "translateY(12px) scale(0.98)", filter: "blur(4px)" }, to: { opacity: "1", transform: "translateY(0) scale(1)", filter: "blur(0)" } },
-        blurIn:      { from: { opacity: "0", filter: "blur(8px)" }, to: { opacity: "1", filter: "blur(0)" } },
+        fadeIn:        { from: { opacity: "0" }, to: { opacity: "1" } },
+        slideUp:       { from: { opacity: "0", transform: "translateY(8px)" }, to: { opacity: "1", transform: "translateY(0)" } },
+        slideUpFade:   { from: { opacity: "0", transform: "translateY(12px) scale(0.98)", filter: "blur(4px)" }, to: { opacity: "1", transform: "translateY(0) scale(1)", filter: "blur(0)" } },
+        blurIn:        { from: { opacity: "0", filter: "blur(8px)" }, to: { opacity: "1", filter: "blur(0)" } },
+        clarioBreathe: {
+          "0%, 100%": { opacity: "0.5", filter: "blur(20px)", transform: "scale(1)" },
+          "50%":      { opacity: "0.75", filter: "blur(26px)", transform: "scale(1.04)" },
+        },
+        clarioShimmer: {
+          from: { backgroundPosition: "-400px 0" },
+          to:   { backgroundPosition:  "400px 0" },
+        },
       },
     },
   },
+  safelist: [
+    { pattern: /^clario-glass-/ },
+    { pattern: /^clario-grid-/ },
+    { pattern: /^clario-ambient/ },
+    { pattern: /^clario-frame-/ },
+    { pattern: /^clario-animate-/ },
+    { pattern: /^skeleton-/ },
+  ],
   plugins: [],
 }

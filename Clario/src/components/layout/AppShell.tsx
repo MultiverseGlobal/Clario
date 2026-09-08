@@ -1,8 +1,9 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import type { HarvestProject } from '../../types/assets';
 import { EcosystemSwitcher } from '../ui/EcosystemSwitcher';
 import { CommandPalette, useCrossAppBus } from '@pseudonyms/ui';
 import { supabase } from '../../lib/supabase';
+import { ChevronRight, Moon, Sun } from 'lucide-react';
 
 export type ClarioPhase =
   | 'home'
@@ -26,6 +27,13 @@ interface AppShellProps {
   hasApiKey: boolean;
 }
 
+const WORKFLOW_STEPS: { step: string; label: string; phase: ClarioPhase }[] = [
+  { step: '01', label: 'Reference',  phase: 'ingest' },
+  { step: '02', label: 'Analyze',    phase: 'harvest_studio' },
+  { step: '03', label: 'Resolve',    phase: 'harvest_studio' },
+  { step: '04', label: 'Export',     phase: 'export' },
+];
+
 export function AppShell({
   children,
   currentProject,
@@ -38,107 +46,62 @@ export function AppShell({
   projectCount,
   hasApiKey,
 }: AppShellProps) {
-  // Determine current active workflow step (1-4) — Reference Library is separate
+  const [theme, setTheme] = useState<'light' | 'dark'>(() =>
+    document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+  );
+
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.classList.toggle('dark', next === 'dark');
+    setTheme(next);
+  };
+
+  // Determine active workflow step (1-4)
   const getActiveStep = (): number => {
     if (currentPhase === 'home' || currentPhase === 'ingest') return 1;
     if (currentPhase === 'export') return 4;
     if (activeResultTab === 'clean' || activeResultTab === 'replacements') return 3;
     return 2;
   };
-
   const currentStep = getActiveStep();
-
-  const { publish } = useCrossAppBus(supabase, null);
-  if (typeof window !== 'undefined') {
-    (window as any).__crossAppBusPublish = publish;
-  }
-
   const isRefLibActive = currentPhase === 'reference_library';
 
-  return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        minHeight: '100vh',
-        background: 'var(--pds-canvas)',
-        color: 'var(--pds-text-primary)',
-        fontFamily: "'Inter', -apple-system, system-ui, sans-serif",
-      }}
-    >
-      {/* ── Persistent Navigation Bar ────────────────────────────────────── */}
-      <header
-        style={{
-          height: 52,
-          borderBottom: '1px solid var(--pds-border-subtle)',
-          background: 'rgba(248, 247, 244, 0.85)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 20px',
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
-        }}
-      >
-        {/* Left: Logo & Project Name */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          {/* Wordmark */}
-          <div
-            onClick={() => onNavigatePhase('home')}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
-          >
-            <div style={{
-              width: 5, height: 5, borderRadius: '50%',
-              backgroundColor: 'var(--pds-text-primary)',
-            }} />
-            <span style={{
-              fontSize: 13,
-              fontWeight: 500,
-              letterSpacing: '0.06em',
-              color: 'var(--pds-text-primary)',
-              fontFamily: "'Vanguard', Impact, Oswald, sans-serif",
-              textTransform: 'uppercase',
-            }}>
-              clario
-            </span>
-          </div>
+  const { publish } = useCrossAppBus(supabase, null);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).__crossAppBusPublish = publish;
+    }
+  }, [publish]);
 
+  return (
+    <div className="flex flex-col min-h-screen bg-background text-foreground font-sans">
+
+      {/* ── Persistent Navigation Bar ───────────────────────────────────────── */}
+      <header className="clario-glass-nav sticky top-0 z-40 h-14 flex items-center justify-between gap-4 px-5">
+
+        {/* ── Left: Logo + Active Project Breadcrumb ───────────────────────── */}
+        <div className="flex items-center gap-3 shrink-0 min-w-0">
+          {/* Wordmark */}
+          <button
+            onClick={() => onNavigatePhase('home')}
+            className="flex items-center gap-2 group outline-none"
+          >
+            {/* Clario dot mark */}
+            <div className="w-[5px] h-[5px] rounded-full bg-foreground group-hover:opacity-60 transition-opacity" />
+            <span className="font-display text-[13px] font-bold uppercase tracking-[0.06em] text-foreground group-hover:opacity-70 transition-opacity">
+              Clario
+            </span>
+          </button>
+
+          {/* Active project breadcrumb */}
           {currentProject && (
             <>
-              <span style={{ color: 'var(--pds-border-mid)', fontSize: 14 }}>/</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 500,
-                    color: 'var(--pds-text-primary)',
-                    fontFamily: "'Inter', system-ui, sans-serif",
-                    maxWidth: 200,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    letterSpacing: '-0.01em',
-                  }}
-                >
+              <span className="text-border-mid text-sm select-none">/</span>
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-[13px] font-medium text-foreground tracking-ui truncate max-w-[180px]">
                   {currentProject.name}
                 </span>
-                <span
-                  style={{
-                    fontSize: 9,
-                    fontWeight: 600,
-                    padding: '2px 6px',
-                    borderRadius: 99,
-                    background: 'var(--pds-surface-2)',
-                    color: 'var(--pds-text-muted)',
-                    fontFamily: "'JetBrains Mono', monospace",
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.06em',
-                    border: '1px solid var(--pds-border-subtle)',
-                  }}
-                >
+                <span className="clario-glass-capsule inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-mono font-semibold uppercase tracking-mono text-muted-foreground shrink-0">
                   {currentProject.mode === 'video_harvester' ? 'Video' : 'Carousel'}
                 </span>
               </div>
@@ -146,223 +109,130 @@ export function AppShell({
           )}
         </div>
 
-        {/* Center: Workflow Stepper + Reference Library Tab */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          {/* 4-Step harvest workflow */}
-          {[
-            { step: 1, label: 'Reference',  phase: 'ingest' as const },
-            { step: 2, label: 'Analyze',    phase: 'harvest_studio' as const },
-            { step: 3, label: 'Resolve',    phase: 'harvest_studio' as const },
-            { step: 4, label: 'Export',     phase: 'export' as const },
-          ].map((s, idx) => {
-            const isActive = currentStep === s.step && !isRefLibActive;
-            const isCompleted = currentStep > s.step && !isRefLibActive;
+        {/* ── Center: Workflow Stepper Pill + Ref Library Tab ─────────────── */}
+        <div className="hidden md:flex items-center gap-1 p-1 rounded-xl bg-surface-2 border border-border-subtle backdrop-blur-sm shadow-inner">
+          {WORKFLOW_STEPS.map((s, idx) => {
+            const isActive  = currentStep === idx + 1 && !isRefLibActive;
+            const isCompleted = currentStep > idx + 1 && !isRefLibActive;
+            const canNavigate = !!currentProject || s.phase === 'ingest';
             return (
-              <div key={s.step} style={{ display: 'flex', alignItems: 'center' }}>
+              <div key={s.step} className="flex items-center">
                 {idx > 0 && (
-                  <span style={{ color: 'var(--pds-border-mid)', fontSize: 10, margin: '0 2px' }}>›</span>
+                  <ChevronRight className="h-3 w-3 mx-0.5 text-border-mid shrink-0" />
                 )}
-                <span
-                  onClick={() => { if (currentProject || s.phase === 'ingest') onNavigatePhase(s.phase); }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 5,
-                    padding: '4px 10px', borderRadius: 6,
-                    fontSize: 11,
-                    fontWeight: isActive ? 500 : 400,
-                    fontFamily: "'Inter', system-ui, sans-serif",
-                    letterSpacing: '-0.01em',
-                    background: isActive
-                      ? 'var(--pds-accent-dim)'
-                      : 'transparent',
-                    border: isActive
-                      ? '1px solid var(--pds-border-mid)'
-                      : '1px solid transparent',
-                    color: isActive
-                      ? 'var(--pds-text-primary)'
+                <button
+                  onClick={() => { if (canNavigate) onNavigatePhase(s.phase); }}
+                  disabled={!canNavigate}
+                  className={[
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-sans font-medium transition-all duration-150',
+                    isActive
+                      ? 'bg-foreground text-background shadow-sm'
                       : isCompleted
-                      ? 'var(--pds-text-secondary)'
-                      : 'var(--pds-text-muted)',
-                    cursor: currentProject ? 'pointer' : 'default',
-                    transition: 'all 150ms ease',
-                  }}
+                      ? 'text-muted-foreground hover:text-foreground hover:bg-surface-1'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-surface-1 disabled:opacity-40 disabled:cursor-default',
+                  ].join(' ')}
                 >
-                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, opacity: 0.5 }}>0{s.step}</span>
+                  <span className={`font-mono text-[9px] ${isActive ? 'opacity-80 font-bold' : 'opacity-40'}`}>
+                    {s.step}
+                  </span>
                   {s.label}
-                </span>
+                </button>
               </div>
             );
           })}
 
           {/* Divider */}
-          <span style={{ width: 1, height: 16, background: 'var(--pds-border-subtle)', margin: '0 8px' }} />
+          <div className="w-px h-4 bg-border-subtle mx-1 shrink-0" />
 
-          {/* Reference Library Tab */}
-          <span
+          {/* Reference Library tab */}
+          <button
             onClick={() => onNavigatePhase('reference_library')}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              padding: '4px 10px', borderRadius: 6,
-              fontSize: 11,
-              fontWeight: isRefLibActive ? 500 : 400,
-              fontFamily: "'Inter', system-ui, sans-serif",
-              letterSpacing: '-0.01em',
-              background: isRefLibActive ? 'var(--pds-accent-dim)' : 'transparent',
-              border: isRefLibActive ? '1px solid var(--pds-border-mid)' : '1px solid transparent',
-              color: isRefLibActive ? 'var(--pds-text-primary)' : 'var(--pds-text-muted)',
-              cursor: 'pointer',
-              transition: 'all 150ms ease',
-            }}
-            onMouseEnter={(e) => {
-              if (!isRefLibActive) {
-                e.currentTarget.style.color = 'var(--pds-text-secondary)';
-                e.currentTarget.style.background = 'var(--pds-surface-2)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isRefLibActive) {
-                e.currentTarget.style.color = 'var(--pds-text-muted)';
-                e.currentTarget.style.background = 'transparent';
-              }
-            }}
+            className={[
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-sans font-medium transition-all duration-150',
+              isRefLibActive
+                ? 'bg-foreground text-background shadow-sm'
+                : 'text-muted-foreground hover:text-foreground hover:bg-surface-1',
+            ].join(' ')}
           >
-            {/* Small library icon */}
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            {/* Inline shelf icon */}
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="shrink-0">
               <rect x="0.5" y="1" width="3" height="8" rx="0.5" stroke="currentColor" strokeWidth="0.8"/>
               <rect x="4.5" y="1" width="3" height="8" rx="0.5" stroke="currentColor" strokeWidth="0.8"/>
               <line x1="8.5" y1="1" x2="9" y2="9" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round"/>
             </svg>
             Ref Library
-          </span>
+          </button>
         </div>
 
-        {/* Right: Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {/* ── Right: Actions ───────────────────────────────────────────────── */}
+        <div className="flex items-center gap-2 shrink-0">
+
+          {/* Vault */}
           <button
             onClick={() => onNavigatePhase('vault')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 5,
-              padding: '4px 10px',
-              borderRadius: 6,
-              fontSize: 11,
-              fontWeight: 500,
-              fontFamily: "'Inter', system-ui, sans-serif",
-              border: '1px solid var(--pds-border-subtle)',
-              background: currentPhase === 'vault' ? 'var(--pds-surface-2)' : 'transparent',
-              color: currentPhase === 'vault' ? 'var(--pds-text-primary)' : 'var(--pds-text-secondary)',
-              cursor: 'pointer',
-              transition: 'all 150ms ease',
-            }}
+            className={[
+              'pds-btn-ghost gap-1.5 px-3 py-1.5 rounded-lg text-[11px]',
+              currentPhase === 'vault' ? 'bg-surface-2 text-foreground' : '',
+            ].join(' ')}
           >
-            <span>Vault</span>
-            <span style={{
-              padding: '1px 5px', borderRadius: 99,
-              background: 'var(--pds-surface-2)',
-              border: '1px solid var(--pds-border-subtle)',
-              fontSize: 9, fontFamily: "'JetBrains Mono', monospace",
-              color: 'var(--pds-text-muted)',
-            }}>
+            Vault
+            <span className="clario-glass-capsule inline-flex items-center px-1.5 py-px rounded-full text-[9px] font-mono text-muted-foreground">
               {vaultCount}
             </span>
           </button>
 
+          {/* Projects */}
           <button
             onClick={() => onNavigatePhase('home')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 5,
-              padding: '4px 10px',
-              borderRadius: 6,
-              fontSize: 11,
-              fontWeight: 500,
-              fontFamily: "'Inter', system-ui, sans-serif",
-              border: '1px solid var(--pds-border-subtle)',
-              background: 'transparent',
-              color: 'var(--pds-text-secondary)',
-              cursor: 'pointer',
-            }}
+            className="pds-btn-ghost gap-1.5 px-3 py-1.5 rounded-lg text-[11px]"
           >
-            <span>Projects</span>
-            <span style={{
-              padding: '1px 5px', borderRadius: 99,
-              background: 'var(--pds-surface-2)',
-              border: '1px solid var(--pds-border-subtle)',
-              fontSize: 9, fontFamily: "'JetBrains Mono', monospace",
-              color: 'var(--pds-text-muted)',
-            }}>
+            Projects
+            <span className="clario-glass-capsule inline-flex items-center px-1.5 py-px rounded-full text-[9px] font-mono text-muted-foreground">
               {projectCount}
             </span>
           </button>
 
-          {/* Primary CTA: obsidian fill on porcelain canvas */}
+          {/* Primary CTA */}
           <button
             onClick={() => onNavigatePhase('ingest')}
-            style={{
-              padding: '5px 14px', borderRadius: 7,
-              fontSize: 11, fontWeight: 500,
-              fontFamily: "'Inter', system-ui, sans-serif",
-              letterSpacing: '-0.01em',
-              border: '1px solid var(--pds-accent)',
-              background: 'var(--pds-accent)',
-              color: 'var(--pds-accent-inv)',
-              cursor: 'pointer',
-              transition: 'opacity 150ms ease, transform 150ms ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.opacity = '0.85';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.opacity = '1';
-            }}
+            className="pds-btn-primary px-3.5 py-1.5 text-[11px] min-h-0 w-auto rounded-lg"
           >
-            + new harvest
+            + New Harvest
           </button>
 
+          {/* Brand Kit */}
           <button
             onClick={onOpenBrandKit}
-            style={{
-              padding: '4px 10px',
-              borderRadius: 6,
-              fontSize: 11,
-              fontWeight: 500,
-              fontFamily: "'Inter', system-ui, sans-serif",
-              border: '1px solid var(--pds-border-subtle)',
-              background: 'transparent',
-              color: 'var(--pds-text-secondary)',
-              cursor: 'pointer',
-            }}
+            className="pds-btn-ghost px-3 py-1.5 rounded-lg text-[11px]"
           >
             Brand Kit
           </button>
 
+          {/* API Key / Gemini status */}
           <button
             onClick={onOpenApiKeyModal}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '4px 10px',
-              borderRadius: 6,
-              fontSize: 11,
-              fontWeight: 500,
-              fontFamily: "'Inter', system-ui, sans-serif",
-              border: '1px solid var(--pds-border-subtle)',
-              background: hasApiKey ? 'rgba(16, 185, 129, 0.06)' : 'transparent',
-              color: hasApiKey ? 'var(--pds-success)' : 'var(--pds-text-secondary)',
-              cursor: 'pointer',
-            }}
+            className={[
+              'pds-btn-ghost flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px]',
+              hasApiKey ? 'text-[var(--pds-success)] border-[rgba(16,185,129,0.25)] bg-[rgba(16,185,129,0.06)]' : '',
+            ].join(' ')}
           >
-            <div
-              style={{
-                width: 5,
-                height: 5,
-                borderRadius: '50%',
-                background: hasApiKey ? 'var(--pds-success)' : 'var(--pds-warning)',
-              }}
-            />
-            <span>{hasApiKey ? 'Gemini 2.0' : 'Local WASM'}</span>
+            <div className={[
+              'w-1.5 h-1.5 rounded-full shrink-0',
+              hasApiKey ? 'bg-[var(--pds-success)]' : 'bg-[var(--pds-warning)]',
+            ].join(' ')} />
+            {hasApiKey ? 'Gemini 2.0' : 'Local WASM'}
+          </button>
+
+          {/* Dark mode toggle */}
+          <button
+            onClick={toggleTheme}
+            className="h-8 w-8 rounded-lg border border-border-subtle bg-surface-1/50 hover:bg-surface-2 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Toggle theme"
+          >
+            {theme === 'dark'
+              ? <Sun className="h-3.5 w-3.5" />
+              : <Moon className="h-3.5 w-3.5" />
+            }
           </button>
 
           {/* 9-Dot Waffle Ecosystem Switcher */}
@@ -370,12 +240,12 @@ export function AppShell({
         </div>
       </header>
 
-      {/* ── Main Workspace Body ─────────────────────────────────────────── */}
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      {/* ── Main Workspace Body ──────────────────────────────────────────────── */}
+      <main className="flex-1 flex flex-col min-w-0">
         {children}
       </main>
 
-      {/* ── CommandPalette (⌘K) ─────────────────────────────────────────── */}
+      {/* ── CommandPalette (⌘K) ─────────────────────────────────────────────── */}
       <CommandPalette
         currentApp="clario"
         extraCommands={[{
@@ -383,10 +253,10 @@ export function AppShell({
           label: 'Clario',
           accent: 'var(--pds-accent)',
           commands: [
-            { id: 'new-harvest',      label: 'New Harvest',      accent: 'var(--pds-accent)', action: () => onNavigatePhase('ingest') },
-            { id: 'vault',            label: 'Open Vault',       accent: 'var(--pds-accent)', action: () => onNavigatePhase('vault') },
-            { id: 'projects',         label: 'All Projects',     accent: 'var(--pds-accent)', action: () => onNavigatePhase('home') },
-            { id: 'reference-library',label: 'Reference Library',accent: 'var(--pds-accent)', action: () => onNavigatePhase('reference_library') },
+            { id: 'new-harvest',       label: 'New Harvest',       accent: 'var(--pds-accent)', action: () => onNavigatePhase('ingest') },
+            { id: 'vault',             label: 'Open Vault',        accent: 'var(--pds-accent)', action: () => onNavigatePhase('vault') },
+            { id: 'projects',          label: 'All Projects',      accent: 'var(--pds-accent)', action: () => onNavigatePhase('home') },
+            { id: 'reference-library', label: 'Reference Library', accent: 'var(--pds-accent)', action: () => onNavigatePhase('reference_library') },
           ],
         }]}
       />
