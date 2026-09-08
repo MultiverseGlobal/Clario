@@ -29,13 +29,13 @@ export function WorkspaceEditor({
   const selectedShot = project?.shots.find(s => s.shot_id === selectedShotId) ?? null;
 
   return (
-    <div className="flex overflow-hidden" style={{ height: 'calc(100vh - 56px)' }}>
+    <div className="flex overflow-hidden h-screen">
 
       {/* ── LEFT SIDEBAR: Asset Library ────────────────────────────────────── */}
       <aside
         onDragOver={handleDragOver}
         onDrop={handleDrop}
-        className="w-72 shrink-0 border-r border-border-subtle bg-surface-1 flex flex-col"
+        className="w-72 shrink-0 border-r border-border-subtle bg-surface-1 flex flex-col pt-20"
       >
         {/* Sidebar header */}
         <div className="px-4 py-3 border-b border-border-subtle">
@@ -105,16 +105,16 @@ export function WorkspaceEditor({
       </aside>
 
       {/* ── CENTER CANVAS: Preview + Timeline ──────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0" style={{ background: '#07080C' }}>
+      <div className="flex-1 flex flex-col min-w-0 bg-transparent pt-20">
 
         {/* Canvas header */}
-        <div className="px-6 py-4 border-b border-white/[0.06] flex items-center gap-3">
-          <Film className="h-4 w-4 text-white/40 shrink-0" />
-          <h2 className="font-display text-[15px] font-bold text-white tracking-tight">
+        <div className="px-6 py-4 border-b border-border-subtle flex items-center gap-3">
+          <Film className="h-4 w-4 text-muted-foreground shrink-0" />
+          <h2 className="font-display text-[15px] font-bold text-foreground tracking-tight">
             {project ? project.name : 'No Project Active'}
           </h2>
           {project && (
-            <span className="ml-auto clario-glass-capsule px-2 py-0.5 rounded-full text-[9px] font-mono text-white/50">
+            <span className="ml-auto clario-glass-capsule px-2 py-0.5 rounded-full text-[9px] font-mono text-muted-foreground">
               {project.shots.length} shots
             </span>
           )}
@@ -144,10 +144,10 @@ export function WorkspaceEditor({
             </div>
           ) : (
             <div className="clario-ambient-glow flex flex-col items-center gap-4 text-center px-8 py-16 rounded-2xl">
-              <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
-                <Film className="h-5 w-5 text-white/30" />
+              <div className="w-12 h-12 rounded-xl bg-surface-2 border border-border-subtle flex items-center justify-center shadow-sm">
+                <Film className="h-5 w-5 text-muted-foreground" />
               </div>
-              <p className="text-[13px] text-white/40">
+              <p className="text-[13px] text-muted-foreground font-medium">
                 {project ? 'Select a shot from the library to preview.' : 'Harvest a video to get started.'}
               </p>
             </div>
@@ -184,7 +184,7 @@ export function WorkspaceEditor({
       </div>
 
       {/* ── RIGHT PANEL: Intelligence & Export ─────────────────────────────── */}
-      <aside className="w-80 shrink-0 border-l border-border-subtle bg-surface-1 flex flex-col">
+      <aside className="w-80 shrink-0 border-l border-border-subtle bg-surface-1 flex flex-col pt-20">
 
         {/* Panel header */}
         <div className="px-4 py-3 border-b border-border-subtle flex items-center justify-between">

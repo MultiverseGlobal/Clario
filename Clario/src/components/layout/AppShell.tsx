@@ -3,7 +3,7 @@ import type { HarvestProject } from '../../types/assets';
 import { EcosystemSwitcher } from '../ui/EcosystemSwitcher';
 import { CommandPalette, useCrossAppBus } from '@pseudonyms/ui';
 import { supabase } from '../../lib/supabase';
-import { ChevronRight, Moon, Sun } from 'lucide-react';
+import { ChevronRight, Moon, Sun, FolderOpen, Database, Palette, Settings } from 'lucide-react';
 
 export type ClarioPhase =
   | 'home'
@@ -89,8 +89,8 @@ export function AppShell({
           title="Open Command Palette (⌘K)"
         >
           <div className="w-[6px] h-[6px] rounded-full bg-foreground" />
-          <span className="font-display text-[13px] font-bold uppercase tracking-[0.06em] text-foreground hidden sm:block">
-            Clario
+          <span className="font-display text-[13px] font-semibold lowercase text-foreground hidden sm:block">
+            clario
           </span>
         </button>
 
@@ -106,9 +106,8 @@ export function AppShell({
         )}
       </div>
 
-      {/* ── Right Floating Dock: Workflow + Tools ────────────────────── */}
-      <div className="fixed top-5 right-5 z-50 flex items-center gap-2 pds-animate-enter pds-delay-2">
-        {/* Stepper Pill */}
+      {/* ── Center Floating Pill: Workflow Stepper ─────────────────────── */}
+      <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 pds-animate-enter pds-delay-2">
         <div className="hidden md:flex items-center gap-1 p-1 rounded-2xl clario-glass-nav border border-border-subtle shadow-sm">
           {WORKFLOW_STEPS.map((s, idx) => {
             const isActive  = currentStep === idx + 1 && !isRefLibActive;
@@ -123,7 +122,7 @@ export function AppShell({
                   className={[
                     'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-sans font-medium transition-all duration-300 ease-out',
                     isActive
-                      ? 'bg-foreground text-background shadow-sm'
+                      ? 'bg-muted text-foreground shadow-sm ring-1 ring-border-subtle'
                       : isCompleted
                       ? 'text-muted-foreground hover:text-foreground hover:bg-muted/80'
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted/80 disabled:opacity-40 disabled:cursor-default',
@@ -145,63 +144,69 @@ export function AppShell({
             className={[
               'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-sans font-medium transition-all duration-300 ease-out',
               isRefLibActive
-                ? 'bg-foreground text-background shadow-sm'
+                ? 'bg-muted text-foreground shadow-sm ring-1 ring-border-subtle'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/80',
             ].join(' ')}
           >
             Ref Library
           </button>
         </div>
+      </div>
 
+      {/* ── Right Floating Dock: Global Tools ──────────────────────────── */}
+      <div className="fixed top-5 right-5 z-50 flex items-center gap-2 pds-animate-enter pds-delay-3">
         {/* Global Tools Dock */}
-        <div className="flex items-center gap-1.5 p-1 rounded-2xl clario-glass-nav border border-border-subtle shadow-sm">
+        <div className="flex items-center gap-1 p-1 rounded-2xl clario-glass-nav border border-border-subtle shadow-sm">
           {/* Projects */}
           <button
             onClick={() => onNavigatePhase('home')}
-            className={['px-3 py-1.5 rounded-xl text-[11px] font-medium transition-colors', currentPhase === 'home' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted/80'].join(' ')}
+            title={`Projects (${projectCount})`}
+            className={['h-8 w-8 rounded-xl flex items-center justify-center transition-colors', currentPhase === 'home' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted/80'].join(' ')}
           >
-            Projects <span className="ml-1 opacity-50 font-mono text-[9px]">{projectCount}</span>
+            <FolderOpen className="h-4 w-4" />
           </button>
           
           {/* Vault */}
           <button
             onClick={() => onNavigatePhase('vault')}
-            className={['px-3 py-1.5 rounded-xl text-[11px] font-medium transition-colors', currentPhase === 'vault' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted/80'].join(' ')}
+            title={`Vault (${vaultCount})`}
+            className={['h-8 w-8 rounded-xl flex items-center justify-center transition-colors relative', currentPhase === 'vault' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted/80'].join(' ')}
           >
-            Vault <span className="ml-1 opacity-50 font-mono text-[9px]">{vaultCount}</span>
+            <Database className="h-4 w-4" />
           </button>
 
           {/* Brand Kit */}
           <button
             onClick={onOpenBrandKit}
-            className="px-3 py-1.5 rounded-xl text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+            title="Brand Kit"
+            className="h-8 w-8 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
           >
-            Brand Kit
+            <Palette className="h-4 w-4" />
           </button>
 
           {/* Settings / Gemini */}
           <button
             onClick={onOpenApiKeyModal}
-            className={['flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-medium transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/80'].join(' ')}
             title="Gemini Settings"
+            className="h-8 w-8 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors relative"
           >
-            Settings
-            <div className={`w-1.5 h-1.5 rounded-full ${hasApiKey ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+            <Settings className="h-4 w-4" />
+            <div className={`absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full ring-2 ring-background ${hasApiKey ? 'bg-emerald-500' : 'bg-amber-500'}`} />
           </button>
           
           <button
             onClick={toggleTheme}
-            className="h-7 w-7 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+            className="h-8 w-8 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
           >
-            {theme === 'dark' ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </button>
 
-          <div className="w-px h-4 bg-border-subtle mx-0.5 shrink-0" />
+          <div className="w-px h-4 bg-border-subtle mx-1 shrink-0" />
 
           {/* New Harvest CTA */}
           <button
             onClick={() => onNavigatePhase('ingest')}
-            className="px-3 py-1.5 text-[11px] font-medium bg-foreground text-background rounded-xl shadow-sm hover:opacity-90 transition-opacity"
+            className="px-3 py-1.5 ml-0.5 text-[11px] font-medium bg-foreground text-background rounded-xl shadow-sm hover:opacity-90 transition-opacity"
           >
             + New
           </button>
@@ -214,7 +219,7 @@ export function AppShell({
       </div>
 
       {/* ── Main Workspace Body ──────────────────────────────────────────────── */}
-      <main className="flex-1 flex flex-col min-w-0 pt-20 z-10 relative">
+      <main className="flex-1 flex flex-col min-w-0 z-10 relative">
         {children}
       </main>
 
