@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Sun,
@@ -10,12 +11,6 @@ import {
   Layers,
   ChevronRight,
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "../ui/dropdown-menu";
 import { EcosystemSwitcher } from "../ui/EcosystemSwitcher";
 import { ClarioPhase } from "./AppShell";
 
@@ -51,6 +46,20 @@ export function FloatingNav({
   isRefLibActive,
   canNavigateWorkflow,
 }: FloatingNavProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
+
   return (
     <>
       {/* ── Brand Mark — top left ───────────────────────────────────── */}
@@ -59,63 +68,49 @@ export function FloatingNav({
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
         className="fixed top-5 left-5 z-50"
+        ref={menuRef}
       >
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-card/80 border border-border/50 shadow-sm backdrop-blur-md hover:bg-card transition-colors outline-none data-[state=open]:bg-card">
-              {/* Clario Icon equivalent */}
-              <div className="w-[8px] h-[8px] rounded-full bg-foreground" />
-              <span className="text-[11px] font-semibold text-muted-foreground hidden sm:block font-mono uppercase tracking-widest">
-                Clario
-              </span>
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="start"
-            className="w-48 bg-card/95 backdrop-blur-xl border-border/50 shadow-xl rounded-xl p-1"
-          >
-            <DropdownMenuItem
-              onClick={() => onNavigatePhase("ingest")}
-              className="gap-2 text-[12px] cursor-pointer focus:bg-foreground focus:text-background rounded-lg"
+        <button
+          onClick={() => setMenuOpen((v) => !v)}
+          className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-card/80 border border-border/50 shadow-sm backdrop-blur-md hover:bg-card transition-colors outline-none"
+        >
+          <div className="w-[8px] h-[8px] rounded-full bg-foreground" />
+          <span className="text-[11px] font-semibold text-muted-foreground hidden sm:block font-mono uppercase tracking-widest">
+            Clario
+          </span>
+        </button>
+
+        {menuOpen && (
+          <div className="absolute top-full left-0 mt-2 w-48 bg-card/95 backdrop-blur-xl border border-border/50 shadow-xl rounded-xl p-1 z-50">
+            <button
+              onClick={() => { onNavigatePhase("ingest"); setMenuOpen(false); }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-[12px] rounded-lg hover:bg-foreground hover:text-background transition-colors text-left"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-3.5 h-3.5 shrink-0" />
               <span>New Harvest</span>
-              <span className="ml-auto text-[10px] font-mono opacity-60">
-                ⌘N
-              </span>
-            </DropdownMenuItem>
-
-            <DropdownMenuItem
+              <span className="ml-auto text-[10px] font-mono opacity-60">⌘N</span>
+            </button>
+            <button
               onClick={() => {
-                const e = new KeyboardEvent("keydown", {
-                  key: "k",
-                  metaKey: true,
-                  bubbles: true,
-                });
+                const e = new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true });
                 document.dispatchEvent(e);
+                setMenuOpen(false);
               }}
-              className="gap-2 text-[12px] cursor-pointer focus:bg-foreground focus:text-background rounded-lg"
+              className="w-full flex items-center gap-2 px-3 py-2 text-[12px] rounded-lg hover:bg-foreground hover:text-background transition-colors text-left"
             >
-              <Command className="w-3.5 h-3.5" />
+              <Command className="w-3.5 h-3.5 shrink-0" />
               <span>Command Palette</span>
-              <span className="ml-auto text-[10px] font-mono opacity-60">
-                ⌘K
-              </span>
-            </DropdownMenuItem>
-
-            <DropdownMenuItem
-              onClick={toggleTheme}
-              className="gap-2 text-[12px] cursor-pointer focus:bg-foreground focus:text-background rounded-lg"
+              <span className="ml-auto text-[10px] font-mono opacity-60">⌘K</span>
+            </button>
+            <button
+              onClick={() => { toggleTheme(); setMenuOpen(false); }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-[12px] rounded-lg hover:bg-foreground hover:text-background transition-colors text-left"
             >
-              {theme === "dark" ? (
-                <Sun className="w-3.5 h-3.5" />
-              ) : (
-                <Moon className="w-3.5 h-3.5" />
-              )}
+              {theme === "dark" ? <Sun className="w-3.5 h-3.5 shrink-0" /> : <Moon className="w-3.5 h-3.5 shrink-0" />}
               <span>Toggle Theme</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </button>
+          </div>
+        )}
       </motion.div>
 
       {/* ── Center Floating Pill: Workflow Stepper ─────────────────────── */}
@@ -136,9 +131,7 @@ export function FloatingNav({
                   <ChevronRight className="h-3 w-3 mx-0.5 text-border/50 shrink-0" />
                 )}
                 <button
-                  onClick={() => {
-                    if (canNavigate) onNavigatePhase(s.phase);
-                  }}
+                  onClick={() => { if (canNavigate) onNavigatePhase(s.phase); }}
                   disabled={!canNavigate}
                   className={[
                     "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-sans font-medium transition-all duration-300 ease-out",
@@ -149,9 +142,7 @@ export function FloatingNav({
                         : "text-muted-foreground hover:text-foreground hover:bg-muted/80 disabled:opacity-40 disabled:cursor-default",
                   ].join(" ")}
                 >
-                  <span
-                    className={`font-mono text-[9px] tracking-widest ${isActive ? "opacity-80 font-bold" : "opacity-40"}`}
-                  >
+                  <span className={`font-mono text-[9px] tracking-widest ${isActive ? "opacity-80 font-bold" : "opacity-40"}`}>
                     {s.step}
                   </span>
                   {s.label}
@@ -180,16 +171,10 @@ export function FloatingNav({
                 : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
             }`}
           >
-            <FolderOpen
-              className={`w-3.5 h-3.5 ${currentPhase === "home" ? "" : "opacity-70 group-hover:opacity-100 transition-opacity"}`}
-            />
-            <span
-              className={`text-[11px] font-semibold font-mono tracking-wide whitespace-nowrap overflow-hidden transition-all duration-300 ease-out ${
-                currentPhase === "home"
-                  ? "max-w-24 opacity-100"
-                  : "max-w-0 opacity-0 group-hover:max-w-24 group-hover:opacity-100 group-hover:ml-2"
-              }`}
-            >
+            <FolderOpen className={`w-3.5 h-3.5 ${currentPhase === "home" ? "" : "opacity-70 group-hover:opacity-100 transition-opacity"}`} />
+            <span className={`text-[11px] font-semibold font-mono tracking-wide whitespace-nowrap overflow-hidden transition-all duration-300 ease-out ${
+              currentPhase === "home" ? "max-w-24 opacity-100" : "max-w-0 opacity-0 group-hover:max-w-24 group-hover:opacity-100 group-hover:ml-2"
+            }`}>
               Projects
             </span>
           </button>
@@ -204,16 +189,10 @@ export function FloatingNav({
                 : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
             }`}
           >
-            <Layers
-              className={`w-3.5 h-3.5 ${currentPhase === "reference_library" ? "" : "opacity-70 group-hover:opacity-100 transition-opacity"}`}
-            />
-            <span
-              className={`text-[11px] font-semibold font-mono tracking-wide whitespace-nowrap overflow-hidden transition-all duration-300 ease-out ${
-                currentPhase === "reference_library"
-                  ? "max-w-32 opacity-100"
-                  : "max-w-0 opacity-0 group-hover:max-w-32 group-hover:opacity-100 group-hover:ml-2"
-              }`}
-            >
+            <Layers className={`w-3.5 h-3.5 ${currentPhase === "reference_library" ? "" : "opacity-70 group-hover:opacity-100 transition-opacity"}`} />
+            <span className={`text-[11px] font-semibold font-mono tracking-wide whitespace-nowrap overflow-hidden transition-all duration-300 ease-out ${
+              currentPhase === "reference_library" ? "max-w-32 opacity-100" : "max-w-0 opacity-0 group-hover:max-w-32 group-hover:opacity-100 group-hover:ml-2"
+            }`}>
               Ref Library
             </span>
           </button>
@@ -237,9 +216,7 @@ export function FloatingNav({
             className="group flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all duration-300 ease-out text-muted-foreground hover:bg-muted/80 hover:text-foreground relative"
           >
             <Settings className="w-3.5 h-3.5 opacity-70 group-hover:opacity-100 transition-opacity" />
-            <div
-              className={`absolute top-1.5 left-1.5 w-1.5 h-1.5 rounded-full ring-2 ring-background ${hasApiKey ? "bg-emerald-500" : "bg-amber-500"}`}
-            />
+            <div className={`absolute top-1.5 left-1.5 w-1.5 h-1.5 rounded-full ring-2 ring-background ${hasApiKey ? "bg-emerald-500" : "bg-amber-500"}`} />
             <span className="text-[11px] font-semibold font-mono tracking-wide whitespace-nowrap overflow-hidden transition-all duration-300 ease-out max-w-0 opacity-0 group-hover:max-w-24 group-hover:opacity-100 group-hover:ml-2">
               Settings
             </span>
