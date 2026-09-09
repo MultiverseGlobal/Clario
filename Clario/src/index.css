@@ -1,5 +1,5 @@
 /* Clario — PDS-v5
- * Font: Vanguard (display) + Athelas (body)
+ * Font: Space Grotesk (display) + Inter (body)
  * Personality: The editor's studio. Cinematic. Frame-accurate. Editorial impact.
  * Mode: Light by default. Dark via .dark class on <html>.
  * ─────────────────────────────────────────────────────────────────────────── */
@@ -10,35 +10,9 @@
 
 @layer base {
 
-  /* ── @font-face declarations ─────────────────────────────────────────────
-   * Vanguard — display. Requires licensed font in /public/fonts/
-   * Fallback: Impact, Oswald (system/web fallback)
-   * Athelas — body. Apple system serif, wide availability.
-   * Fallback: Georgia, Times New Roman
+  /* ── Fonts ───────────────────────────────────────────────────────────────
+   * Space Grotesk and Inter are loaded via Google Fonts in index.html
    */
-  @font-face {
-    font-family: 'Vanguard';
-    src: local('Vanguard'), local('Vanguard-Bold');
-    font-weight: 700 900;
-    font-style: normal;
-    font-display: swap;
-  }
-
-  @font-face {
-    font-family: 'Athelas';
-    src: local('Athelas'), local('Athelas-Regular');
-    font-weight: 400;
-    font-style: normal;
-    font-display: swap;
-  }
-
-  @font-face {
-    font-family: 'Athelas';
-    src: local('Athelas Bold'), local('Athelas-Bold');
-    font-weight: 700;
-    font-style: normal;
-    font-display: swap;
-  }
 
   /* ── Light Mode (:root default) ──────────────────────────────────────── */
   :root {
@@ -128,20 +102,21 @@
   body {
     background-color: var(--pds-canvas);
     color: var(--pds-text-primary);
-    /* Clario body: Athelas — refined editorial serif */
-    font-family: 'Athelas', Georgia, 'Times New Roman', serif;
+    /* Clario body: Inter — utilitarian precision, zero ornament */
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     min-height: 100vh;
     overflow-x: hidden;
-    line-height: 1.65;
+    line-height: 1.5;
     margin: 0;
+    letter-spacing: -0.015em;
   }
 
-  /* Clario display: Vanguard — cinematic editorial impact */
+  /* Clario display: Space Grotesk — geometric, authoritative, architectural */
   h1, h2, h3, h4, h5, h6, .font-display {
-    font-family: 'Vanguard', Impact, Oswald, sans-serif;
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
     font-weight: 700;
     letter-spacing: -0.025em;
-    line-height: 1.05;
+    line-height: 1.15;
   }
 
   /* UI elements, labels, nav: use clean sans */

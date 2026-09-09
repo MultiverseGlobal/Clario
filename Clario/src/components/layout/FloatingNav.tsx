@@ -9,6 +9,7 @@ import {
   Layers,
 } from "lucide-react";
 import { EcosystemSwitcher } from "../ui/EcosystemSwitcher";
+import { ClarioLogo } from "../ui/ClarioLogo";
 import { ClarioPhase } from "./AppShell";
 
 interface FloatingNavProps {
@@ -57,7 +58,7 @@ export function FloatingNav({
           onClick={() => setMenuOpen((v) => !v)}
           className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-card/80 border border-border/50 shadow-sm backdrop-blur-md hover:bg-card transition-colors outline-none"
         >
-          <div className="w-[8px] h-[8px] rounded-full bg-foreground" />
+          <ClarioLogo size={16} />
           <span className="text-[11px] font-semibold text-muted-foreground hidden sm:block font-mono uppercase tracking-widest">
             Clario
           </span>

@@ -60,9 +60,9 @@ export default {
         },
       },
       fontFamily: {
-        // Clario: Vanguard display, Athelas body, Inter UI, JetBrains Mono data
-        display: ["Vanguard", "Impact", "Oswald", "sans-serif"],
-        body:    ["Athelas", "Georgia", "Times New Roman", "serif"],
+        // Clario: Space Grotesk display, Inter body, Inter UI, JetBrains Mono data
+        display: ["Space Grotesk", "Inter", "system-ui", "sans-serif"],
+        body:    ["Inter", "-apple-system", "system-ui", "sans-serif"],
         sans:    ["Inter", "-apple-system", "system-ui", "sans-serif"],
         mono:    ["JetBrains Mono", "Courier New", "monospace"],
       },
