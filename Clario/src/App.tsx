@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { HarvestProject } from './types/assets';
+
 import { listProjects, saveProject, ClarioProject } from './lib/projectStore';
 import { fetchApiBaseFromDb } from './lib/apiClient';
 import { getApiKey, setApiKey, fetchApiKeyFromDb } from './lib/gemini';
