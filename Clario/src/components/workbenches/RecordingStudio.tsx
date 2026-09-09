@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Camera, Video, Mic, ArrowLeft, Maximize, Target, Activity, Settings2 } from 'lucide-react';
+import { Camera, Video, Mic, ArrowLeft, Maximize, Target, Activity, Settings2, MonitorUp } from 'lucide-react';
 
 interface RecordingStudioProps {
   onBack: () => void;
@@ -9,10 +9,10 @@ interface RecordingStudioProps {
 
 const TELEPROMPTER_SCRIPT = [
   { text: "Hey! Thanks for taking the time to review this.", type: "normal" },
-  { text: "I know you've been struggling with pipeline stagnation recently.", type: "pain", cue: "Zoom in slightly to build empathy" },
-  { text: "What we've built here is specifically designed to eliminate that friction.", type: "normal", cue: "Pan to product demo on screen" },
+  { text: "I know you've been struggling with pipeline stagnation recently.", type: "pain", cue: "Zoom in PIP slightly" },
+  { text: "What we've built here is specifically designed to eliminate that friction.", type: "normal", cue: "Highlight screen feature" },
   { text: "It's fully automated and integrates directly with your existing stack.", type: "feature" },
-  { text: "Let's walk through how this completely changes your outreach.", type: "normal", cue: "Smile and transition to screen share" },
+  { text: "Let's walk through how this completely changes your outreach.", type: "normal", cue: "Expand PIP to full screen" },
 ];
 
 export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
@@ -31,13 +31,11 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
         setRecordingTime(t => {
           const nextT = t + 1;
           
-          // Advance teleprompter every 4 seconds for prototype
           if (nextT % 4 === 0 && currentLineIndex < TELEPROMPTER_SCRIPT.length - 1) {
             const nextLine = currentLineIndex + 1;
             setCurrentLineIndex(nextLine);
             if (TELEPROMPTER_SCRIPT[nextLine].cue) {
               setActiveCue(TELEPROMPTER_SCRIPT[nextLine].cue!);
-              // Hide cue after 3 seconds
               setTimeout(() => setActiveCue(null), 3000);
             }
           }
@@ -94,86 +92,103 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black text-white flex flex-col font-sans">
+    <div className="fixed inset-0 z-[100] bg-black text-white flex flex-col font-sans overflow-hidden clario-mesh-gradient">
+      
       {/* Top Bar */}
-      <div className="flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent absolute top-0 w-full z-10">
-        <button onClick={onBack} className="pds-btn-ghost text-white hover:bg-white/10 flex items-center gap-2">
+      <div className="flex items-center justify-between p-6 w-full z-20">
+        <button onClick={onBack} className="pds-btn-ghost bg-white/5 border-white/10 text-white hover:bg-white/10 flex items-center gap-2 rounded-full px-5 py-2.5 backdrop-blur-md">
           <ArrowLeft className="w-4 h-4" />
-          Back
+          <span className="font-medium text-sm">Exit Studio</span>
         </button>
+        
+        {isRecording && (
+          <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3 bg-red-500/10 border border-red-500/20 backdrop-blur-md px-4 py-1.5 rounded-full">
+            <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.6)]" />
+            <span className="text-red-400 font-mono text-sm tracking-widest">{formatTime(recordingTime)}</span>
+          </div>
+        )}
+        
         <div className="flex items-center gap-4">
-          {isRecording && (
-            <div className="flex items-center gap-2 text-red-500 font-mono text-sm animate-pulse">
-              <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
-              {formatTime(recordingTime)}
-            </div>
-          )}
-          <button className="p-2 rounded-full hover:bg-white/10 transition-colors">
-            <Settings2 className="w-5 h-5" />
+          <button className="p-2.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors backdrop-blur-md">
+            <Settings2 className="w-5 h-5 text-white/80" />
           </button>
         </div>
       </div>
 
-      {/* Main Studio Area */}
-      <div className="flex-1 relative flex items-center justify-center overflow-hidden">
-        {/* Video Feed */}
-        {stream ? (
-          <video 
-            ref={videoRef} 
-            autoPlay 
-            muted 
-            playsInline 
-            className="w-full h-full object-cover transform -scale-x-100" 
-          />
-        ) : (
-          <div className="flex flex-col items-center justify-center text-white/50 gap-4">
-            <Camera className="w-12 h-12" />
-            <p className="font-mono text-sm uppercase tracking-widest">Camera Unavailable</p>
-          </div>
-        )}
-
-        {/* AI Director Overlays */}
-        <div className="absolute inset-0 pointer-events-none border-[1px] border-white/10 m-8 rounded-3xl overflow-hidden flex flex-col">
-          {/* Rule of thirds grid lines */}
-          <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 opacity-10">
-            <div className="border-r border-b border-white" />
-            <div className="border-r border-b border-white" />
-            <div className="border-b border-white" />
-            <div className="border-r border-b border-white" />
-            <div className="border-r border-b border-white" />
-            <div className="border-b border-white" />
-            <div className="border-r border-white" />
-            <div className="border-r border-white" />
-            <div />
+      {/* Main Studio Area (Cap.so layout) */}
+      <div className="flex-1 relative flex items-center justify-center p-12 gap-12 z-10">
+        
+        {/* Screen Canvas wrapper */}
+        <div className="relative w-full max-w-5xl aspect-video rounded-[24px] shadow-2xl clario-frame-card overflow-hidden ring-1 ring-white/10 bg-black/40 backdrop-blur-xl">
+          
+          {/* Simulated Screen Content */}
+          <div className="absolute inset-0 bg-surface-2 dark:bg-[#0E1018] flex flex-col">
+            <div className="h-10 bg-white/5 border-b border-white/5 flex items-center px-4 gap-2">
+              <div className="w-3 h-3 rounded-full bg-red-500/80" />
+              <div className="w-3 h-3 rounded-full bg-amber-500/80" />
+              <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
+              <div className="mx-auto h-5 w-48 bg-white/5 rounded-md" />
+            </div>
+            <div className="flex-1 flex items-center justify-center text-white/20">
+              <div className="flex flex-col items-center gap-4">
+                <MonitorUp className="w-16 h-16 opacity-50" />
+                <p className="font-mono text-sm uppercase tracking-widest">Screen Sharing Active</p>
+              </div>
+            </div>
           </div>
 
-          {/* AI Cue Popup */}
+          {/* AI Cue Overlays floating on screen */}
           <AnimatePresence>
             {activeCue && (
               <motion.div 
                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                className="absolute top-1/4 left-1/2 -translate-x-1/2 bg-accent text-accent-foreground px-6 py-3 rounded-full font-bold shadow-2xl flex items-center gap-3 backdrop-blur-md"
+                className="absolute top-8 left-1/2 -translate-x-1/2 clario-glass-capsule px-6 py-3 rounded-full font-bold shadow-2xl flex items-center gap-3 z-30"
               >
-                <Target className="w-5 h-5 animate-pulse" />
-                {activeCue}
+                <Target className="w-5 h-5 text-accent animate-pulse" />
+                <span className="text-white">{activeCue}</span>
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Picture-in-Picture Camera */}
+          <motion.div 
+            className="absolute bottom-8 left-8 w-64 aspect-video rounded-2xl overflow-hidden ring-2 ring-white/20 shadow-[0_20px_40px_rgba(0,0,0,0.5)] z-20 group cursor-move"
+            whileHover={{ scale: 1.02 }}
+            drag
+            dragConstraints={{ left: 0, right: 800, top: 0, bottom: 400 }}
+            dragElastic={0.1}
+          >
+            {stream ? (
+              <video 
+                ref={videoRef} 
+                autoPlay 
+                muted 
+                playsInline 
+                className="w-full h-full object-cover transform -scale-x-100" 
+              />
+            ) : (
+              <div className="w-full h-full bg-black/80 flex items-center justify-center backdrop-blur-md">
+                <Camera className="w-8 h-8 text-white/30" />
+              </div>
+            )}
+            {/* Inner highlight rim for PIP */}
+            <div className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/10 pointer-events-none" />
+          </motion.div>
         </div>
 
-        {/* Teleprompter Widget */}
-        <div className="absolute right-12 top-24 bottom-32 w-80 bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6 flex flex-col pointer-events-auto">
+        {/* Teleprompter Sidebar */}
+        <div className="w-[340px] h-full max-h-[600px] clario-glass-panel rounded-[24px] flex flex-col p-6 shadow-2xl border border-white/10 relative overflow-hidden">
           <div className="flex items-center justify-between mb-6 pb-4 border-b border-white/10">
-            <div className="flex items-center gap-2 text-white/80">
+            <div className="flex items-center gap-2 text-white">
               <Activity className="w-4 h-4 text-accent" />
-              <span className="text-xs font-mono uppercase tracking-widest">AI Teleprompter</span>
+              <span className="text-xs font-mono uppercase tracking-widest font-semibold">Teleprompter</span>
             </div>
           </div>
           
           <div className="flex-1 overflow-hidden relative">
-            <div className="absolute inset-y-0 left-0 w-1 bg-white/10 rounded-full overflow-hidden">
+            <div className="absolute inset-y-0 left-0 w-1 bg-white/5 rounded-full overflow-hidden">
               <motion.div 
                 className="w-full bg-accent"
                 animate={{ height: `${((currentLineIndex + 1) / TELEPROMPTER_SCRIPT.length) * 100}%` }}
@@ -198,7 +213,7 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
                       : 'text-white/60'
                     }`}
                   >
-                    <p className={`text-lg leading-relaxed ${isActive ? 'font-bold' : 'font-medium'}`}>
+                    <p className={`text-xl leading-relaxed ${isActive ? 'font-bold' : 'font-medium'}`}>
                       {line.text}
                     </p>
                   </motion.div>
@@ -209,30 +224,37 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
         </div>
       </div>
 
-      {/* Bottom Controls */}
-      <div className="h-28 bg-black flex items-center justify-center gap-8 px-12 z-10 border-t border-white/10">
-        <div className="flex-1 flex justify-start gap-4 text-white/50">
-          <button className="p-3 rounded-xl hover:bg-white/10 transition-colors">
+      {/* Floating Bottom Controls */}
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 clario-glass-capsule rounded-full px-8 py-4 flex items-center gap-8 shadow-2xl z-20">
+        <div className="flex items-center gap-4 text-white/70">
+          <button className="p-3 rounded-full hover:bg-white/10 hover:text-white transition-colors">
             <Mic className="w-5 h-5" />
           </button>
-          <button className="p-3 rounded-xl hover:bg-white/10 transition-colors">
+          <button className="p-3 rounded-full hover:bg-white/10 hover:text-white transition-colors">
             <Video className="w-5 h-5" />
           </button>
         </div>
         
+        <div className="w-px h-8 bg-white/10" />
+        
         <button 
           onClick={handleToggleRecord}
-          className="w-16 h-16 rounded-full flex items-center justify-center border-4 border-white/20 hover:border-white/40 transition-all group"
+          className="w-14 h-14 rounded-full flex items-center justify-center border-2 border-white/20 hover:border-white/40 transition-all group bg-white/5"
         >
           {isRecording ? (
-            <div className="w-6 h-6 rounded-sm bg-red-500 shadow-[0_0_20px_rgba(239,68,68,0.5)]" />
+            <div className="w-5 h-5 rounded-sm bg-red-500 shadow-[0_0_20px_rgba(239,68,68,0.5)]" />
           ) : (
-            <div className="w-12 h-12 rounded-full bg-red-500 shadow-[0_0_20px_rgba(239,68,68,0.5)] group-hover:scale-95 transition-transform" />
+            <div className="w-10 h-10 rounded-full bg-red-500 shadow-[0_0_20px_rgba(239,68,68,0.5)] group-hover:scale-95 transition-transform" />
           )}
         </button>
 
-        <div className="flex-1 flex justify-end">
-          <button className="p-3 rounded-xl hover:bg-white/10 transition-colors text-white/50">
+        <div className="w-px h-8 bg-white/10" />
+
+        <div className="flex items-center gap-4 text-white/70">
+          <button className="p-3 rounded-full hover:bg-white/10 hover:text-white transition-colors">
+            <MonitorUp className="w-5 h-5" />
+          </button>
+          <button className="p-3 rounded-full hover:bg-white/10 hover:text-white transition-colors">
             <Maximize className="w-5 h-5" />
           </button>
         </div>

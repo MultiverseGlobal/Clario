@@ -47,7 +47,7 @@ export function AppShell({
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground font-sans clario-grid-bg relative">
       {/* ── Ambient Glow (Atlas Light Mesh) ── */}
-      <div className="fixed inset-0 clario-ambient-glow pointer-events-none z-0" />
+      <div className="fixed inset-0 clario-ambient-glow clario-animate-breathe pointer-events-none z-0" />
 
       <FloatingNav
         currentPhase={currentPhase}

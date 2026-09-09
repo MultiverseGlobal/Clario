@@ -13,7 +13,7 @@ import { DeliverableView } from './components/workbenches/DeliverableView';
 
 export default function App() {
   const [currentProject, setCurrentProject] = useState<ClarioProject | null>(null);
-  const [currentPhase, setCurrentPhase] = useState<ClarioPhase>('reference_library');
+  const [currentPhase, setCurrentPhase] = useState<ClarioPhase>('home');
   const [latestResult, setLatestResult] = useState<any>(null);
 
   // Shell modals
