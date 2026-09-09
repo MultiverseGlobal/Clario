@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { listProjects, saveProject, ClarioProject } from '../../lib/projectStore';
+import { listProjects, ClarioProject } from '../../lib/projectStore';
 import { Play, Plus, Clock, FileVideo } from 'lucide-react';
 import { ProjectCreationWizard } from './ProjectCreationWizard';
 

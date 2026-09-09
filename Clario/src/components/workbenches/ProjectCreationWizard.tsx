@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Video, Presentation, Target, Sparkles, UploadCloud, Link as LinkIcon, Camera, CheckCircle2, ArrowRight, X, Loader2, Copy } from 'lucide-react';
+import { Video, Presentation, Target, Sparkles, UploadCloud, Link as LinkIcon, Camera, CheckCircle2, ArrowRight, X, Copy } from 'lucide-react';
 import { RecordingStudio } from './RecordingStudio';
 import { ClarioProject, saveProject } from '../../lib/projectStore';
 
@@ -30,7 +30,7 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState('');
 
-  const nextStep = (s: Step) => setStep(s);
+
 
   const simulateProcessing = (type: 'video' | 'slides') => {
     setStep(type === 'video' ? 'processing_video' : 'processing_slides');

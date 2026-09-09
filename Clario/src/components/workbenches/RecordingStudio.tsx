@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Camera, Video, Mic, ArrowLeft, Maximize, Target, Activity, Settings2, PlaySquare } from 'lucide-react';
+import { Camera, Video, Mic, ArrowLeft, Maximize, Target, Activity, Settings2 } from 'lucide-react';
 
 interface RecordingStudioProps {
   onBack: () => void;
