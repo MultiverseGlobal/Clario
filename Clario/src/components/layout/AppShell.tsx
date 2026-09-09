@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useState } from 'react';
-import type { HarvestProject } from '../../types/assets';
+
 import { CommandPalette, useCrossAppBus } from '@pseudonyms/ui';
 import { supabase } from '../../lib/supabase';
 import { FloatingNav } from './FloatingNav';
