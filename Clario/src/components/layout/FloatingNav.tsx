@@ -3,12 +3,10 @@ import { motion } from "framer-motion";
 import {
   Sun,
   Moon,
-  Plus,
   Command,
   FolderOpen,
   Settings,
   Layers,
-  ChevronRight,
 } from "lucide-react";
 import { EcosystemSwitcher } from "../ui/EcosystemSwitcher";
 import { ClarioPhase } from "./AppShell";
@@ -20,17 +18,10 @@ interface FloatingNavProps {
   toggleTheme: () => void;
   onNavigatePhase: (phase: ClarioPhase) => void;
   onOpenApiKeyModal: () => void;
-  currentStep: number;
   isRefLibActive: boolean;
   canNavigateWorkflow: boolean;
 }
 
-const WORKFLOW_STEPS: { step: string; label: string; phase: ClarioPhase }[] = [
-  { step: "01", label: "Reference", phase: "ingest" },
-  { step: "02", label: "Analyze", phase: "harvest_studio" },
-  { step: "03", label: "Resolve", phase: "harvest_studio" },
-  { step: "04", label: "Export", phase: "export" },
-];
 
 export function FloatingNav({
   currentPhase,
@@ -39,7 +30,6 @@ export function FloatingNav({
   toggleTheme,
   onNavigatePhase,
   onOpenApiKeyModal,
-  currentStep,
   isRefLibActive,
   canNavigateWorkflow,
 }: FloatingNavProps) {
@@ -79,14 +69,7 @@ export function FloatingNav({
 
         {menuOpen && (
           <div className="absolute top-full left-0 mt-2 w-48 bg-card/95 backdrop-blur-xl border border-border/50 shadow-xl rounded-xl p-1 z-50">
-            <button
-              onClick={() => { onNavigatePhase("ingest"); setMenuOpen(false); }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-[12px] rounded-lg hover:bg-foreground hover:text-background transition-colors text-left"
-            >
-              <Plus className="w-3.5 h-3.5 shrink-0" />
-              <span>New Harvest</span>
-              <span className="ml-auto text-[10px] font-mono opacity-60">⌘N</span>
-            </button>
+
             <button
               onClick={() => {
                 const e = new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true });
@@ -110,45 +93,7 @@ export function FloatingNav({
         )}
       </motion.div>
 
-      {/* ── Center Floating Pill: Workflow Stepper ─────────────────────── */}
-      <motion.div
-        initial={{ opacity: 0, y: -6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-        className="fixed top-5 left-1/2 -translate-x-1/2 z-50 flex items-center"
-      >
-        <div className="hidden md:flex items-center p-1 rounded-2xl bg-card/80 border border-border/50 shadow-sm backdrop-blur-md">
-          {WORKFLOW_STEPS.map((s, idx) => {
-            const isActive = currentStep === idx + 1 && !isRefLibActive;
-            const isCompleted = currentStep > idx + 1 && !isRefLibActive;
-            const canNavigate = canNavigateWorkflow || s.phase === "ingest";
-            return (
-              <div key={s.step} className="flex items-center">
-                {idx > 0 && (
-                  <ChevronRight className="h-3 w-3 mx-0.5 text-border/50 shrink-0" />
-                )}
-                <button
-                  onClick={() => { if (canNavigate) onNavigatePhase(s.phase); }}
-                  disabled={!canNavigate}
-                  className={[
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-sans font-medium transition-all duration-300 ease-out",
-                    isActive
-                      ? "bg-foreground text-background shadow-sm"
-                      : isCompleted
-                        ? "text-muted-foreground hover:text-foreground hover:bg-muted/80"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/80 disabled:opacity-40 disabled:cursor-default",
-                  ].join(" ")}
-                >
-                  <span className={`font-mono text-[9px] tracking-widest ${isActive ? "opacity-80 font-bold" : "opacity-40"}`}>
-                    {s.step}
-                  </span>
-                  {s.label}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </motion.div>
+
 
       {/* ── Main Navigation Dock — top right ────────────────────── */}
       <motion.div

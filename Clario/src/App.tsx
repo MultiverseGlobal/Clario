@@ -1,27 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { toBlobURL } from '@ffmpeg/util';
-import type { HarvesterMode, HarvestProject } from './types/assets';
-import { WorkspaceEditor } from './components/layout/WorkspaceEditor';
-import { harvestVideoProject, harvestSlideProject } from './lib/extractor';
+import type { HarvestProject } from './types/assets';
 import { saveProject, listProjects } from './lib/projectStore';
-import { checkServerHealth, uploadToWorker, pollJobStatus, fetchApiBaseFromDb } from './lib/apiClient';
+import { fetchApiBaseFromDb } from './lib/apiClient';
 import { getApiKey, setApiKey, fetchApiKeyFromDb } from './lib/gemini';
 import { AppShell, type ClarioPhase } from './components/layout/AppShell';
 import { AuthGate } from './components/layout/AuthGate';
 import { fetchBrandKitFromDb } from './lib/brandKit';
-import { syncProjectHarvested } from './lib/metaphorSync';
 import { ReferenceLibraryPanel } from './components/workbenches/ReferenceLibraryPanel';
 import { ScriptAnalysisWorkbench } from './components/workbenches/ScriptAnalysisWorkbench';
 
 export default function App() {
-  const [mode, _setMode] = useState<HarvesterMode>('video_harvester');
   const [currentProject, setCurrentProject] = useState<HarvestProject | null>(null);
-  const [_contactSheetUrl, setContactSheetUrl] = useState<string>('');
-  const [isHarvesting, setIsHarvesting] = useState<boolean>(false);
-  const [progress, setProgress] = useState<{ msg: string; pct: number }>({ msg: '', pct: 0 });
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [currentPhase, setCurrentPhase] = useState<ClarioPhase>('workspace');
+  const [currentPhase, setCurrentPhase] = useState<ClarioPhase>('reference_library');
 
   // Shell modals
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
@@ -56,95 +46,6 @@ export default function App() {
     refreshProjectList();
   }, [refreshProjectList]);
 
-  // Load FFmpeg WASM in background
-  useEffect(() => {
-    const load = async () => {
-      const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
-      try {
-        await ffmpegRef.load({
-          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-        });
-      } catch (err) {
-        console.warn('FFmpeg background load warning:', err);
-      }
-    };
-    load();
-  }, [ffmpegRef]);
-
-
-
-  const handleHarvestFiles = async (files: File[], referenceUrl: string = '') => {
-    if (files.length === 0) return;
-    setIsHarvesting(true);
-    setErrorMessage(null);
-
-    try {
-      const isServerOnline = await checkServerHealth();
-
-      if (isServerOnline && mode === 'video_harvester') {
-        setProgress({ msg: 'Connecting to FastAPI media worker…', pct: 5 });
-        const { job_id } = await uploadToWorker(files[0], mode);
-        const serverProject = await pollJobStatus(job_id, (msg, pct) => setProgress({ msg, pct }));
-        await saveProject(serverProject);
-        setCurrentProject(serverProject);
-        syncProjectHarvested(serverProject.name, mode, serverProject.shots?.length || 0);
-        if ((window as any).__crossAppBusPublish) {
-          (window as any).__crossAppBusPublish({
-            from: 'clario',
-            type: 'clario:job_complete',
-            payload: { projectId: serverProject.id }
-          });
-        }
-      } else {
-        if (mode === 'video_harvester') {
-          const { project, contactSheetUrl: sheetUrl } = await harvestVideoProject(
-            files[0],
-            referenceUrl,
-            ffmpegRef,
-            (msg, pct) => setProgress({ msg, pct })
-          );
-          await saveProject(project);
-          setCurrentProject(project);
-          setContactSheetUrl(sheetUrl);
-          if ((window as any).__crossAppBusPublish) {
-            (window as any).__crossAppBusPublish({
-              from: 'clario',
-              type: 'clario:job_complete',
-              payload: { projectId: project.id }
-            });
-          }
-        } else {
-          const { project } = await harvestSlideProject(
-            files,
-            referenceUrl,
-            (msg, pct) => setProgress({ msg, pct })
-          );
-          await saveProject(project);
-          setCurrentProject(project);
-          if ((window as any).__crossAppBusPublish) {
-            (window as any).__crossAppBusPublish({
-              from: 'clario',
-              type: 'clario:job_complete',
-              payload: { projectId: project.id }
-            });
-          }
-        }
-      }
-      await refreshProjectList();
-    } catch (err: any) {
-      console.error('Harvest pipeline error:', err);
-      setErrorMessage(
-        `Harvest error: ${err.message || 'Processing failed. Check console or verify your file format.'}`
-      );
-    } finally {
-      setIsHarvesting(false);
-      setProgress({ msg: '', pct: 0 });
-    }
-  };
-
-
-
   const handleUpdateProject = async (updated: HarvestProject) => {
     setCurrentProject(updated);
     await saveProject(updated);
@@ -178,152 +79,6 @@ export default function App() {
       onOpenApiKeyModal={() => setShowApiKeyModal(true)}
       hasApiKey={Boolean(getApiKey())}
     >
-      {/* ── Global Processing / Loading Modal ───────────────────────────────── */}
-      {isHarvesting && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 9999,
-            background: 'rgba(17, 19, 24, 0.55)',
-            backdropFilter: 'blur(6px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <div
-            className="paper-card"
-            style={{
-              padding: '32px 36px',
-              width: 420,
-              textAlign: 'center',
-              boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
-            }}
-          >
-            <div
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: 12,
-                background: 'rgba(78, 108, 242, 0.1)',
-                color: 'var(--accent)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 16px',
-              }}
-            >
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 20 20"
-                fill="none"
-                style={{ animation: 'spin 1.5s linear infinite' }}
-              >
-                <circle
-                  cx="10"
-                  cy="10"
-                  r="7"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeDasharray="32"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </div>
-            <h3
-              style={{
-                fontSize: 16,
-                fontWeight: 700,
-                fontFamily: 'var(--font-display)',
-                color: 'var(--text-primary)',
-                marginBottom: 6,
-              }}
-            >
-              Harvesting Asset Intelligence
-            </h3>
-            <p
-              style={{
-                fontSize: 12,
-                color: 'var(--text-secondary)',
-                marginBottom: 20,
-                minHeight: 32,
-              }}
-            >
-              {progress.msg || 'Extracting media ingredients and analyzing sources…'}
-            </p>
-
-            {/* Progress Bar */}
-            <div
-              style={{
-                width: '100%',
-                height: 4,
-                background: 'var(--surface-2)',
-                borderRadius: 2,
-                overflow: 'hidden',
-                marginBottom: 10,
-              }}
-            >
-              <div
-                style={{
-                  width: `${progress.pct}%`,
-                  height: '100%',
-                  background: 'var(--text-primary)',
-                  borderRadius: 2,
-                  transition: 'width 0.2s ease',
-                }}
-              />
-            </div>
-            <span
-              style={{
-                fontSize: 11,
-                color: 'var(--text-muted)',
-                fontFamily: 'var(--font-mono)',
-              }}
-            >
-              {progress.pct}% COMPLETE
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* ── Global Error Banner ────────────────────────────────────────────── */}
-      {errorMessage && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 70,
-            right: 20,
-            zIndex: 10000,
-            background: 'rgba(239, 68, 68, 0.1)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-            borderRadius: 8,
-            padding: '10px 16px',
-            color: '#EF4444',
-            fontSize: 12,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-          }}
-        >
-          <span>{errorMessage}</span>
-          <button
-            onClick={() => setErrorMessage(null)}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#EF4444',
-              cursor: 'pointer',
-              fontWeight: 700,
-            }}
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
       {/* ── Brand Kit Drawer / Modal ───────────────────────────────────────── */}
 
       {/* ── API Key Modal ──────────────────────────────────────────────────── */}
@@ -425,12 +180,9 @@ export default function App() {
           )}
         </>
       ) : (
-        <WorkspaceEditor
-          project={currentProject}
-          onUpdateProject={handleUpdateProject}
-          onHarvestFiles={handleHarvestFiles}
-          onExportPack={() => console.log('Export triggered')}
-        />
+        <div className="flex-1 flex items-center justify-center text-muted-foreground">
+          Welcome to Clario
+        </div>
       )}
     </AppShell>
     </AuthGate>

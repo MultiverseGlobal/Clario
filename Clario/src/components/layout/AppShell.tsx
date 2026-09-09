@@ -6,17 +6,12 @@ import { FloatingNav } from './FloatingNav';
 
 export type ClarioPhase =
   | 'home'
-  | 'ingest'
-  | 'harvest_studio'
-  | 'export'
-  | 'workspace'
   | 'reference_library';
 
 interface AppShellProps {
   children: ReactNode;
   currentProject: HarvestProject | null;
   currentPhase: ClarioPhase;
-  activeResultTab?: 'evidence' | 'clean' | 'replacements' | 'provenance';
   onNavigatePhase: (phase: ClarioPhase) => void;
   onOpenApiKeyModal: () => void;
   hasApiKey: boolean;
@@ -28,7 +23,6 @@ export function AppShell({
   children,
   currentProject,
   currentPhase,
-  activeResultTab = 'evidence',
   onNavigatePhase,
   onOpenApiKeyModal,
   hasApiKey,
@@ -43,14 +37,6 @@ export function AppShell({
     setTheme(next);
   };
 
-  // Determine active workflow step (1-4)
-  const getActiveStep = (): number => {
-    if (currentPhase === 'home' || currentPhase === 'ingest') return 1;
-    if (currentPhase === 'export') return 4;
-    if (activeResultTab === 'clean' || activeResultTab === 'replacements') return 3;
-    return 2;
-  };
-  const currentStep = getActiveStep();
   const isRefLibActive = currentPhase === 'reference_library';
 
   const { publish } = useCrossAppBus(supabase, null);
@@ -72,7 +58,6 @@ export function AppShell({
         toggleTheme={toggleTheme}
         onNavigatePhase={onNavigatePhase}
         onOpenApiKeyModal={onOpenApiKeyModal}
-        currentStep={currentStep}
         isRefLibActive={isRefLibActive}
         canNavigateWorkflow={!!currentProject}
       />
@@ -90,7 +75,6 @@ export function AppShell({
           label: 'Clario',
           accent: 'var(--pds-accent)',
           commands: [
-            { id: 'new-harvest',       label: 'New Harvest',       accent: 'var(--pds-accent)', action: () => onNavigatePhase('ingest') },
             { id: 'projects',          label: 'All Projects',      accent: 'var(--pds-accent)', action: () => onNavigatePhase('home') },
             { id: 'reference-library', label: 'Reference Library', accent: 'var(--pds-accent)', action: () => onNavigatePhase('reference_library') },
           ],
