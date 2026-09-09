@@ -10,7 +10,6 @@ export type ClarioPhase =
 
 interface AppShellProps {
   children: ReactNode;
-  currentProject: HarvestProject | null;
   currentPhase: ClarioPhase;
   onNavigatePhase: (phase: ClarioPhase) => void;
   onOpenApiKeyModal: () => void;
@@ -21,7 +20,6 @@ interface AppShellProps {
 
 export function AppShell({
   children,
-  currentProject,
   currentPhase,
   onNavigatePhase,
   onOpenApiKeyModal,
@@ -37,7 +35,6 @@ export function AppShell({
     setTheme(next);
   };
 
-  const isRefLibActive = currentPhase === 'reference_library';
 
   const { publish } = useCrossAppBus(supabase, null);
   useEffect(() => {
@@ -58,8 +55,6 @@ export function AppShell({
         toggleTheme={toggleTheme}
         onNavigatePhase={onNavigatePhase}
         onOpenApiKeyModal={onOpenApiKeyModal}
-        isRefLibActive={isRefLibActive}
-        canNavigateWorkflow={!!currentProject}
       />
 
       {/* ── Main Workspace Body ──────────────────────────────────────────────── */}

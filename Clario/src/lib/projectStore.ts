@@ -17,7 +17,6 @@ import {
   isProductionEligible,
   type ReferenceSegmentRecord,
 } from '../types/assets';
-import { formatSegmentFilename } from './segmentCutter';
 
 export type CanvasFormat = '1:1' | '9:16' | '16:9' | '4:5';
 
@@ -199,7 +198,7 @@ export function extractProjectAssetRecords(project: HarvestProject): AssetRecord
       rightsStatus: 'reference_only',
       productionEligible: false,
       title: rs.title || `${rs.shot_id.toUpperCase()} Reference Segment`,
-      filename: rs.filename || formatSegmentFilename(rs.shot_id, rs.start_seconds, rs.end_seconds),
+      filename: rs.filename || `${rs.shot_id}_${rs.start_seconds}-${rs.end_seconds}.mp4`,
       mimeType: 'video/mp4',
       sourceUrl: rs.url,
       rightsNote: 'Reference segment. Not cleared for production.',

@@ -18,8 +18,6 @@ interface FloatingNavProps {
   toggleTheme: () => void;
   onNavigatePhase: (phase: ClarioPhase) => void;
   onOpenApiKeyModal: () => void;
-  isRefLibActive: boolean;
-  canNavigateWorkflow: boolean;
 }
 
 
@@ -30,8 +28,6 @@ export function FloatingNav({
   toggleTheme,
   onNavigatePhase,
   onOpenApiKeyModal,
-  isRefLibActive,
-  canNavigateWorkflow,
 }: FloatingNavProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);

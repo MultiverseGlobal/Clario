@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { HarvestProject } from './types/assets';
-import { saveProject, listProjects } from './lib/projectStore';
+import { listProjects } from './lib/projectStore';
 import { fetchApiBaseFromDb } from './lib/apiClient';
 import { getApiKey, setApiKey, fetchApiKeyFromDb } from './lib/gemini';
 import { AppShell, type ClarioPhase } from './components/layout/AppShell';
@@ -32,7 +32,7 @@ export default function App() {
     });
   }, []);
 
-  const ffmpegRef = useState(() => new FFmpeg())[0];
+
 
   const refreshProjectList = useCallback(async () => {
     try {
@@ -46,11 +46,7 @@ export default function App() {
     refreshProjectList();
   }, [refreshProjectList]);
 
-  const handleUpdateProject = async (updated: HarvestProject) => {
-    setCurrentProject(updated);
-    await saveProject(updated);
-    await refreshProjectList();
-  };
+
 
   const handleSaveApiKey = () => {
     setApiKey(apiKeyInput);
@@ -73,7 +69,6 @@ export default function App() {
   return (
     <AuthGate>
       <AppShell
-      currentProject={currentProject}
       currentPhase={currentPhase}
       onNavigatePhase={handleNavigatePhase}
       onOpenApiKeyModal={() => setShowApiKeyModal(true)}
