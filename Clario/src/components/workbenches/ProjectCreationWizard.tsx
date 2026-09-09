@@ -70,10 +70,10 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
   };
 
   const createAndRoute = async () => {
-    const newId = \`proj_\${Date.now()}\`;
+    const newId = `proj_${Date.now()}`;
     const newProject: ClarioProject = {
       id: newId,
-      name: \`New \${projectType === 'slides' ? 'Slide' : videoCategory === 'sales' ? 'Sales' : 'Content'} Project\`,
+      name: `New ${projectType === 'slides' ? 'Slide' : videoCategory === 'sales' ? 'Sales' : 'Content'} Project`,
       mode: 'video_harvester',
       scriptText: '',
       slides: [],

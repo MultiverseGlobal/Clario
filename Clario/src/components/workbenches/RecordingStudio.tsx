@@ -176,7 +176,7 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
             <div className="absolute inset-y-0 left-0 w-1 bg-white/10 rounded-full overflow-hidden">
               <motion.div 
                 className="w-full bg-accent"
-                animate={{ height: \`\${((currentLineIndex + 1) / TELEPROMPTER_SCRIPT.length) * 100}%\` }}
+                animate={{ height: `${((currentLineIndex + 1) / TELEPROMPTER_SCRIPT.length) * 100}%` }}
               />
             </div>
             
@@ -193,12 +193,12 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
                       scale: isActive ? 1.05 : 1,
                       x: isActive ? 0 : -5
                     }}
-                    className={\`transition-colors duration-300 \${
+                    className={`transition-colors duration-300 ${
                       isActive ? (line.type === 'pain' ? 'text-red-400' : line.type === 'feature' ? 'text-blue-400' : 'text-white') 
                       : 'text-white/60'
-                    }\`}
+                    }`}
                   >
-                    <p className={\`text-lg leading-relaxed \${isActive ? 'font-bold' : 'font-medium'}\`}>
+                    <p className={`text-lg leading-relaxed ${isActive ? 'font-bold' : 'font-medium'}`}>
                       {line.text}
                     </p>
                   </motion.div>
