@@ -8,6 +8,7 @@ import { AuthGate } from './components/layout/AuthGate';
 import { fetchBrandKitFromDb } from './lib/brandKit';
 import { ReferenceLibraryPanel } from './components/workbenches/ReferenceLibraryPanel';
 import { ScriptAnalysisWorkbench } from './components/workbenches/ScriptAnalysisWorkbench';
+import { HomeView } from './components/workbenches/HomeView';
 
 export default function App() {
   const [currentProject, setCurrentProject] = useState<HarvestProject | null>(null);
@@ -175,9 +176,12 @@ export default function App() {
           )}
         </>
       ) : (
-        <div className="flex-1 flex items-center justify-center text-muted-foreground">
-          Welcome to Clario
-        </div>
+        <HomeView
+          onSelectProject={(p) => {
+            setCurrentProject(p as any);
+            setCurrentPhase('reference_library');
+          }}
+        />
       )}
     </AppShell>
     </AuthGate>
