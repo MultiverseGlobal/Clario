@@ -6,7 +6,8 @@ import { FloatingNav } from './FloatingNav';
 
 export type ClarioPhase =
   | 'home'
-  | 'reference_library';
+  | 'reference_library'
+  | 'deliverable';
 
 interface AppShellProps {
   children: ReactNode;

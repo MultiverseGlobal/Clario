@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { listProjects, ClarioProject } from '../../lib/projectStore';
+import { listProjects, saveProject, ClarioProject } from '../../lib/projectStore';
 import { Play, Plus, Clock, FileVideo } from 'lucide-react';
 
 export function HomeView({ onSelectProject }: { onSelectProject: (p: ClarioProject) => void }) {
@@ -20,6 +20,23 @@ export function HomeView({ onSelectProject }: { onSelectProject: (p: ClarioProje
     load();
   }, []);
 
+  const handleCreate = async () => {
+    const newId = `proj_${Date.now()}`;
+    const newProject: ClarioProject = {
+      id: newId,
+      name: 'Untitled Project',
+      mode: 'video_harvester',
+      scriptText: '',
+      slides: [],
+      trackItems: [],
+      selectedAssets: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    await saveProject(newProject);
+    onSelectProject(newProject);
+  };
+
   return (
     <div className="flex-1 flex flex-col w-full max-w-6xl mx-auto px-6 py-12 animate-fade-in">
       
@@ -30,7 +47,7 @@ export function HomeView({ onSelectProject }: { onSelectProject: (p: ClarioProje
             Recent editorial and analysis projects.
           </p>
         </div>
-        <button className="pds-btn-primary max-w-[160px]">
+        <button onClick={handleCreate} className="pds-btn-primary max-w-[160px]">
           <Plus className="w-4 h-4 mr-1" />
           New Project
         </button>
@@ -51,7 +68,7 @@ export function HomeView({ onSelectProject }: { onSelectProject: (p: ClarioProje
           <p className="text-secondary-foreground max-w-md text-center mb-6 opacity-80">
             Your workspace is empty. Create a new project to start analyzing scripts and generating storyboards.
           </p>
-          <button className="pds-btn-primary max-w-[160px]">
+          <button onClick={handleCreate} className="pds-btn-primary max-w-[160px]">
             <Plus className="w-4 h-4 mr-1" />
             New Project
           </button>

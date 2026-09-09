@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { ClarioProject } from '../../lib/projectStore';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -33,9 +35,12 @@ interface ScriptMatchResponse {
 }
 
 interface ScriptAnalysisWorkbenchProps {
+  currentProject: ClarioProject;
+  onUpdateProject: (p: ClarioProject) => void;
   userId: string;
   serverBase?: string;
   geminiApiKey?: string;
+  onGenerateDeliverable?: (result: ScriptMatchResponse) => void;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -117,7 +122,13 @@ function TimelineView({ chunks }: { chunks: ChunkResult[] }) {
   return (
     <div style={{ padding: '20px 28px', display: 'flex', flexDirection: 'column', gap: 0 }}>
       {chunks.map((chunk, ci) => (
-        <div key={ci} style={{ display: 'flex', gap: 0, alignItems: 'flex-start', position: 'relative' }}>
+        <motion.div 
+          key={ci} 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: ci * 0.05 }}
+          style={{ display: 'flex', gap: 0, alignItems: 'flex-start', position: 'relative' }}
+        >
           {/* Timeline spine */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 32, flexShrink: 0 }}>
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--pds-accent)', marginTop: 6, flexShrink: 0, border: '2px solid var(--pds-surface-1)', boxShadow: '0 0 0 1px var(--pds-border-mid)' }} />
@@ -146,7 +157,7 @@ function TimelineView({ chunks }: { chunks: ChunkResult[] }) {
               <p style={{ margin: 0, fontSize: 10, color: 'var(--pds-danger)', fontFamily: "'Inter', system-ui, sans-serif" }}>{chunk.error}</p>
             )}
           </div>
-        </div>
+        </motion.div>
       ))}
     </div>
   );
@@ -154,14 +165,17 @@ function TimelineView({ chunks }: { chunks: ChunkResult[] }) {
 
 // ── Storyboard View ───────────────────────────────────────────────────────────
 
-function StoryboardView({ chunks }: { chunks: ChunkResult[] }) {
+function StoryboardView({ chunks, onGenerateDeliverable }: { chunks: ChunkResult[], onGenerateDeliverable?: () => void }) {
   return (
     <div style={{ padding: '20px 28px', display: 'flex', flexDirection: 'column', gap: 16 }}>
       {chunks.map((chunk, ci) => {
         const topClip = chunk.matches[0];
         return (
-          <div
+          <motion.div
             key={ci}
+            initial={{ opacity: 0, scale: 0.98, y: 15 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1], delay: ci * 0.08 }}
             style={{
               display: 'grid',
               gridTemplateColumns: topClip ? '1fr 1fr' : '1fr',
@@ -210,9 +224,26 @@ function StoryboardView({ chunks }: { chunks: ChunkResult[] }) {
                 )}
               </div>
             )}
-          </div>
+          </motion.div>
         );
       })}
+      
+      {onGenerateDeliverable && chunks.length > 0 && (
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: chunks.length * 0.08 + 0.2 }}
+          style={{ display: 'flex', justifyContent: 'center', marginTop: 24, paddingBottom: 24 }}
+        >
+          <button 
+            onClick={onGenerateDeliverable}
+            className="pds-btn-primary" 
+            style={{ padding: '12px 32px', fontSize: 14 }}
+          >
+            Generate Deliverable →
+          </button>
+        </motion.div>
+      )}
     </div>
   );
 }
@@ -230,8 +261,11 @@ function RankedView({ clips }: { clips: MatchedClip[] }) {
   return (
     <div style={{ padding: '20px 28px', display: 'flex', flexDirection: 'column', gap: 8 }}>
       {clips.map((clip, i) => (
-        <div
+        <motion.div
           key={clip.id}
+          initial={{ opacity: 0, x: -10 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.2, delay: i * 0.03 }}
           style={{
             display: 'flex',
             gap: 14,
@@ -276,7 +310,7 @@ function RankedView({ clips }: { clips: MatchedClip[] }) {
           </span>
 
           <SimilarityBadge value={clip.similarity} />
-        </div>
+        </motion.div>
       ))}
     </div>
   );
@@ -285,11 +319,14 @@ function RankedView({ clips }: { clips: MatchedClip[] }) {
 // ── Main Workbench ─────────────────────────────────────────────────────────────
 
 export function ScriptAnalysisWorkbench({
+  currentProject,
+  onUpdateProject,
   userId,
   serverBase = '/api/v1',
   geminiApiKey,
+  onGenerateDeliverable
 }: ScriptAnalysisWorkbenchProps) {
-  const [script, setScript] = useState('');
+  const [script, setScript] = useState(currentProject.scriptText || '');
   const [activeTab, setActiveTab] = useState<WorkbenchTab>('timeline');
   const [result, setResult] = useState<ScriptMatchResponse | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -300,6 +337,7 @@ export function ScriptAnalysisWorkbench({
     setIsAnalyzing(true);
     setError(null);
     setResult(null);
+    onUpdateProject({ ...currentProject, scriptText: script });
     try {
       const res = await fetch(`${serverBase}/script/match`, {
         method: 'POST',
@@ -363,7 +401,11 @@ export function ScriptAnalysisWorkbench({
         <div style={{ flex: 1, padding: '16px 20px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <textarea
             value={script}
-            onChange={(e) => setScript(e.target.value)}
+            onChange={(e) => {
+              setScript(e.target.value);
+              // Optimistic update of project text (might want to debounce in real app)
+              onUpdateProject({ ...currentProject, scriptText: e.target.value });
+            }}
             placeholder={EXAMPLE_SCRIPT}
             style={{
               flex: 1,
@@ -517,7 +559,7 @@ export function ScriptAnalysisWorkbench({
 
           {/* Results */}
           {result && activeTab === 'timeline'   && <TimelineView  chunks={result.chunks} />}
-          {result && activeTab === 'storyboard' && <StoryboardView chunks={result.chunks} />}
+          {result && activeTab === 'storyboard' && <StoryboardView chunks={result.chunks} onGenerateDeliverable={() => onGenerateDeliverable && onGenerateDeliverable(result)} />}
           {result && activeTab === 'ranked'     && <RankedView    clips={result.ranked_clips} />}
         </div>
       </div>

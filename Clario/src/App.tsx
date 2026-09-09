@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { HarvestProject } from './types/assets';
-import { listProjects } from './lib/projectStore';
+import { listProjects, saveProject, ClarioProject } from './lib/projectStore';
 import { fetchApiBaseFromDb } from './lib/apiClient';
 import { getApiKey, setApiKey, fetchApiKeyFromDb } from './lib/gemini';
 import { AppShell, type ClarioPhase } from './components/layout/AppShell';
@@ -9,10 +9,12 @@ import { fetchBrandKitFromDb } from './lib/brandKit';
 import { ReferenceLibraryPanel } from './components/workbenches/ReferenceLibraryPanel';
 import { ScriptAnalysisWorkbench } from './components/workbenches/ScriptAnalysisWorkbench';
 import { HomeView } from './components/workbenches/HomeView';
+import { DeliverableView } from './components/workbenches/DeliverableView';
 
 export default function App() {
-  const [currentProject, setCurrentProject] = useState<HarvestProject | null>(null);
+  const [currentProject, setCurrentProject] = useState<ClarioProject | null>(null);
   const [currentPhase, setCurrentPhase] = useState<ClarioPhase>('reference_library');
+  const [latestResult, setLatestResult] = useState<any>(null);
 
   // Shell modals
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
@@ -163,9 +165,18 @@ export default function App() {
           {/* Script Analysis Workbench is shown when a project is active */}
           {currentProject ? (
             <ScriptAnalysisWorkbench
+              currentProject={currentProject}
+              onUpdateProject={(p) => {
+                setCurrentProject(p);
+                saveProject(p);
+              }}
               userId={currentProject.id || 'local'}
               serverBase="/api/v1"
               geminiApiKey={getApiKey() || undefined}
+              onGenerateDeliverable={(result) => {
+                setLatestResult(result);
+                setCurrentPhase('deliverable');
+              }}
             />
           ) : (
             <ReferenceLibraryPanel
@@ -175,10 +186,16 @@ export default function App() {
             />
           )}
         </>
+      ) : currentPhase === 'deliverable' ? (
+        <DeliverableView 
+          projectName={currentProject?.name || 'Untitled Project'} 
+          result={latestResult} 
+          onBack={() => setCurrentPhase('reference_library')} 
+        />
       ) : (
         <HomeView
           onSelectProject={(p) => {
-            setCurrentProject(p as any);
+            setCurrentProject(p);
             setCurrentPhase('reference_library');
           }}
         />
