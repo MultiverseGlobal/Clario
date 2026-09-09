@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { listProjects, saveProject, ClarioProject } from '../../lib/projectStore';
 import { Play, Plus, Clock, FileVideo } from 'lucide-react';
+import { ProjectCreationWizard } from './ProjectCreationWizard';
 
 export function HomeView({ onSelectProject }: { onSelectProject: (p: ClarioProject) => void }) {
   const [projects, setProjects] = useState<ClarioProject[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showWizard, setShowWizard] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -20,21 +22,8 @@ export function HomeView({ onSelectProject }: { onSelectProject: (p: ClarioProje
     load();
   }, []);
 
-  const handleCreate = async () => {
-    const newId = `proj_${Date.now()}`;
-    const newProject: ClarioProject = {
-      id: newId,
-      name: 'Untitled Project',
-      mode: 'video_harvester',
-      scriptText: '',
-      slides: [],
-      trackItems: [],
-      selectedAssets: [],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-    await saveProject(newProject);
-    onSelectProject(newProject);
+  const handleCreate = () => {
+    setShowWizard(true);
   };
 
   return (
@@ -101,6 +90,16 @@ export function HomeView({ onSelectProject }: { onSelectProject: (p: ClarioProje
             </div>
           ))}
         </div>
+      )}
+
+      {showWizard && (
+        <ProjectCreationWizard 
+          onClose={() => setShowWizard(false)} 
+          onProjectCreated={(p) => {
+            setShowWizard(false);
+            onSelectProject(p);
+          }} 
+        />
       )}
     </div>
   );
