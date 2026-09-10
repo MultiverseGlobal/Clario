@@ -52,14 +52,16 @@ export function AppShell({
       {/* ── Ambient Glow (Atlas Light Mesh) ── */}
       <div className="fixed inset-0 clario-ambient-glow clario-animate-breathe pointer-events-none z-0" />
 
-      <FloatingNav
-        currentPhase={currentPhase}
-        hasApiKey={hasApiKey}
-        theme={theme}
-        toggleTheme={toggleTheme}
-        onNavigatePhase={onNavigatePhase}
-        onOpenApiKeyModal={onOpenApiKeyModal}
-      />
+      {currentPhase !== 'studio' && currentPhase !== 'preview' && (
+        <FloatingNav
+          currentPhase={currentPhase}
+          hasApiKey={hasApiKey}
+          theme={theme}
+          toggleTheme={toggleTheme}
+          onNavigatePhase={onNavigatePhase}
+          onOpenApiKeyModal={onOpenApiKeyModal}
+        />
+      )}
 
       {/* ── Main Workspace Body ──────────────────────────────────────────────── */}
       <main className="flex-1 flex flex-col min-w-0 z-10 relative pt-20">

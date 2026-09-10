@@ -23,15 +23,22 @@ export function HomeView({ onSelectProject }: { onSelectProject: (p: ClarioProje
     load();
   }, []);
 
+  const [projectToDelete, setProjectToDelete] = useState<ClarioProject | null>(null);
+
   const handleCreate = () => {
     setShowWizard(true);
   };
 
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
+  const handleDelete = (e: React.MouseEvent, p: ClarioProject) => {
     e.stopPropagation();
-    if (confirm('Are you sure you want to delete this project?')) {
-      await deleteProject(id);
-      load(); // Reload projects
+    setProjectToDelete(p);
+  };
+
+  const confirmDelete = async () => {
+    if (projectToDelete) {
+      await deleteProject(projectToDelete.id);
+      setProjectToDelete(null);
+      load();
     }
   };
 
@@ -89,7 +96,7 @@ export function HomeView({ onSelectProject }: { onSelectProject: (p: ClarioProje
                 
                 <div className="flex items-center gap-2">
                   <button 
-                    onClick={(e) => handleDelete(e, p.id)}
+                    onClick={(e) => handleDelete(e, p)}
                     className="opacity-0 group-hover:opacity-100 transition-opacity p-2 text-red-500/70 hover:text-red-500 hover:bg-red-500/10 rounded-lg"
                     title="Delete Project"
                   >
@@ -122,6 +129,21 @@ export function HomeView({ onSelectProject }: { onSelectProject: (p: ClarioProje
             onSelectProject(p);
           }} 
         />
+      )}
+
+      {projectToDelete && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fade-in" onClick={() => setProjectToDelete(null)}>
+          <div className="clario-glass-card max-w-sm w-full p-6 rounded-2xl shadow-2xl border border-border" onClick={e => e.stopPropagation()}>
+            <h3 className="font-display text-xl font-bold mb-2">Delete Project?</h3>
+            <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+              Are you sure you want to delete <span className="font-semibold text-foreground">"{projectToDelete.name}"</span>?<br/>This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button className="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" onClick={() => setProjectToDelete(null)}>Cancel</button>
+              <button className="px-4 py-2 text-sm font-medium rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors shadow-sm shadow-red-500/20" onClick={confirmDelete}>Delete</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
