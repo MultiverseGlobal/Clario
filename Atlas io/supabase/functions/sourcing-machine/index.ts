@@ -1,4 +1,4 @@
-﻿import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -3010,13 +3010,13 @@ Respond ONLY as a JSON object:
 
       if (lead_id && supabaseAdmin) {
         const { data: dbLead } = await supabaseAdmin
-          .from("kuro_pipeline_view")
-          .select("id, company, website, user_id, notes")
+          .from("atlas_opportunities")
+          .select("id, company_name, company_url, user_id")
           .eq("id", lead_id)
           .single();
         if (dbLead) {
-          company = dbLead.company;
-          website = dbLead.website;
+          company = dbLead.company_name;
+          website = dbLead.company_url;
           userId = dbLead.user_id;
         }
       }
@@ -3106,12 +3106,11 @@ Perform a complete, structured analysis and return JSON with these exact keys:
         researchData.pain_hypotheses = (enriched.pains ?? []).map((p: any) => p.problem);
         researchData.suggested_offer = enriched.offer?.one_liner ?? researchData.suggested_offer;
 
-        // Update Kuro OS pipeline
-        await supabaseAdmin.from("kuro_pipeline_view").update({
-          research_data: researchData,
-          icp_score: enriched.icp_score ?? 7,
-          priority: enriched.priority ?? "medium",
-          stage: "researched",
+        // Update Atlas Opportunities
+        await supabaseAdmin.from("atlas_opportunities").update({
+          fit_score: enriched.icp_score ?? 7,
+          pain_signals: enriched.pains ?? [],
+          buying_signals: enriched.research?.recent_signals ?? [],
         }).eq("id", lead_id);
 
         // Save outreach drafts into atlas_outreach

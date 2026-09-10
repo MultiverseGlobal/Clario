@@ -368,6 +368,73 @@ async def ingest_file(
 
     return {"job_id": job_id, "project_id": project_id, "status": "queued"}
 
+@app.post("/api/v1/harvest/ingest-url")
+async def ingest_url(
+    background_tasks: BackgroundTasks,
+    req: IngestUrlRequest
+):
+    if not req.url:
+        raise HTTPException(status_code=400, detail="URL is required")
+        
+    project_id = f"proj_{uuid.uuid4().hex[:10]}"
+    job_id = f"job_{uuid.uuid4().hex[:10]}"
+    project_dir = os.path.join(MEDIA_ROOT, project_id)
+    os.makedirs(project_dir, exist_ok=True)
+    
+    unique_prefix = f"clario_ingest_{uuid.uuid4().hex[:8]}"
+    out_template = os.path.join(project_dir, f"{unique_prefix}.%(ext)s")
+    
+    cmd = [
+        "python", "-m", "yt_dlp",
+        "-f", "best[ext=mp4]/best",
+        "--extractor-args", "youtube:player_client=android",
+        "--no-playlist",
+        "--max-filesize", "100M",
+        "-o", out_template,
+        req.url
+    ]
+    
+    # Download synchronously so we can queue the correct file path, or we can queue the download itself.
+    # We will queue a wrapper task that downloads then processes.
+    
+    async def download_and_process(job_id_inner, project_id_inner, url_inner, out_template_inner, project_dir_inner):
+        update_job(job_id_inner, {
+            "status": "processing",
+            "progress_pct": 5,
+            "status_msg": "Downloading video via yt-dlp..."
+        })
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await proc.communicate()
+            if proc.returncode != 0:
+                raise Exception(stderr.decode())
+                
+            downloaded_file = next((f for f in os.listdir(project_dir_inner) if f.startswith(unique_prefix)), None)
+            if not downloaded_file:
+                raise Exception("Downloaded file not found")
+                
+            file_path = os.path.join(project_dir_inner, downloaded_file)
+            await process_video_harvest_job(job_id_inner, project_id_inner, file_path, url_inner)
+            
+        except Exception as e:
+            update_job(job_id_inner, {
+                "status": "failed",
+                "status_msg": f"Download failed: {str(e)}",
+                "result": {"error": str(e)}
+            })
+            
+    update_job(job_id, {
+        "status": "queued",
+        "progress_pct": 0,
+        "status_msg": "Queued for download and processing",
+        "input_url": req.url
+    })
+    
+    background_tasks.add_task(download_and_process, job_id, project_id, req.url, out_template, project_dir)
+    return {"job_id": job_id, "project_id": project_id, "status": "queued"}
+
 @app.get("/api/v1/harvest/jobs/{job_id}")
 async def get_job_status(job_id: str):
     job = get_job(job_id)
