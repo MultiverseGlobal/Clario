@@ -394,6 +394,43 @@ export async function saveProject(project: ClarioProject | HarvestProject): Prom
  * Fetch a single project by ID.
  */
 export async function getProject(id: string): Promise<ClarioProject | null> {
+  try {
+    const { data: userAuth } = await supabase.auth.getUser();
+    if (userAuth.user) {
+      const { data: remoteProj, error } = await supabase
+        .from('clario_projects')
+        .select('*')
+        .eq('id', id)
+        .eq('user_id', userAuth.user.id)
+        .maybeSingle();
+
+      if (!error && remoteProj) {
+        const timestamp = new Date(remoteProj.updated_at).getTime();
+        const harvestData: HarvestProject = {
+          id: remoteProj.id,
+          name: remoteProj.name,
+          mode: remoteProj.mode,
+          shots: [],
+          slides: remoteProj.metadata?.slides || [],
+          generated_prompts: [],
+          provenance: [],
+          created_at: timestamp,
+          updated_at: timestamp,
+        };
+        await db.projects.put({
+          id: remoteProj.id,
+          name: remoteProj.name,
+          mode: remoteProj.mode,
+          created_at: timestamp,
+          updated_at: timestamp,
+          project_data: harvestData,
+        });
+      }
+    }
+  } catch (err) {
+    console.warn("Failed to fetch remote project:", err);
+  }
+
   const record = await db.projects.get(id);
   if (!record) return null;
 
@@ -423,6 +460,47 @@ export async function getProject(id: string): Promise<ClarioProject | null> {
  * List all saved projects from IndexedDB.
  */
 export async function listProjects(): Promise<ClarioProject[]> {
+  try {
+    const { data: userAuth } = await supabase.auth.getUser();
+    if (userAuth.user) {
+      const { data: remoteProjects, error } = await supabase
+        .from('clario_projects')
+        .select('*')
+        .eq('user_id', userAuth.user.id)
+        .order('updated_at', { ascending: false });
+
+      if (!error && remoteProjects) {
+        for (const remote of remoteProjects) {
+          const existing = await db.projects.get(remote.id);
+          if (!existing) {
+            const timestamp = new Date(remote.updated_at).getTime();
+            const harvestData: HarvestProject = {
+              id: remote.id,
+              name: remote.name,
+              mode: remote.mode,
+              shots: [],
+              slides: remote.metadata?.slides || [],
+              generated_prompts: [],
+              provenance: [],
+              created_at: timestamp,
+              updated_at: timestamp,
+            };
+            await db.projects.put({
+              id: remote.id,
+              name: remote.name,
+              mode: remote.mode,
+              created_at: timestamp,
+              updated_at: timestamp,
+              project_data: harvestData,
+            });
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Failed to fetch remote projects:", err);
+  }
+
   const records = await db.projects.orderBy('updated_at').reverse().toArray();
 
   return records.map(record => {
@@ -641,5 +719,53 @@ export async function renameProject(id: string, newName: string): Promise<void> 
     if (record.project_data) {
       await syncProjectToVault(record.project_data);
     }
+  }
+}
+
+/**
+ * Uploads a recorded Blob to Supabase Storage and adds it to the Vault as a reference asset.
+ */
+export async function uploadBlobToVault(blob: Blob, projectName?: string): Promise<AssetRecord | null> {
+  try {
+    const { data: userAuth } = await supabase.auth.getUser();
+    if (!userAuth.user) throw new Error("Must be logged in to upload assets");
+
+    const assetId = `rec_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const filename = `${assetId}.webm`;
+    const storagePath = `${userAuth.user.id}/${filename}`;
+
+    const { error } = await supabase.storage
+      .from('clario_assets')
+      .upload(storagePath, blob, { contentType: blob.type });
+
+    if (error) throw error;
+
+    // Get public URL
+    const { data: urlData } = supabase.storage.from('clario_assets').getPublicUrl(storagePath);
+
+    // Create a new Vault Asset Record
+    const record: AssetRecord = {
+      id: `local:${assetId}`,
+      projectId: 'local',
+      projectName: projectName || 'Local Recording',
+      shotId: assetId,
+      assetKind: 'reference_segment',
+      rightsStatus: 'reference_only',
+      productionEligible: false,
+      title: 'Screen Recording',
+      filename,
+      mimeType: blob.type,
+      sourceUrl: urlData.publicUrl,
+      url: urlData.publicUrl,
+      rightsNote: 'Self-recorded screen capture',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    await syncAssetToVault(record);
+    return record;
+  } catch (err) {
+    console.error("Failed to upload blob to vault:", err);
+    return null;
   }
 }

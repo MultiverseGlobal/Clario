@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
-import { listProjects, saveProject, ClarioProject } from './lib/projectStore';
+import { listProjects, saveProject, uploadBlobToVault, ClarioProject } from './lib/projectStore';
 import { fetchApiBaseFromDb } from './lib/apiClient';
 import { getApiKey, setApiKey, fetchApiKeyFromDb } from './lib/gemini';
 import { AppShell, type ClarioPhase } from './components/layout/AppShell';
@@ -10,11 +10,14 @@ import { ReferenceLibraryPanel } from './components/workbenches/ReferenceLibrary
 import { ScriptAnalysisWorkbench } from './components/workbenches/ScriptAnalysisWorkbench';
 import { HomeView } from './components/workbenches/HomeView';
 import { DeliverableView } from './components/workbenches/DeliverableView';
+import { RecordingStudio } from './components/workbenches/RecordingStudio';
+import { RecordingPreview } from './components/workbenches/RecordingPreview';
 
 export default function App() {
   const [currentProject, setCurrentProject] = useState<ClarioProject | null>(null);
   const [currentPhase, setCurrentPhase] = useState<ClarioPhase>('home');
   const [latestResult, setLatestResult] = useState<any>(null);
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
 
   // Shell modals
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
@@ -81,80 +84,80 @@ export default function App() {
 
       {/* ── API Key Modal ──────────────────────────────────────────────────── */}
       {showApiKeyModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 9999,
-            background: 'rgba(17, 19, 24, 0.6)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 20,
-          }}
-          onClick={() => setShowApiKeyModal(false)}
-        >
           <div
-            onClick={e => e.stopPropagation()}
+            className="pds-animate-enter"
             style={{
-              width: '100%',
-              maxWidth: 460,
-              background: 'var(--panel)',
-              border: '1px solid var(--border)',
-              borderRadius: 14,
-              padding: 24,
-              boxShadow: '0 20px 50px rgba(0,0,0,0.2)',
+              position: 'fixed',
+              inset: 0,
+              zIndex: 9999,
+              background: 'rgba(17, 19, 24, 0.4)',
+              backdropFilter: 'blur(24px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 20,
             }}
+            onClick={() => setShowApiKeyModal(false)}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, fontFamily: 'var(--font-display)' }}>
-                Gemini 2.0 API Configuration
-              </h3>
-              <button
-                onClick={() => setShowApiKeyModal(false)}
-                style={{ background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', color: 'var(--text-muted)' }}
-              >
-                ✕
-              </button>
-            </div>
-            <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 16, lineHeight: 1.4 }}>
-              Add a Google Gemini API key to unlock advanced multimodal scene deconstruction, optical text separation, and automatic prompt generation.
-            </p>
-            <input
-              type="password"
-              placeholder="AIzaSy…"
-              value={apiKeyInput}
-              onChange={e => setApiKeyInput(e.target.value)}
+            <div
+              className="clario-glass-card"
+              onClick={e => e.stopPropagation()}
               style={{
                 width: '100%',
-                padding: '10px 12px',
-                borderRadius: 8,
-                border: '1px solid var(--border)',
-                background: 'var(--base)',
-                color: 'var(--text-primary)',
-                fontSize: 12,
-                fontFamily: 'var(--font-mono)',
-                outline: 'none',
-                marginBottom: 16,
+                maxWidth: 460,
+                borderRadius: 14,
+                padding: 24,
+                boxShadow: 'var(--pds-shadow-float)',
               }}
-            />
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                onClick={handleSaveApiKey}
-                className="btn-primary"
-                style={{ flex: 1, padding: '10px', fontSize: 12 }}
-              >
-                {savedKeySuccess ? '✓ Saved Key!' : 'Save Key'}
-              </button>
-              <button
-                onClick={() => setShowApiKeyModal(false)}
-                className="btn-ghost"
-                style={{ padding: '10px 14px', fontSize: 12, border: '1px solid var(--border)' }}
-              >
-                Cancel
-              </button>
-            </div>
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <h3 className="font-display" style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>
+                  Gemini 2.0 API Configuration
+                </h3>
+                <button
+                  onClick={() => setShowApiKeyModal(false)}
+                  style={{ background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', color: 'var(--pds-text-muted)' }}
+                >
+                  ✕
+                </button>
+              </div>
+              <p style={{ fontSize: 12, color: 'var(--pds-text-secondary)', marginBottom: 16, lineHeight: 1.4 }}>
+              Add a Google Gemini API key to unlock advanced multimodal scene deconstruction, optical text separation, and automatic prompt generation.
+            </p>
+              <input
+                type="password"
+                placeholder="AIzaSy…"
+                value={apiKeyInput}
+                onChange={e => setApiKeyInput(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  border: '1px solid var(--pds-border-subtle)',
+                  background: 'var(--pds-surface-2)',
+                  color: 'var(--pds-text-primary)',
+                  fontSize: 12,
+                  fontFamily: 'monospace',
+                  outline: 'none',
+                  marginBottom: 16,
+                }}
+              />
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  onClick={handleSaveApiKey}
+                  className="pds-btn-primary"
+                  style={{ flex: 1, padding: '10px', fontSize: 12 }}
+                >
+                  {savedKeySuccess ? '✓ Saved Key!' : 'Save Key'}
+                </button>
+                <button
+                  onClick={() => setShowApiKeyModal(false)}
+                  className="pds-btn-ghost"
+                  style={{ padding: '10px 14px', fontSize: 12 }}
+                >
+                  Cancel
+                </button>
+              </div>
           </div>
         </div>
       )}
@@ -191,6 +194,36 @@ export default function App() {
           projectName={currentProject?.name || 'Untitled Project'} 
           result={latestResult} 
           onBack={() => setCurrentPhase('reference_library')} 
+        />
+      ) : currentPhase === 'studio' ? (
+        <RecordingStudio
+          onBack={() => setCurrentPhase('home')}
+          onFinish={(blob) => {
+            if (blob) {
+              setRecordedBlob(blob);
+              setCurrentPhase('preview');
+            } else {
+              setCurrentPhase('home');
+            }
+          }}
+        />
+      ) : currentPhase === 'preview' && recordedBlob ? (
+        <RecordingPreview
+          blob={recordedBlob}
+          projectName={currentProject?.name}
+          onBack={() => setCurrentPhase('home')}
+          onReRecord={() => {
+            setRecordedBlob(null);
+            setCurrentPhase('studio');
+          }}
+          onSave={async (blob) => {
+             const asset = await uploadBlobToVault(blob, currentProject?.name);
+             if (asset) {
+               console.log('Saved blob to Vault and Supabase:', asset);
+             } else {
+               console.error('Failed to save blob to Vault');
+             }
+          }}
         />
       ) : (
         <HomeView

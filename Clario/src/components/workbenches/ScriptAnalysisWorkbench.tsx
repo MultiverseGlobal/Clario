@@ -217,6 +217,14 @@ function StoryboardView({ chunks, onGenerateDeliverable }: { chunks: ChunkResult
                   </span>
                   <SimilarityBadge value={topClip.similarity} />
                 </div>
+                <div style={{ padding: '8px 12px', background: 'var(--pds-surface-2)', borderRadius: 6, border: '1px solid var(--pds-border-subtle)', marginTop: 8 }}>
+                  <p style={{ margin: 0, fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: 'var(--pds-accent)' }}>
+                    EDL Timestamp: {fmtSec(topClip.start_sec)} - {fmtSec(topClip.end_sec)} (Duration: {fmtSec(topClip.duration)})
+                  </p>
+                  <p style={{ margin: '4px 0 0', fontSize: 10, fontFamily: "'Inter', system-ui, sans-serif", color: 'var(--pds-text-secondary)' }}>
+                    Instruction: Insert <span style={{ color: 'var(--pds-text-primary)', fontWeight: 600 }}>{topClip.title || topClip.shot_id}</span> during this beat.
+                  </p>
+                </div>
                 {topClip.description && (
                   <p style={{ margin: 0, fontSize: 10, fontFamily: "'Athelas', Georgia, serif", color: 'var(--pds-text-muted)', lineHeight: 1.45, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                     {topClip.description}

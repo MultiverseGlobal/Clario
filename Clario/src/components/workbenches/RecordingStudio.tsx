@@ -1,8 +1,8 @@
-﻿import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Camera, Video, Mic, MicOff, VideoOff,
-  ArrowLeft, Maximize, Target, Activity,
+  ArrowLeft, Maximize, Activity,
   Settings2, MonitorUp,
 } from 'lucide-react';
 
@@ -11,13 +11,7 @@ interface RecordingStudioProps {
   onFinish: (videoBlob?: Blob) => void;
 }
 
-const TELEPROMPTER_SCRIPT = [
-  { text: "Hey! Thanks for taking the time to review this.", type: "normal" },
-  { text: "I know you've been struggling with pipeline stagnation recently.", type: "pain", cue: "Zoom in PIP slightly" },
-  { text: "What we've built here is specifically designed to eliminate that friction.", type: "normal", cue: "Highlight screen feature" },
-  { text: "It's fully automated and integrates directly with your existing stack.", type: "feature" },
-  { text: "Let's walk through how this completely changes your outreach.", type: "normal", cue: "Expand PIP to full screen" },
-];
+
 
 export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
   const screenVideoRef   = useRef<HTMLVideoElement>(null);
@@ -29,33 +23,30 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [isRecording, setIsRecording]   = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
-  const [activeCue, setActiveCue]         = useState<string | null>(null);
-  const [currentLineIndex, setCurrentLineIndex] = useState(0);
   const [micOn, setMicOn] = useState(true);
-  const [camOn, setCamOn] = useState(true);
+  const [camOn, setCamOn] = useState(false);
   const [screenError, setScreenError] = useState<string | null>(null);
+  
+  const [teleprompterText, setTeleprompterText] = useState(
+    "• Hey! Thanks for taking the time to review this.\n\n" +
+    "• I know you've been struggling with pipeline stagnation recently.\n\n" +
+    "• What we've built here is specifically designed to eliminate that friction.\n\n" +
+    "• It's fully automated and integrates directly with your existing stack.\n\n" +
+    "• Let's walk through how this completely changes your outreach."
+  );
 
   const isReady = !!screenStream;
 
-  // Recording timer & teleprompter advance
+  // Recording timer
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
     if (isRecording) {
       interval = setInterval(() => {
-        setRecordingTime(t => {
-          const next = t + 1;
-          if (next % 4 === 0 && currentLineIndex < TELEPROMPTER_SCRIPT.length - 1) {
-            const nextLine = currentLineIndex + 1;
-            setCurrentLineIndex(nextLine);
-            const cue = TELEPROMPTER_SCRIPT[nextLine].cue;
-            if (cue) { setActiveCue(cue); setTimeout(() => setActiveCue(null), 3000); }
-          }
-          return next;
-        });
+        setRecordingTime(t => t + 1);
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [isRecording, currentLineIndex]);
+  }, [isRecording]);
 
   // Webcam (PIP) â€” request on mount
   useEffect(() => {
@@ -87,7 +78,6 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
       setScreenStream(null);
       setIsRecording(false);
       setRecordingTime(0);
-      setCurrentLineIndex(0);
       mediaRecorderRef.current?.stop();
     };
     track?.addEventListener('ended', onEnded);
@@ -139,9 +129,6 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
 
       setIsRecording(true);
       setRecordingTime(0);
-      setCurrentLineIndex(0);
-      const cue = TELEPROMPTER_SCRIPT[0].cue;
-      if (cue) { setActiveCue(cue); setTimeout(() => setActiveCue(null), 3000); }
     }
   }
 
@@ -222,20 +209,7 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
           {/* Live screen stream */}
           <video ref={screenVideoRef} autoPlay muted playsInline className="w-full h-full object-contain bg-black" />
 
-          {/* AI cue overlay */}
-          <AnimatePresence>
-            {activeCue && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                className="absolute top-8 left-1/2 -translate-x-1/2 clario-glass-capsule px-6 py-3 rounded-full font-bold shadow-2xl flex items-center gap-3 z-30"
-              >
-                <Target className="w-5 h-5 text-accent animate-pulse" />
-                <span className="text-white">{activeCue}</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
+
 
           {/* Draggable PIP webcam */}
           <motion.div
@@ -257,41 +231,24 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
         </div>
 
         {/* Teleprompter Sidebar */}
-        <div className="w-[340px] h-full max-h-[600px] clario-glass-panel rounded-[24px] flex flex-col p-6 shadow-2xl border border-white/10 relative overflow-hidden">
-          <div className="flex items-center gap-2 mb-6 pb-4 border-b border-white/10 text-white">
-            <Activity className="w-4 h-4 text-accent" />
-            <span className="text-xs font-mono uppercase tracking-widest font-semibold">Teleprompter</span>
+        <div className="w-[340px] h-full max-h-[600px] clario-glass-panel rounded-[24px] flex flex-col shadow-2xl border border-white/10 relative overflow-hidden group">
+          <div className="flex items-center justify-between p-6 pb-4 border-b border-white/10 text-white shrink-0">
+            <div className="flex items-center gap-2">
+              <Activity className={`w-4 h-4 ${isRecording ? 'text-red-400' : 'text-accent'}`} />
+              <span className="text-xs font-mono uppercase tracking-widest font-semibold">Talking Points</span>
+            </div>
           </div>
 
-          <div className="flex-1 overflow-hidden relative">
-            <div className="absolute inset-y-0 left-0 w-1 bg-white/5 rounded-full overflow-hidden">
-              <motion.div
-                className="w-full bg-accent"
-                animate={{ height: `${((currentLineIndex + 1) / TELEPROMPTER_SCRIPT.length) * 100}%` }}
-                transition={{ type: 'spring', stiffness: 80 }}
-              />
-            </div>
-            <div className="pl-6 flex flex-col gap-6">
-              {TELEPROMPTER_SCRIPT.map((line, i) => {
-                const isActive = i === currentLineIndex;
-                const isPast   = i < currentLineIndex;
-                return (
-                  <motion.div
-                    key={i}
-                    animate={{ opacity: isActive ? 1 : isPast ? 0.3 : 0.5, scale: isActive ? 1.04 : 1, x: isActive ? 0 : -4 }}
-                    className={`transition-colors duration-300 ${
-                      isActive
-                        ? line.type === 'pain'    ? 'text-red-400'
-                        : line.type === 'feature' ? 'text-blue-400'
-                        :                           'text-white'
-                        : 'text-white/60'
-                    }`}
-                  >
-                    <p className={`text-xl leading-relaxed ${isActive ? 'font-bold' : 'font-medium'}`}>{line.text}</p>
-                  </motion.div>
-                );
-              })}
-            </div>
+          <div className="flex-1 relative">
+            <textarea
+              className="w-full h-full bg-transparent text-white/90 text-lg leading-relaxed resize-none p-6 outline-none placeholder:text-white/30"
+              value={teleprompterText}
+              onChange={e => setTeleprompterText(e.target.value)}
+              placeholder="Write your talking points here..."
+              spellCheck={false}
+            />
+            {/* Visual fade effect for bottom edge */}
+            <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
           </div>
         </div>
       </div>

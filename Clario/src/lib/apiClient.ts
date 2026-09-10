@@ -86,8 +86,14 @@ export async function uploadToWorker(
   formData.append('file', file);
   formData.append('mode', mode);
 
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+  const headers: HeadersInit = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   const res = await fetch(`${getApiBase()}/harvest/ingest-file`, {
     method: 'POST',
+    headers,
     body: formData,
   });
 
@@ -105,8 +111,13 @@ export async function pollJobStatus(
   jobId: string,
   onProgress?: (msg: string, pct: number) => void
 ): Promise<HarvestProject> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+  const headers: HeadersInit = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   while (true) {
-    const res = await fetch(`${getApiBase()}/harvest/jobs/${jobId}`);
+    const res = await fetch(`${getApiBase()}/harvest/jobs/${jobId}`, { headers });
     if (!res.ok) throw new Error(`Job status error: ${res.statusText}`);
 
     const data: ServerJobStatus = await res.json();
@@ -154,9 +165,14 @@ export async function cutSegmentOnServer(
   startSeconds: number,
   endSeconds: number
 ): Promise<{ status: string; url: string; filename: string }> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+  const headers: HeadersInit = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   const res = await fetch(`${getApiBase()}/projects/${projectId}/segments/cut`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({
       shot_id: shotId,
       start_seconds: startSeconds,

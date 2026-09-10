@@ -7,6 +7,7 @@ import {
   FolderOpen,
   Settings,
   Layers,
+  Video,
 } from "lucide-react";
 import { EcosystemSwitcher } from "../ui/EcosystemSwitcher";
 import { ClarioLogo } from "../ui/ClarioLogo";
@@ -136,6 +137,28 @@ export function FloatingNav({
             </span>
           </button>
 
+
+          {/* Record */}
+          <button
+            onClick={() => onNavigatePhase("studio")}
+            title="Recording Studio"
+            className={`group flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all duration-300 ease-out relative ${
+              currentPhase === "studio" || currentPhase === "preview"
+                ? "bg-foreground text-background shadow-sm"
+                : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+            }`}
+          >
+            <Video className={`w-3.5 h-3.5 ${currentPhase === 'studio' || currentPhase === 'preview' ? '' : 'opacity-70 group-hover:opacity-100 transition-opacity'}`} />
+            {/* Red dot — always visible */}
+            <div className={`absolute top-1.5 left-1.5 w-1.5 h-1.5 rounded-full ring-2 ring-background bg-red-500 ${
+              currentPhase === 'studio' ? 'animate-pulse' : ''
+            }`} />
+            <span className={`text-[11px] font-semibold font-mono tracking-wide whitespace-nowrap overflow-hidden transition-all duration-300 ease-out ${
+              currentPhase === "studio" || currentPhase === "preview" ? "max-w-24 opacity-100" : "max-w-0 opacity-0 group-hover:max-w-24 group-hover:opacity-100 group-hover:ml-2"
+            }`}>
+              Record
+            </span>
+          </button>
 
           <button
             onClick={onOpenApiKeyModal}

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Video, Presentation, Target, Sparkles, UploadCloud, Link as LinkIcon, Camera, CheckCircle2, ArrowRight, X, Copy } from 'lucide-react';
 import { RecordingStudio } from './RecordingStudio';
 import { ClarioProject, saveProject } from '../../lib/projectStore';
+import { generateClaudeCodePrompt } from '../../lib/gemini';
 
 interface ProjectCreationWizardProps {
   onClose: () => void;
@@ -29,6 +30,7 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
   // Faux processing states
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState('');
+  const [generatedPrompt, setGeneratedPrompt] = useState('');
 
 
 
@@ -54,6 +56,14 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
       setProgress(p => {
         if (p >= 100) {
           clearInterval(interval);
+          if (type === 'slides') {
+            setGeneratedPrompt(generateClaudeCodePrompt(
+              "The 4 Step Framework for Viral Reach",
+              ["#0F1015", "#181922", "#F8FAFC", "#10B981"],
+              "Step-by-Step SOP / Tool Matrix",
+              "Top category pill, bold hook headline, 4-item horizontal card container, bottom takeaway"
+            ));
+          }
           setStep(type === 'video' ? 'success_video' : 'success_slides');
           return 100;
         }
@@ -294,17 +304,12 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
                 <div className="w-full bg-surface-2 border border-border rounded-xl p-4 relative group">
                   <button 
                     className="absolute top-2 right-2 p-2 rounded-md hover:bg-surface-3 text-muted-foreground transition-colors"
-                    onClick={() => navigator.clipboard.writeText("Act as an expert presentation designer. I have analyzed a slide deck and extracted the core narrative geometry. Please redesign the following slides to align with an ultra-premium, cinematic aesthetic. Maintain the narrative hierarchy but elevate the language...")}
+                    onClick={() => navigator.clipboard.writeText(generatedPrompt)}
                   >
                     <Copy className="w-4 h-4" />
                   </button>
                   <p className="font-mono text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap max-h-40 overflow-y-auto pr-8">
-                    Act as an expert presentation designer. I have analyzed a slide deck and extracted the core narrative geometry. Please redesign the following slides to align with an ultra-premium, cinematic aesthetic. Maintain the narrative hierarchy but elevate the language...
-                    <br/><br/>
-                    [SLIDE 1]<br/>
-                    Title: The Stagnation Problem<br/>
-                    Key Takeaway: Existing pipelines are decaying.<br/>
-                    ...
+                    {generatedPrompt}
                   </p>
                 </div>
 
