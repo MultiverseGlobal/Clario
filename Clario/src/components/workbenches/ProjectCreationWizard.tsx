@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Video, Presentation, Target, Sparkles, UploadCloud, Link as LinkIcon, Camera, CheckCircle2, ArrowRight, X, Copy } from 'lucide-react';
 import { RecordingStudio } from './RecordingStudio';
 import { ClarioProject, saveProject } from '../../lib/projectStore';
 import { generateClaudeCodePrompt } from '../../lib/gemini';
+import { getApiBase } from '../../lib/apiClient';
 
 interface ProjectCreationWizardProps {
   onClose: () => void;
@@ -34,49 +35,93 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
 
 
 
-  const simulateProcessing = (type: 'video' | 'slides') => {
-    setStep(type === 'video' ? 'processing_video' : 'processing_slides');
-    setProgress(0);
-    
-    const steps = type === 'video' ? [
-      "Analyzing video frames...",
-      "Detecting inpainted captions...",
-      "Segmenting visual elements...",
-      "Removing burn-in text layers...",
-      "Generating clean master assets..."
-    ] : [
-      "Extracting slide geometry...",
-      "Running OCR on layout...",
-      "Identifying visual hierarchy...",
-      "Generating LLM recreation prompt..."
-    ];
+  const serverBase = getApiBase();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-    let currentStep = 0;
-    const interval = setInterval(() => {
-      setProgress(p => {
-        if (p >= 100) {
-          clearInterval(interval);
-          if (type === 'slides') {
-            setGeneratedPrompt(generateClaudeCodePrompt(
-              "The 4 Step Framework for Viral Reach",
-              ["#0F1015", "#181922", "#F8FAFC", "#10B981"],
-              "Step-by-Step SOP / Tool Matrix",
-              "Top category pill, bold hook headline, 4-item horizontal card container, bottom takeaway"
-            ));
+  useEffect(() => {
+    return () => {
+      if (pollTimer.current) clearInterval(pollTimer.current);
+    };
+  }, []);
+
+  const startPolling = useCallback((jobId: string, type: 'video' | 'slides') => {
+    if (pollTimer.current) clearInterval(pollTimer.current);
+    pollTimer.current = setInterval(async () => {
+      try {
+        const res = await fetch(`${serverBase}/harvest/jobs/${jobId}`);
+        const job = await res.json();
+        
+        setProgress(job.progress_pct || 0);
+        setStatusText(job.status_msg || 'Processing...');
+        
+        if (job.status === 'completed' || job.status === 'failed') {
+          clearInterval(pollTimer.current!);
+          if (job.status === 'completed') {
+            if (type === 'slides') {
+              setGeneratedPrompt(generateClaudeCodePrompt(
+                "The 4 Step Framework for Viral Reach",
+                ["#0F1015", "#181922", "#F8FAFC", "#10B981"],
+                "Step-by-Step SOP / Tool Matrix",
+                "Top category pill, bold hook headline, 4-item horizontal card container, bottom takeaway"
+              ));
+            }
+            setStep(type === 'video' ? 'success_video' : 'success_slides');
+          } else {
+            setStatusText('Processing failed');
           }
-          setStep(type === 'video' ? 'success_video' : 'success_slides');
-          return 100;
         }
-        
-        // Update status text every ~20%
-        if (p % 20 === 0 && currentStep < steps.length) {
-          setStatusText(steps[currentStep]);
-          currentStep++;
-        }
-        
-        return p + 2; // 2% every 50ms = ~2.5s total
+      } catch (err) {
+        clearInterval(pollTimer.current!);
+        setStatusText('Error fetching status');
+      }
+    }, 2000);
+  }, [serverBase]);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !projectType) return;
+
+    setStep(projectType === 'video' ? 'processing_video' : 'processing_slides');
+    setProgress(0);
+    setStatusText('Uploading...');
+
+    const form = new FormData();
+    form.append('file', file);
+    form.append('mode', projectType === 'video' ? 'video_harvester' : 'slide_harvester');
+
+    try {
+      const res = await fetch(`${serverBase}/harvest/ingest-file`, {
+        method: 'POST',
+        body: form,
       });
-    }, 50);
+      const data = await res.json();
+      startPolling(data.job_id, projectType);
+    } catch (err) {
+      setStatusText('Upload failed');
+    }
+  };
+
+  const handleUrlIngest = async () => {
+    if (!projectType) return;
+    const url = window.prompt("Enter URL (YouTube, Drive, etc):");
+    if (!url) return;
+
+    setStep(projectType === 'video' ? 'processing_video' : 'processing_slides');
+    setProgress(0);
+    setStatusText('Queuing URL...');
+
+    try {
+      const res = await fetch(`${serverBase}/harvest/ingest-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json();
+      startPolling(data.job_id, projectType);
+    } catch (err) {
+      setStatusText('URL Ingest failed');
+    }
   };
 
   const createAndRoute = async () => {
@@ -96,9 +141,27 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
     onProjectCreated(newProject);
   };
 
-  const handleRecordingFinished = () => {
-    // Return from studio, simulate processing
-    simulateProcessing('video');
+  const handleRecordingFinished = async (blob: Blob) => {
+    if (!projectType) return;
+    setStep('processing_video');
+    setProgress(0);
+    setStatusText('Uploading Recording...');
+
+    const file = new File([blob], 'recording.webm', { type: 'video/webm' });
+    const form = new FormData();
+    form.append('file', file);
+    form.append('mode', 'video_harvester');
+
+    try {
+      const res = await fetch(`${serverBase}/harvest/ingest-file`, {
+        method: 'POST',
+        body: form,
+      });
+      const data = await res.json();
+      startPolling(data.job_id, 'video');
+    } catch (err) {
+      setStatusText('Upload failed');
+    }
   };
 
   if (step === 'recording_studio') {
@@ -210,16 +273,23 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
                       onClick={() => setStep('recording_studio')}
                     />
                   )}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept={projectType === 'video' ? "video/*" : "application/pdf,image/*,.ppt,.pptx"}
+                    onChange={handleFileUpload}
+                    style={{ display: 'none' }}
+                  />
                   <Card 
                     icon={UploadCloud} title="Upload File" 
                     description="Browse your computer for local files." 
-                    onClick={() => simulateProcessing(projectType!)}
+                    onClick={() => fileInputRef.current?.click()}
                   />
                   {step !== 'sales_source' && (
                     <Card 
                       icon={LinkIcon} title="Paste URL" 
                       description="Import directly from a web link (YouTube, Drive, etc)." 
-                      onClick={() => simulateProcessing(projectType!)}
+                      onClick={() => handleUrlIngest()}
                     />
                   )}
                 </div>

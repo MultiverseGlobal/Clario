@@ -1,6 +1,8 @@
 import { useState, useRef } from 'react';
 import type { ShotRecord, CleanAssetRecord } from '../../types/assets';
 import { RightsBadge } from '../ui/RightsBadge';
+import { uploadBlobToVault } from '../../lib/projectStore';
+import { toast } from 'sonner';
 
 interface CleanSourceDrawerProps {
   shot: ShotRecord | null;
@@ -22,28 +24,46 @@ export function CleanSourceDrawer({
   const [customTitle, setCustomTitle] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [isUploading, setIsUploading] = useState(false);
+
   if (!shot) return null;
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const newCleanAsset: CleanAssetRecord = {
-      id: `clean_${shot.shot_id}_${Date.now()}`,
-      shot_id: shot.shot_id,
-      asset_type: file.type.startsWith('video/') ? 'clip' : 'still',
-      title: customTitle.trim() || file.name,
-      url: URL.createObjectURL(file),
-      dimensions: '1080x1920',
-      rights_status: 'user_owned',
-      source_title: customTitle.trim() || 'User Imported Master File',
-      source_url: customSourceUrl.trim() || undefined,
-      transformation_history: ['Attached via local file import'],
-      created_at: Date.now(),
-    };
+    try {
+      setIsUploading(true);
+      toast.info("Uploading asset...");
+      
+      const assetRecord = await uploadBlobToVault(file);
+      if (!assetRecord) {
+        throw new Error("Upload returned null");
+      }
 
-    onAttachCleanAsset(newCleanAsset);
-    onClose();
+      const newCleanAsset: CleanAssetRecord = {
+        id: `clean_${shot.shot_id}_${Date.now()}`,
+        shot_id: shot.shot_id,
+        asset_type: file.type.startsWith('video/') ? 'clip' : 'still',
+        title: customTitle.trim() || file.name,
+        url: assetRecord.url,
+        dimensions: '1080x1920', // Alternatively, get dimensions if needed
+        rights_status: 'user_owned',
+        source_title: customTitle.trim() || 'User Imported Master File',
+        source_url: customSourceUrl.trim() || undefined,
+        transformation_history: ['Attached via local file import'],
+        created_at: Date.now(),
+      };
+
+      onAttachCleanAsset(newCleanAsset);
+      toast.success("Asset uploaded successfully");
+      onClose();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Upload failed");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -393,11 +413,12 @@ export function CleanSourceDrawer({
                 />
 
                 <button
+                  disabled={isUploading}
                   onClick={() => fileInputRef.current?.click()}
                   className="btn-primary"
-                  style={{ width: '100%', padding: '10px 14px', fontSize: 12 }}
+                  style={{ width: '100%', padding: '10px 14px', fontSize: 12, opacity: isUploading ? 0.7 : 1, cursor: isUploading ? 'not-allowed' : 'pointer' }}
                 >
-                  📁 Select Clean Master File…
+                  {isUploading ? 'Uploading...' : '📁 Select Clean Master File…'}
                 </button>
               </div>
 
