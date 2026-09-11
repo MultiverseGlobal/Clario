@@ -22,6 +22,7 @@ export default function App() {
   // Shell modals
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState("");
+  const [apiBaseInput, setApiBaseInput] = useState("");
   const [savedKeySuccess, setSavedKeySuccess] = useState(false);
 
 
@@ -34,6 +35,7 @@ export default function App() {
       fetchBrandKitFromDb()
     ]).finally(() => {
       setApiKeyInput(getApiKey());
+      import('./lib/apiClient').then(m => setApiBaseInput(m.getApiBase()));
       setSettingsLoaded(true);
     });
   }, []);
@@ -54,8 +56,11 @@ export default function App() {
 
 
 
-  const handleSaveApiKey = () => {
+  const handleSaveApiKey = async () => {
     setApiKey(apiKeyInput);
+    const { setApiBase } = await import('./lib/apiClient');
+    await setApiBase(apiBaseInput);
+    
     setSavedKeySuccess(true);
     setTimeout(() => {
       setSavedKeySuccess(false);
@@ -112,7 +117,7 @@ export default function App() {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <h3 className="font-display" style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>
-                  Gemini 2.0 API Configuration
+                  Configuration Settings
                 </h3>
                 <button
                   onClick={() => setShowApiKeyModal(false)}
@@ -121,27 +126,53 @@ export default function App() {
                   ✕
                 </button>
               </div>
-              <p style={{ fontSize: 12, color: 'var(--pds-text-secondary)', marginBottom: 16, lineHeight: 1.4 }}>
-              Add a Google Gemini API key to unlock advanced multimodal scene deconstruction, optical text separation, and automatic prompt generation.
-            </p>
-              <input
-                type="password"
-                placeholder="AIzaSy…"
-                value={apiKeyInput}
-                onChange={e => setApiKeyInput(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: 8,
-                  border: '1px solid var(--pds-border-subtle)',
-                  background: 'var(--pds-surface-2)',
-                  color: 'var(--pds-text-primary)',
-                  fontSize: 12,
-                  fontFamily: 'monospace',
-                  outline: 'none',
-                  marginBottom: 16,
-                }}
-              />
+              
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--pds-text-secondary)', marginBottom: 4 }}>
+                  Gemini 2.0 API Key
+                </label>
+                <input
+                  type="password"
+                  placeholder="AIzaSy…"
+                  value={apiKeyInput}
+                  onChange={e => setApiKeyInput(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    border: '1px solid var(--pds-border-subtle)',
+                    background: 'var(--pds-surface-2)',
+                    color: 'var(--pds-text-primary)',
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--pds-text-secondary)', marginBottom: 4 }}>
+                  FastAPI Backend URL
+                </label>
+                <input
+                  type="text"
+                  placeholder="http://localhost:8000"
+                  value={apiBaseInput}
+                  onChange={e => setApiBaseInput(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    border: '1px solid var(--pds-border-subtle)',
+                    background: 'var(--pds-surface-2)',
+                    color: 'var(--pds-text-primary)',
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
               <div style={{ display: 'flex', gap: 10 }}>
                 <button
                   onClick={handleSaveApiKey}

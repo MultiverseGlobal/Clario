@@ -58,75 +58,78 @@ class ShotRecord(BaseModel):
     content_type: ContentType = "b_roll"
     source_type: SourceType = "unresolved"
     likely_source: str = "Unresolved"
-    confidence: ConfidenceLevel = "possible"
-    exact_source_found: bool = False
-    clean_source_url: str = ""
-    license_status: LicenseStatus = "copyrighted_reference_only"
-    replacement_needed: bool = True
-    replacement_prompt: str = ""
-    search_queries: List[str] = Field(default_factory=list)
-    notes: str = ""
-
-# ── Slide & Design Token Records ─────────────────────────────────────────────
-
-class SlideGraphicElement(BaseModel):
-    id: str
-    label: Optional[str] = None
-    image_url: str
-    x: float = 0.0
-    y: float = 0.0
-    width: float = 100.0
-    height: Optional[float] = None
-    type: Literal["icon", "badge", "sticker", "dock", "logo"] = "icon"
-
-class TypographyTokens(BaseModel):
-    headline_font: str = "Inter"
-    font_size: str = "48px"
-    font_weight: str = "800"
-    letter_spacing: str = "-0.03em"
-    body_font: Optional[str] = "Inter 16px"
-
-class LayoutTokens(BaseModel):
-    archetype: str = "Framework"
-    structure: str = "Container with items"
-    aspect_ratio: str = "1:1"
+    likely_source_confidence: ConfidenceLevel = "unresolved"
+    primary_subject: str = "Unknown"
+    camera_angle: str = "Unknown"
+    motion_type: str = "Unknown"
+    lighting_type: str = "Unknown"
+    color_palette: List[str] = Field(default_factory=list)
+    setting: str = "Unknown"
+    text_on_screen: str = ""
+    audio_transcript: str = ""
+    audio_tags: List[str] = Field(default_factory=list)
+    brands_logos: List[str] = Field(default_factory=list)
+    faces_detected: int = 0
+    music_detected: bool = False
+    speech_detected: bool = False
+    source_candidates: List[SourceCandidate] = Field(default_factory=list)
+    embedding: Optional[List[float]] = None
 
 class SlideHarvestRecord(BaseModel):
+    project_id: str
     slide_id: str
-    slide_index: int
-    image_url: str
-    ocr_transcript: str = ""
-    ocr_confidence: float = 0.95
-    typography_tokens: TypographyTokens = Field(default_factory=TypographyTokens)
-    palette_tokens: List[str] = Field(default_factory=list)
-    layout_tokens: LayoutTokens = Field(default_factory=LayoutTokens)
-    isolated_elements: List[SlideGraphicElement] = Field(default_factory=list)
-    source_candidates: List[str] = Field(default_factory=list)
-    claude_code_prompt: str = ""
-    replacement_prompt: str = ""
+    time_seconds: float
+    frame_url: str
+    extracted_text: str = ""
+    extracted_charts: List[str] = Field(default_factory=list)
+    visual_description: str = ""
+    slide_type: Literal["title", "data", "text", "diagram", "image", "unknown"] = "unknown"
+    key_takeaway: str = ""
 
-# ── Provenance & Project Manifest ────────────────────────────────────────────
+# ── Provenance & Rights Models ───────────────────────────────────────────────
 
 class ProvenanceRecord(BaseModel):
-    asset_id: str
-    asset_name: str
-    provenance_type: Literal[
-        "exact_source",
-        "licensed_alternative",
-        "self_recorded",
-        "public_domain",
-        "generated_replacement",
-    ]
-    source_url: Optional[str] = None
-    license_note: str = ""
-    confidence: ConfidenceLevel = "possible"
-    timestamp: int
-    intended_use: str = ""
+    shot_id: str
+    rights_status: LicenseStatus
+    clearance_method: Literal["auto", "manual_override", "license_purchase", "pending"]
+    cleared_by: Optional[str] = None
+    cleared_at: Optional[int] = None
+    notes: str = ""
+    evidence_links: List[str] = Field(default_factory=list)
+
+class CleanAssetRecord(BaseModel):
+    id: str
+    shot_id: str
+    title: str
+    url: str
+    mime_type: str
+    rights_status: LicenseStatus
+    production_eligible: bool = True
+    rights_note: str = ""
+    created_at: int
+
+class ReplacementRecord(BaseModel):
+    id: str
+    shot_id: str
+    replacement_type: str
+    title: str
+    url: str
+    prompt: Optional[str] = None
+    negative_prompt: Optional[str] = None
+    model_provider: Optional[str] = None
+    dimensions: Optional[str] = None
+    rights_status: str
+    production_eligible: bool = True
+    rights_note: str = ""
+    transformation_history: List[str] = Field(default_factory=list)
+    created_at: int
+
+# ── Project Model ────────────────────────────────────────────────────────────
 
 class HarvestProject(BaseModel):
     id: str
     name: str
-    mode: Literal["video_harvester", "slide_harvester"]
+    created_by: str
     reference_url: Optional[str] = None
     source_file_name: Optional[str] = None
     shots: List[ShotRecord] = Field(default_factory=list)
@@ -156,3 +159,7 @@ class JobStatusResponse(BaseModel):
     status_msg: str
     error: Optional[str] = None
     result: Optional[Dict[str, Any]] = None
+
+class GenerateImageRequest(BaseModel):
+    prompt: str = Field(..., description="The image generation prompt")
+    reference_url: Optional[str] = Field(None, description="Optional reference image URL")

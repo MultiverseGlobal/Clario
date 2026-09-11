@@ -229,37 +229,56 @@ Return ONLY this JSON (no markdown, no explanation):
 
     const isStream = !!body.stream;
 
-    // OpenRouter Call with Fallbacks
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${openRouterApiKey}`,
-        "HTTP-Referer": "https://atlas.ai",
-      },
-      signal: AbortSignal.timeout(60000),
-      body: JSON.stringify({
-        model: "anthropic/claude-3.5-sonnet",
-        // OpenRouter fallback routing
-        route: "fallback",
-        models: ["anthropic/claude-3.5-sonnet", "openai/gpt-4o", "google/gemini-1.5-pro"],
-        temperature: 0.4,
-        max_tokens: 2048,
-        stream: isStream,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        // Note: JSON mode might not be strictly adhered to when streaming by all models, 
-        // but it usually works well enough with Claude/GPT-4o.
-        ...(isStream ? {} : { response_format: { type: "json_object" } }),
-      }),
-    });
-
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`OpenRouter error: ${res.status} ${err}`);
+    // OpenRouter Call with Fallbacks and Retry Loop
+    let attempt = 0;
+    const maxRetries = 3;
+    let finalRes: Response | null = null;
+    
+    while (attempt < maxRetries) {
+      try {
+        finalRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${openRouterApiKey}`,
+            "HTTP-Referer": "https://atlas.ai",
+          },
+          signal: AbortSignal.timeout(60000),
+          body: JSON.stringify({
+            model: "anthropic/claude-3.5-sonnet",
+            // OpenRouter fallback routing
+            route: "fallback",
+            models: ["anthropic/claude-3.5-sonnet", "openai/gpt-4o", "google/gemini-1.5-pro"],
+            temperature: 0.4,
+            max_tokens: 2048,
+            stream: isStream,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
+            ],
+            // Note: JSON mode might not be strictly adhered to when streaming by all models, 
+            // but it usually works well enough with Claude/GPT-4o.
+            ...(isStream ? {} : { response_format: { type: "json_object" } }),
+          }),
+        });
+        if (!finalRes.ok) {
+          const err = await finalRes.text();
+          if (finalRes.status === 429) {
+            throw new Error(`RATE_LIMIT: ${err}`);
+          }
+          throw new Error(`OpenRouter error: ${finalRes.status} ${err}`);
+        }
+        break; // Success, exit retry loop
+      } catch (err: any) {
+        attempt++;
+        console.warn(`[generate-outreach] Attempt ${attempt} failed: ${err.message}.`);
+        if (attempt >= maxRetries) {
+          throw err;
+        }
+        await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));
+      }
     }
+    const res = finalRes!;
 
     if (isStream) {
       // Forward the SSE stream directly to the client

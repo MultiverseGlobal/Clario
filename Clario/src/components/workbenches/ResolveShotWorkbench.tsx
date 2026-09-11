@@ -10,6 +10,8 @@ import {
 } from '../../types/assets';
 import { RightsBadge } from '../ui/RightsBadge';
 import { ClipPreviewModal } from '../modals/ClipPreviewModal';
+import { getApiBase } from '../../lib/apiClient';
+import toast from 'react-hot-toast';
 
 interface ResolveShotWorkbenchProps {
   shot: ShotRecord | null;
@@ -211,16 +213,45 @@ export function ResolveShotWorkbench({ shot, referenceVideoUrl, onClose, onResol
     onClose();
   };
 
+  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
+
   // ── Handle Choice C: Reconstruct Reference Still ───────────────────────────
-  const handleSimulateInpaint = () => {
+  const handleSimulateInpaint = async () => {
+    if (!shot) return;
     setIsReconstructing(true);
-    setTimeout(() => {
-      setIsReconstructing(false);
+    setGeneratedImageUrl(null);
+    
+    try {
+      const promptStr = `Inpaint overlay regions: ${[maskCaptions && 'captions', maskWatermark && 'watermark', cropReframe && 'crop out unnecessary elements'].filter(Boolean).join(', ')}. Keep the underlying image structure exactly the same, just remove these artifacts.`;
+      
+      const res = await fetch(`${getApiBase()}/reference/generate-image`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: promptStr,
+          reference_url: shot.frame_url
+        })
+      });
+      
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.detail || 'Failed to generate image');
+      }
+      
+      const data = await res.json();
+      setGeneratedImageUrl(data.url);
       setPreviewReconstructed(true);
-    }, 700);
+      toast.success("Successfully generated reconstructed still!");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Image generation failed');
+    } finally {
+      setIsReconstructing(false);
+    }
   };
 
   const handleSaveReconstructedStill = () => {
+    const finalUrl = generatedImageUrl || shot.frame_url;
     const resolvedAsset: ResolvedAssetRecord = {
       id: `reconstructed_still_${shot.shot_id}_${Date.now()}`,
       shot_id: shot.shot_id,
@@ -228,7 +259,7 @@ export function ResolveShotWorkbench({ shot, referenceVideoUrl, onClose, onResol
       output_type: 'ai_cleaned_reference_still',
       title: `Reconstructed Reference Still (${shot.shot_id.toUpperCase()})`,
       media_type: 'image',
-      url: shot.frame_url,
+      url: finalUrl,
       dimensions: '1080x1920 (9:16 Still)',
       rights_status: 'reference_only',
       production_eligible: false,
@@ -246,7 +277,7 @@ export function ResolveShotWorkbench({ shot, referenceVideoUrl, onClose, onResol
       asset_kind: 'reconstructed_still',
       replacement_type: cropReframe ? 'crop_reframe' : 'ai_cleaned_reference',
       title: resolvedAsset.title,
-      url: shot.frame_url,
+      url: finalUrl,
       prompt: `Inpainted overlay regions: ${[maskCaptions && 'captions', maskWatermark && 'watermark'].filter(Boolean).join(', ')}`,
       model_provider: 'Clario Still Inpainter v1',
       dimensions: '1080x1920',
@@ -839,7 +870,7 @@ export function ResolveShotWorkbench({ shot, referenceVideoUrl, onClose, onResol
                 {previewReconstructed ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     <div style={{ borderRadius: 8, overflow: 'hidden', height: 160, background: '#000', position: 'relative' }}>
-                      <img src={shot.frame_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <img src={generatedImageUrl || shot.frame_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       <div style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.7)', color: '#FFF', fontSize: 10, padding: '2px 8px', borderRadius: 4 }}>
                         Inpainted Sample
                       </div>

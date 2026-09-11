@@ -93,15 +93,19 @@ def get_job(job_id: str):
 
 # ── Async Media Pipeline Worker ──────────────────────────────────────────────
 
-async def process_video_harvest_job(job_id: str, project_id: str, video_path: str, reference_url: str = ""):
-    try:
-        update_job(job_id, {
-            "status": "processing",
-            "progress_pct": 10,
-            "status_msg": "Detecting shot boundaries with FFmpeg…"
-        })
+# Global semaphore to limit heavy FFmpeg concurrent processing
+processing_semaphore = asyncio.Semaphore(2)
 
-        project_dir = os.path.join(MEDIA_ROOT, project_id)
+async def process_video_harvest_job(job_id: str, project_id: str, video_path: str, reference_url: str = ""):
+    async with processing_semaphore:
+        try:
+            update_job(job_id, {
+                "status": "processing",
+                "progress_pct": 10,
+                "status_msg": "Detecting shot boundaries with FFmpeg…"
+            })
+
+            project_dir = os.path.join(MEDIA_ROOT, project_id)
         os.makedirs(project_dir, exist_ok=True)
 
         # 1. Scene detection
@@ -546,17 +550,18 @@ async def _process_reference_ingest(
     gemini_api_key: str | None,
 ):
     """Background worker: scene detect → keyframes → vision → embed → upsert to Supabase."""
-    project_id = f"ref_{uuid.uuid4().hex[:10]}"
-    project_dir = os.path.join(MEDIA_ROOT, project_id)
-    os.makedirs(project_dir, exist_ok=True)
-
-    try:
-        update_job(job_id, {"status": "processing", "progress_pct": 10, "status_msg": "Detecting scenes…"})
-
-        intervals = detect_scenes_ffmpeg(video_path, threshold=0.3)
-        update_job(job_id, {"progress_pct": 25, "status_msg": f"{len(intervals)} shots found. Extracting keyframes…"})
-
-        rows = []
+    async with processing_semaphore:
+        project_id = f"ref_{uuid.uuid4().hex[:10]}"
+        project_dir = os.path.join(MEDIA_ROOT, project_id)
+        os.makedirs(project_dir, exist_ok=True)
+    
+        try:
+            update_job(job_id, {"status": "processing", "progress_pct": 10, "status_msg": "Detecting scenes…"})
+    
+            intervals = detect_scenes_ffmpeg(video_path, threshold=0.3)
+            update_job(job_id, {"progress_pct": 25, "status_msg": f"{len(intervals)} shots found. Extracting keyframes…"})
+    
+            rows = []
         for idx, (start_sec, end_sec) in enumerate(intervals):
             shot_id = f"shot_{str(idx + 1).zfill(3)}"
             frame_filename = f"{shot_id}.jpg"
@@ -821,6 +826,54 @@ async def script_match(req: ScriptMatchRequest):
         "total_chunks": len(chunks),
         "total_unique_clips": len(ranked_clip_ids),
     }
+
+
+import httpx
+
+@app.post("/api/v1/reference/generate-image")
+async def reference_generate_image(req: GenerateImageRequest):
+    """
+    Generate an image using OpenAI DALL-E 3 (for inpainting/reconstruction workflows).
+    Requires OPENAI_API_KEY environment variable.
+    """
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="OPENAI_API_KEY is not configured on the server.")
+
+    # In a real inpainting workflow we might use an edit endpoint, but DALL-E 3 only supports generation currently.
+    # We pass the reference URL as part of the prompt context.
+    augmented_prompt = req.prompt
+    if req.reference_url:
+        augmented_prompt += f"\n\n(Style match reference: {req.reference_url})"
+
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(
+                "https://api.openai.com/v1/images/generations",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "dall-e-3",
+                    "prompt": augmented_prompt,
+                    "n": 1,
+                    "size": "1024x1024",
+                    "quality": "standard"
+                }
+            )
+            
+            if resp.status_code != 200:
+                err_data = resp.json()
+                raise HTTPException(status_code=resp.status_code, detail=f"OpenAI error: {err_data}")
+                
+            data = resp.json()
+            image_url = data["data"][0]["url"]
+            
+            return {"status": "success", "url": image_url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 if __name__ == "__main__":
