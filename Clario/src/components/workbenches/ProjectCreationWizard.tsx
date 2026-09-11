@@ -95,10 +95,14 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
         method: 'POST',
         body: form,
       });
+      if (!res.ok) {
+        throw new Error('Backend URL unreachable or server error');
+      }
       const data = await res.json();
       startPolling(data.job_id, projectType);
-    } catch (err) {
-      setStatusText('Upload failed');
+    } catch (err: any) {
+      console.error(err);
+      setStatusText(err.message.includes('fetch') ? 'Upload failed: Backend URL unreachable. Configure Settings.' : 'Upload failed');
     }
   };
 
@@ -117,10 +121,14 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
       });
+      if (!res.ok) {
+        throw new Error('Backend URL unreachable or server error');
+      }
       const data = await res.json();
       startPolling(data.job_id, projectType);
-    } catch (err) {
-      setStatusText('URL Ingest failed');
+    } catch (err: any) {
+      console.error(err);
+      setStatusText(err.message.includes('fetch') ? 'URL Ingest failed: Backend URL unreachable. Configure Settings.' : 'URL Ingest failed');
     }
   };
 

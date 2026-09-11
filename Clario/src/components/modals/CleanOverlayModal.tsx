@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ShotRecord, ReplacementRecord } from '../../types/assets';
 import { RightsBadge } from '../ui/RightsBadge';
+import { getApiBase } from '../../lib/apiClient';
 
 interface CleanOverlayModalProps {
   shot: ShotRecord | null;
@@ -17,12 +18,31 @@ export function CleanOverlayModal({ shot, onClose, onSaveCleanedAsset }: CleanOv
 
   if (!shot) return null;
 
-  const handleSimulateInpaint = () => {
+  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
+
+  const handleSimulateInpaint = async () => {
     setIsProcessing(true);
-    setTimeout(() => {
-      setIsProcessing(false);
+    setGeneratedImageUrl(null);
+    try {
+      const promptStr = `Inpaint overlay regions: ${[maskCaptions && 'captions', maskWatermark && 'watermark', cropReframe && 'crop out unnecessary elements'].filter(Boolean).join(', ')}. Keep the underlying image structure exactly the same, just remove these artifacts.`;
+      const res = await fetch(`${getApiBase()}/reference/generate-image`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: promptStr,
+          reference_url: shot.frame_url
+        })
+      });
+      if (!res.ok) throw new Error('Image generation failed');
+      const data = await res.json();
+      setGeneratedImageUrl(data.url);
       setPreviewCleaned(true);
-    }, 800);
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Image generation failed');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleSave = () => {
@@ -31,7 +51,7 @@ export function CleanOverlayModal({ shot, onClose, onSaveCleanedAsset }: CleanOv
       shot_id: shot.shot_id,
       replacement_type: cropReframe ? 'crop_reframe' : 'ai_cleaned_reference',
       title: `Reconstructed Research Still (${shot.shot_id.toUpperCase()})`,
-      url: shot.frame_url,
+      url: generatedImageUrl || shot.frame_url,
       prompt: `Inpainted overlay regions: ${[maskCaptions && 'captions', maskWatermark && 'watermarks', cropReframe && 'crop'].filter(Boolean).join(', ')}`,
       model_provider: 'Clario Research Inpainter v1',
       dimensions: '1080x1920 (9:16)',
@@ -204,7 +224,7 @@ export function CleanOverlayModal({ shot, onClose, onSaveCleanedAsset }: CleanOv
               }}
             >
               <img
-                src={shot.frame_url}
+                src={generatedImageUrl || shot.frame_url}
                 alt=""
                 style={{
                   width: '100%',
