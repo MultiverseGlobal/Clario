@@ -11,7 +11,7 @@ import {
 import { RightsBadge } from '../ui/RightsBadge';
 import { ClipPreviewModal } from '../modals/ClipPreviewModal';
 import { getApiBase } from '../../lib/apiClient';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 interface ResolveShotWorkbenchProps {
   shot: ShotRecord | null;

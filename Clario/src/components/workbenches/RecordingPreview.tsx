@@ -26,8 +26,6 @@ export function RecordingPreview({ blob, projectName, onReRecord, onBack, onSave
   const [saved, setSaved] = useState(false);
   const [isPolishing, setIsPolishing] = useState(false);
   const [edits, setEdits] = useState<{ time: number; label: string }[]>([]);
-  const [polishError, setPolishError] = useState<string | null>(null);
-
   useEffect(() => {
     return () => URL.revokeObjectURL(objectUrl);
   }, [objectUrl]);
@@ -57,7 +55,6 @@ export function RecordingPreview({ blob, projectName, onReRecord, onBack, onSave
   async function handleAIPolish() {
     if (duration <= 0) return;
     setIsPolishing(true);
-    setPolishError(null);
 
     const apiKey = getApiKey();
 
