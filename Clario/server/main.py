@@ -830,6 +830,10 @@ async def script_match(req: ScriptMatchRequest):
 
 import httpx
 
+class GenerateImageRequest(BaseModel):
+    prompt: str
+    reference_url: str | None = None
+
 @app.post("/api/v1/reference/generate-image")
 async def reference_generate_image(req: GenerateImageRequest):
     """
