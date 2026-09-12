@@ -106,7 +106,7 @@ async def process_video_harvest_job(job_id: str, project_id: str, video_path: st
             })
 
             project_dir = os.path.join(MEDIA_ROOT, project_id)
-        os.makedirs(project_dir, exist_ok=True)
+            os.makedirs(project_dir, exist_ok=True)
 
         # 1. Scene detection
         intervals = detect_scenes_ffmpeg(video_path, threshold=0.3)
