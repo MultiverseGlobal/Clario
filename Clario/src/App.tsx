@@ -224,7 +224,7 @@ export default function App() {
         <DeliverableView 
           projectName={currentProject?.name || 'Untitled Project'} 
           result={latestResult} 
-          onBack={() => setCurrentPhase('reference_library')} 
+          onBack={() => setCurrentPhase('home')} 
         />
       ) : currentPhase === 'studio' ? (
         <RecordingStudio

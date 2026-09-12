@@ -55,7 +55,7 @@ export function DeliverableView({ projectName, result, onBack }: DeliverableView
       <div className="sticky top-0 z-50 flex items-center justify-between px-8 py-4 bg-canvas/90 backdrop-blur border-b border-border print:hidden">
         <button onClick={onBack} className="pds-btn-ghost flex items-center gap-2">
           <ArrowLeft className="w-4 h-4" />
-          Back to Analysis
+          Back to Projects
         </button>
         <button onClick={handleExport} className="pds-btn-primary flex items-center gap-2">
           <Download className="w-4 h-4" />

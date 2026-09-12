@@ -102,9 +102,16 @@ export function HomeView({ onSelectProject }: { onSelectProject: (p: ClarioProje
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
-                  <span className="pds-status-badge active">
-                    Active
-                  </span>
+                  {(() => {
+                    const hasResults = (p.harvestProject?.clean_assets?.length ?? 0) > 0
+                      || (p.selectedAssets?.length ?? 0) > 0
+                      || (p.trackItems?.length ?? 0) > 0;
+                    return (
+                      <span className={`pds-status-badge ${hasResults ? 'completed' : 'active'}`}>
+                        {hasResults ? 'Processed' : 'Active'}
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
               

@@ -17,6 +17,7 @@ type Step =
   | 'sales_source' 
   | 'content_source' 
   | 'slides_source' 
+  | 'url_input'
   | 'recording_studio'
   | 'processing_video'
   | 'processing_slides'
@@ -27,6 +28,7 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
   const [step, setStep] = useState<Step>('type');
   const [projectType, setProjectType] = useState<'video'|'slides'|null>(null);
   const [videoCategory, setVideoCategory] = useState<'sales'|'content'|null>(null);
+  const [urlInput, setUrlInput] = useState('');
   
   // Faux processing states
   const [progress, setProgress] = useState(0);
@@ -106,10 +108,8 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
     }
   };
 
-  const handleUrlIngest = async () => {
-    if (!projectType) return;
-    const url = window.prompt("Enter URL (YouTube, Drive, etc):");
-    if (!url) return;
+  const handleUrlIngest = async (url: string) => {
+    if (!projectType || !url) return;
 
     setStep(projectType === 'video' ? 'processing_video' : 'processing_slides');
     setProgress(0);
@@ -297,12 +297,48 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
                     <Card 
                       icon={LinkIcon} title="Paste URL" 
                       description="Import directly from a web link (YouTube, Drive, etc)." 
-                      onClick={() => handleUrlIngest()}
+                      onClick={() => setStep('url_input')}
                     />
                   )}
                 </div>
                 <button 
                   onClick={() => setStep(step === 'slides_source' ? 'type' : 'video_category')} 
+                  className="text-sm text-muted-foreground hover:text-foreground mt-4 text-center"
+                >
+                  ← Back
+                </button>
+              </motion.div>
+            )}
+
+            {step === 'url_input' && (
+              <motion.div 
+                key="url_input"
+                initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
+                className="flex flex-col gap-6"
+              >
+                <div className="text-center mb-4">
+                  <h3 className="text-2xl font-bold mb-2">Import from URL</h3>
+                  <p className="text-muted-foreground">Paste a link to a YouTube video, Google Drive file, or other supported source.</p>
+                </div>
+                <div className="flex flex-col gap-4 max-w-md mx-auto w-full">
+                  <input
+                    type="url"
+                    value={urlInput}
+                    onChange={(e) => setUrlInput(e.target.value)}
+                    placeholder="https://..."
+                    className="w-full px-4 py-3 rounded-xl bg-surface-1 border border-border focus:border-accent outline-none transition-colors text-foreground"
+                    autoFocus
+                  />
+                  <button 
+                    onClick={() => handleUrlIngest(urlInput)}
+                    disabled={!urlInput}
+                    className="w-full py-3 rounded-xl bg-accent text-accent-foreground font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                  >
+                    Import Source
+                  </button>
+                </div>
+                <button 
+                  onClick={() => setStep(projectType === 'slides' ? 'slides_source' : videoCategory === 'sales' ? 'sales_source' : 'content_source')} 
                   className="text-sm text-muted-foreground hover:text-foreground mt-4 text-center"
                 >
                   ← Back

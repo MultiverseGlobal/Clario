@@ -16,6 +16,8 @@ interface RecordingStudioProps {
 export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
   const screenVideoRef   = useRef<HTMLVideoElement>(null);
   const pipVideoRef      = useRef<HTMLVideoElement>(null);
+  const canvasRef        = useRef<HTMLCanvasElement>(null);
+  const compositorRef    = useRef<number | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef        = useRef<BlobPart[]>([]);
 
@@ -103,7 +105,7 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
       setScreenStream(s);
     } catch (err: any) {
       if (err?.name !== 'NotAllowedError') {
-        setScreenError('Screen sharing failed â€” please try again.');
+        setScreenError('Screen sharing failed - please try again.');
       }
     }
   }
@@ -111,19 +113,80 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
   function handleToggleRecord() {
     if (isRecording) {
       mediaRecorderRef.current?.stop();
+      if (compositorRef.current !== null) {
+        cancelAnimationFrame(compositorRef.current);
+        compositorRef.current = null;
+      }
       setIsRecording(false);
     } else {
       if (!screenStream) return;
-      const combined = new MediaStream();
-      screenStream.getVideoTracks().forEach(t => combined.addTrack(t));
-      if (micOn) cameraStream?.getAudioTracks().forEach(t => combined.addTrack(t));
+
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      // Match canvas resolution to screen stream track settings
+      const screenTrack = screenStream.getVideoTracks()[0];
+      const settings = screenTrack.getSettings();
+      canvas.width  = settings.width  || 1920;
+      canvas.height = settings.height || 1080;
+
+      const ctx = canvas.getContext('2d')!;
+      const screenVid = screenVideoRef.current!;
+      const pipVid    = pipVideoRef.current!;
+
+      // Canvas compositor loop - runs every animation frame
+      const drawFrame = () => {
+        ctx.drawImage(screenVid, 0, 0, canvas.width, canvas.height);
+
+        if (camOn && cameraStream) {
+          const pipW = Math.round(canvas.width * 0.18);
+          const pipH = Math.round(pipW * 0.5625); // 16:9
+          const pipX = canvas.width  - pipW - 24;
+          const pipY = canvas.height - pipH - 24;
+
+          // Rounded clip path for PIP
+          ctx.save();
+          const radius = 14;
+          ctx.beginPath();
+          ctx.moveTo(pipX + radius, pipY);
+          ctx.lineTo(pipX + pipW - radius, pipY);
+          ctx.quadraticCurveTo(pipX + pipW, pipY, pipX + pipW, pipY + radius);
+          ctx.lineTo(pipX + pipW, pipY + pipH - radius);
+          ctx.quadraticCurveTo(pipX + pipW, pipY + pipH, pipX + pipW - radius, pipY + pipH);
+          ctx.lineTo(pipX + radius, pipY + pipH);
+          ctx.quadraticCurveTo(pipX, pipY + pipH, pipX, pipY + pipH - radius);
+          ctx.lineTo(pipX, pipY + radius);
+          ctx.quadraticCurveTo(pipX, pipY, pipX + radius, pipY);
+          ctx.closePath();
+          ctx.clip();
+          ctx.drawImage(pipVid, pipX, pipY, pipW, pipH);
+          ctx.restore();
+        }
+
+        compositorRef.current = requestAnimationFrame(drawFrame);
+      };
+      compositorRef.current = requestAnimationFrame(drawFrame);
+
+      // Capture the composed canvas as a stream at 30fps
+      const canvasStream = canvas.captureStream(30);
+
+      // Attach audio from microphone
+      if (micOn) {
+        cameraStream?.getAudioTracks().forEach(t => canvasStream.addTrack(t));
+      }
 
       chunksRef.current = [];
       const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
         ? 'video/webm;codecs=vp9' : 'video/webm';
-      const mr = new MediaRecorder(combined, { mimeType });
+      const mr = new MediaRecorder(canvasStream, { mimeType });
       mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-      mr.onstop = () => onFinish(new Blob(chunksRef.current, { type: 'video/webm' }));
+      mr.onstop = () => {
+        if (compositorRef.current !== null) {
+          cancelAnimationFrame(compositorRef.current);
+          compositorRef.current = null;
+        }
+        onFinish(new Blob(chunksRef.current, { type: 'video/webm' }));
+      };
       mr.start(500);
       mediaRecorderRef.current = mr;
 
@@ -149,6 +212,9 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
 
   return (
     <div className="fixed inset-0 z-[100] bg-black text-white flex flex-col font-sans overflow-hidden clario-mesh-gradient">
+
+      {/* Hidden compositor canvas - not displayed, used only for MediaRecorder capture */}
+      <canvas ref={canvasRef} style={{ display: 'none' }} />
 
       {/* Top Bar */}
       <div className="flex items-center justify-between p-6 w-full z-20">
