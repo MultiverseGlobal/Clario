@@ -562,60 +562,60 @@ async def _process_reference_ingest(
             update_job(job_id, {"progress_pct": 25, "status_msg": f"{len(intervals)} shots found. Extracting keyframes…"})
     
             rows = []
-        for idx, (start_sec, end_sec) in enumerate(intervals):
-            shot_id = f"shot_{str(idx + 1).zfill(3)}"
-            frame_filename = f"{shot_id}.jpg"
-            frame_path = os.path.join(project_dir, frame_filename)
-            mid_sec = round((start_sec + end_sec) / 2.0, 2)
-
-            extract_frame_at_timestamp(video_path, mid_sec, frame_path)
-            intel = analyze_shot_frame(frame_path, shot_id, start_sec, end_sec)
-
-            # Build rich text for embedding: description + content type
-            embed_text = f"{intel['visual_description']} {intel.get('editor_text', '')} {intel.get('content_type', '')}"
-            embedding = _get_gemini_embedding(embed_text, gemini_api_key)
-
-            frame_url = f"/media/{project_id}/{frame_filename}"
-            row = {
-                "user_id": user_id,
-                "source_url": source_url,
-                "source_type": source_type,
-                "title": os.path.basename(video_path),
-                "shot_id": shot_id,
-                "start_sec": start_sec,
-                "end_sec": end_sec,
-                "duration": round(end_sec - start_sec, 2),
-                "frame_url": frame_url,
-                "description": intel["visual_description"],
-                "content_type": intel.get("content_type", ""),
-                "embedding": embedding,
-            }
-            rows.append(row)
-
-            progress = 25 + int(65 * (idx + 1) / len(intervals))
-            update_job(job_id, {"progress_pct": progress, "status_msg": f"Processed shot {idx + 1}/{len(intervals)}"})
-
-        # Upsert to Supabase (filter out rows without embeddings if key missing)
-        if supabase and rows:
-            # pgvector expects embedding as a list; Supabase Python client handles serialization
-            supabase.table("reference_library").insert(rows).execute()
-
-        update_job(job_id, {
-            "status": "completed",
-            "progress_pct": 100,
-            "status_msg": f"Ingested {len(rows)} shots into Reference Library.",
-            "result": {"shot_count": len(rows), "project_id": project_id},
-        })
-
-    except Exception as e:
-        update_job(job_id, {"status": "failed", "status_msg": f"Failed: {str(e)}", "result": {"error": str(e)}})
-    finally:
-        # Clean up downloaded video
-        try:
-            os.unlink(video_path)
-        except Exception:
-            pass
-
+            for idx, (start_sec, end_sec) in enumerate(intervals):
+                shot_id = f"shot_{str(idx + 1).zfill(3)}"
+                frame_filename = f"{shot_id}.jpg"
+                frame_path = os.path.join(project_dir, frame_filename)
+                mid_sec = round((start_sec + end_sec) / 2.0, 2)
+    
+                extract_frame_at_timestamp(video_path, mid_sec, frame_path)
+                intel = analyze_shot_frame(frame_path, shot_id, start_sec, end_sec)
+    
+                # Build rich text for embedding: description + content type
+                embed_text = f"{intel['visual_description']} {intel.get('editor_text', '')} {intel.get('content_type', '')}"
+                embedding = _get_gemini_embedding(embed_text, gemini_api_key)
+    
+                frame_url = f"/media/{project_id}/{frame_filename}"
+                row = {
+                    "user_id": user_id,
+                    "source_url": source_url,
+                    "source_type": source_type,
+                    "title": os.path.basename(video_path),
+                    "shot_id": shot_id,
+                    "start_sec": start_sec,
+                    "end_sec": end_sec,
+                    "duration": round(end_sec - start_sec, 2),
+                    "frame_url": frame_url,
+                    "description": intel["visual_description"],
+                    "content_type": intel.get("content_type", ""),
+                    "embedding": embedding,
+                }
+                rows.append(row)
+    
+                progress = 25 + int(65 * (idx + 1) / len(intervals))
+                update_job(job_id, {"progress_pct": progress, "status_msg": f"Processed shot {idx + 1}/{len(intervals)}"})
+    
+            # Upsert to Supabase (filter out rows without embeddings if key missing)
+            if supabase and rows:
+                # pgvector expects embedding as a list; Supabase Python client handles serialization
+                supabase.table("reference_library").insert(rows).execute()
+    
+            update_job(job_id, {
+                "status": "completed",
+                "progress_pct": 100,
+                "status_msg": f"Ingested {len(rows)} shots into Reference Library.",
+                "result": {"shot_count": len(rows), "project_id": project_id},
+            })
+    
+        except Exception as e:
+            update_job(job_id, {"status": "failed", "status_msg": f"Failed: {str(e)}", "result": {"error": str(e)}})
+        finally:
+            # Clean up downloaded video
+            try:
+                os.unlink(video_path)
+            except Exception:
+                pass
+    
 
 @app.post("/api/v1/reference/ingest-url")
 async def reference_ingest_url(
