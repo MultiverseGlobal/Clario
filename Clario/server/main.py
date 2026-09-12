@@ -108,111 +108,111 @@ async def process_video_harvest_job(job_id: str, project_id: str, video_path: st
             project_dir = os.path.join(MEDIA_ROOT, project_id)
             os.makedirs(project_dir, exist_ok=True)
 
-        # 1. Scene detection
-        intervals = detect_scenes_ffmpeg(video_path, threshold=0.3)
-        update_job(job_id, {
-            "progress_pct": 30,
-            "status_msg": f"Extracted {len(intervals)} shots. Slicing keyframes…"
-        })
-
-        shots: List[ShotRecord] = []
-        frame_paths: List[str] = []
-        labels: List[str] = []
-
-        # 2. Keyframe extraction & multimodal vision
-        for idx, (start_sec, end_sec) in enumerate(intervals):
-            shot_id = f"shot_{str(idx + 1).zfill(3)}"
-            mid_sec = round((start_sec + end_sec) / 2.0, 2)
-            frame_filename = f"{shot_id}.jpg"
-            frame_disk_path = os.path.join(project_dir, frame_filename)
-
-            extract_frame_at_timestamp(video_path, mid_sec, frame_disk_path)
-            frame_paths.append(frame_disk_path)
-            labels.append(f"{shot_id.upper()} · {start_sec}s-{end_sec}s")
-
-            # Vision intelligence
-            intel = analyze_shot_frame(frame_disk_path, shot_id, start_sec, end_sec)
-
-            frame_web_url = f"/media/{project_id}/{frame_filename}"
-
-            shot_record = ShotRecord(
-                project_id=project_id,
-                shot_id=shot_id,
-                start_seconds=start_sec,
-                end_seconds=end_sec,
-                duration=round(end_sec - start_sec, 2),
-                frame_url=frame_web_url,
-                visual_description=intel["visual_description"],
-                editor_text=intel["editor_text"],
-                source_text=intel["source_text"],
-                content_type=intel["content_type"],
-                source_type=intel["source_type"],
-                likely_source=intel["likely_source"],
-                confidence=intel["confidence"],
-                exact_source_found=intel["exact_source_found"],
-                clean_source_url=intel["clean_source_url"],
-                license_status=intel["license_status"],
-                replacement_needed=intel["replacement_needed"],
-                replacement_prompt=intel["replacement_prompt"],
-                search_queries=intel["search_queries"],
-                notes=intel["notes"],
-            )
-            shots.append(shot_record)
-
-            progress = 30 + int(70 * (idx + 1) / len(intervals))
+            # 1. Scene detection
+            intervals = detect_scenes_ffmpeg(video_path, threshold=0.3)
             update_job(job_id, {
-                "progress_pct": progress,
-                "status_msg": f"Analyzed shot {idx + 1}/{len(intervals)}…"
+                "progress_pct": 30,
+                "status_msg": f"Extracted {len(intervals)} shots. Slicing keyframes…"
             })
-
-        update_job(job_id, {"status_msg": "Generating composite contact sheet…"})
-        contact_sheet_filename = "contact_sheet.jpg"
-        contact_sheet_path = os.path.join(project_dir, contact_sheet_filename)
-        generate_contact_sheet_pillow(frame_paths, labels, contact_sheet_path)
-
-        # 4. Assemble Project Record
-        video_filename = os.path.basename(video_path)
-        video_media_url = f"/media/{project_id}/{video_filename}"
-        project = HarvestProject(
-            id=project_id,
-            name=f"Harvest {project_id[:8]}",
-            mode="video_harvester",
-            reference_url=video_media_url,
-            source_file_name=video_filename,
-            shots=shots,
-            slides=[],
-            provenance=[
-                ProvenanceRecord(
-                    asset_id=s.shot_id,
-                    asset_name=f"{s.shot_id} ({s.content_type})",
-                    provenance_type="exact_source" if s.exact_source_found else "generated_replacement",
-                    source_url=s.clean_source_url or reference_url,
-                    license_note=s.license_status,
-                    confidence=s.confidence,
-                    timestamp=int(asyncio.get_event_loop().time() * 1000),
-                    intended_use="Video Asset Intelligence",
+    
+            shots: List[ShotRecord] = []
+            frame_paths: List[str] = []
+            labels: List[str] = []
+    
+            # 2. Keyframe extraction & multimodal vision
+            for idx, (start_sec, end_sec) in enumerate(intervals):
+                shot_id = f"shot_{str(idx + 1).zfill(3)}"
+                mid_sec = round((start_sec + end_sec) / 2.0, 2)
+                frame_filename = f"{shot_id}.jpg"
+                frame_disk_path = os.path.join(project_dir, frame_filename)
+    
+                extract_frame_at_timestamp(video_path, mid_sec, frame_disk_path)
+                frame_paths.append(frame_disk_path)
+                labels.append(f"{shot_id.upper()} · {start_sec}s-{end_sec}s")
+    
+                # Vision intelligence
+                intel = analyze_shot_frame(frame_disk_path, shot_id, start_sec, end_sec)
+    
+                frame_web_url = f"/media/{project_id}/{frame_filename}"
+    
+                shot_record = ShotRecord(
+                    project_id=project_id,
+                    shot_id=shot_id,
+                    start_seconds=start_sec,
+                    end_seconds=end_sec,
+                    duration=round(end_sec - start_sec, 2),
+                    frame_url=frame_web_url,
+                    visual_description=intel["visual_description"],
+                    editor_text=intel["editor_text"],
+                    source_text=intel["source_text"],
+                    content_type=intel["content_type"],
+                    source_type=intel["source_type"],
+                    likely_source=intel["likely_source"],
+                    confidence=intel["confidence"],
+                    exact_source_found=intel["exact_source_found"],
+                    clean_source_url=intel["clean_source_url"],
+                    license_status=intel["license_status"],
+                    replacement_needed=intel["replacement_needed"],
+                    replacement_prompt=intel["replacement_prompt"],
+                    search_queries=intel["search_queries"],
+                    notes=intel["notes"],
                 )
-                for s in shots
-            ],
-            created_at=int(asyncio.get_event_loop().time() * 1000),
-            updated_at=int(asyncio.get_event_loop().time() * 1000),
-        )
-
-        PROJECTS_DB[project_id] = project
-        update_job(job_id, {
-            "status": "completed",
-            "progress_pct": 100,
-            "status_msg": "Harvest completed successfully.",
-            "result": project.model_dump()
-        })
-
-    except Exception as e:
-        update_job(job_id, {
-            "status": "failed",
-            "status_msg": f"Failed: {str(e)}",
-            "result": {"error": str(e)}
-        })
-
+                shots.append(shot_record)
+    
+                progress = 30 + int(70 * (idx + 1) / len(intervals))
+                update_job(job_id, {
+                    "progress_pct": progress,
+                    "status_msg": f"Analyzed shot {idx + 1}/{len(intervals)}…"
+                })
+    
+            update_job(job_id, {"status_msg": "Generating composite contact sheet…"})
+            contact_sheet_filename = "contact_sheet.jpg"
+            contact_sheet_path = os.path.join(project_dir, contact_sheet_filename)
+            generate_contact_sheet_pillow(frame_paths, labels, contact_sheet_path)
+    
+            # 4. Assemble Project Record
+            video_filename = os.path.basename(video_path)
+            video_media_url = f"/media/{project_id}/{video_filename}"
+            project = HarvestProject(
+                id=project_id,
+                name=f"Harvest {project_id[:8]}",
+                mode="video_harvester",
+                reference_url=video_media_url,
+                source_file_name=video_filename,
+                shots=shots,
+                slides=[],
+                provenance=[
+                    ProvenanceRecord(
+                        asset_id=s.shot_id,
+                        asset_name=f"{s.shot_id} ({s.content_type})",
+                        provenance_type="exact_source" if s.exact_source_found else "generated_replacement",
+                        source_url=s.clean_source_url or reference_url,
+                        license_note=s.license_status,
+                        confidence=s.confidence,
+                        timestamp=int(asyncio.get_event_loop().time() * 1000),
+                        intended_use="Video Asset Intelligence",
+                    )
+                    for s in shots
+                ],
+                created_at=int(asyncio.get_event_loop().time() * 1000),
+                updated_at=int(asyncio.get_event_loop().time() * 1000),
+            )
+    
+            PROJECTS_DB[project_id] = project
+            update_job(job_id, {
+                "status": "completed",
+                "progress_pct": 100,
+                "status_msg": "Harvest completed successfully.",
+                "result": project.model_dump()
+            })
+    
+        except Exception as e:
+            update_job(job_id, {
+                "status": "failed",
+                "status_msg": f"Failed: {str(e)}",
+                "result": {"error": str(e)}
+            })
+    
 # ── API Endpoints ────────────────────────────────────────────────────────────
 
 @app.get("/api/v1/health")
