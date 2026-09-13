@@ -98,9 +98,14 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
     setStatusText('Uploading to secure storage...');
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user?.id;
+      if (!uid) throw new Error('Not authenticated. Please log in first.');
+
       const fileExt = file.name.split('.').pop();
       const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
-      const filePath = `uploads/${fileName}`;
+      // RLS policy requires first path segment to be the user's UUID
+      const filePath = `${uid}/${fileName}`;
 
       // 1. Direct upload to Supabase
       const { error: uploadError } = await supabase.storage

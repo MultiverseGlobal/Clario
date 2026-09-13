@@ -214,8 +214,8 @@ Deno.serve(async (req: Request) => {
 
     const openRouterApiKey = Deno.env.get("OPENROUTER_API_KEY");
     const groqApiKey = dbSettings?.groq_api_key || Deno.env.get("GROQ_API_KEY");
-    const kimiApiKey = Deno.env.get("KIMI_API_KEY") || Deno.env.get("MOONSHOT_API_KEY");
-    const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
+    const kimiApiKey = dbSettings?.kimi_api_key || Deno.env.get("KIMI_API_KEY") || Deno.env.get("MOONSHOT_API_KEY");
+    const geminiApiKey = dbSettings?.gemini_api_key || Deno.env.get("GEMINI_API_KEY");
     const openaiApiKey = dbSettings?.openai_api_key || Deno.env.get("OPENAI_API_KEY");
     
     const providers = [
