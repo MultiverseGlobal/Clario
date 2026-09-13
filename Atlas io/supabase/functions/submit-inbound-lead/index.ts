@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { company, prospect, email, website, bottleneck } = await req.json();
+    const { organization_name: company, prospect, email, website, bottleneck } = await req.json();
 
     if (!company || !email) {
       throw new Error("Company and email are required");
@@ -31,16 +31,14 @@ serve(async (req) => {
     const userId = users[0].id;
 
     // Create the pipeline view / lead
-    const { data, error } = await supabaseAdmin.from("pipeline_crm").insert({
+    const { data, error } = await supabaseAdmin.from("atlas_opportunities").insert({
       user_id: userId,
-      company: company,
-      prospect: prospect,
-      email: email,
-      website: website,
+      organization_name: company,
+      primary_domain: website,
+      deal_deal_notes: `Submitted via Inbound Landing Page.\n\nStated Bottleneck: ${bottleneck}`,
+      pipeline_pipeline_stage: "discovered",
       acquisition_channel: "Inbound",
-      stage: "new",
-      notes: `Submitted via Inbound Landing Page.\n\nStated Bottleneck: ${bottleneck}`,
-      icp_score: 50, // default
+      fit_score: 50, // default
     }).select().single();
 
     if (error) {

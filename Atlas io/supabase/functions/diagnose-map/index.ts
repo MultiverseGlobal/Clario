@@ -162,7 +162,7 @@ function buildUserPrompt(
   }
 
   const notesSection = manualNotes?.trim()
-    ? `\nFounder notes:\n${manualNotes.trim()}`
+    ? `\nFounder deal_notes:\n${manualNotes.trim()}`
     : "";
 
   const feedbackSection = recentFeedbackNotes && recentFeedbackNotes.length > 0
@@ -705,7 +705,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // 7. Resolve manual notes: check request body first, otherwise fall back to latest in DB
+    // 7. Resolve manual deal_notes: check request body first, otherwise fall back to latest in DB
     const manualNoteSignal = signals?.find((s) => s.title === "__manual_note");
     const dbManualNote = manualNoteSignal?.payload?.note || "";
     const manualNotes = body.manual_notes ?? dbManualNote;

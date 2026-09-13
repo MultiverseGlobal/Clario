@@ -9,8 +9,8 @@ const corsHeaders = {
 interface DraftGeneratorRequest {
   lead: {
     prospect: string;
-    company: string;
-    website: string;
+    organization_name: string;
+    primary_domain: string;
     founder_thesis: string;
     source?: string;
     linkedin_url?: string | null;
@@ -215,16 +215,16 @@ Return ONLY a valid JSON object:
   "contact_channel": "string"
 }`;
 
-    const userPrompt = `Company: ${body.lead.company}
+    const userPrompt = `Company: ${body.lead.organization_name}
 Prospect: ${body.lead.prospect}
-Website: ${body.lead.website}
+Website: ${body.lead.primary_domain}
 Founder's Stated Problem (Thesis): ${body.lead.founder_thesis}
 Acquisition Channel: ${body.lead.acquisition_channel || "Outbound"}
 Known Email: ${body.lead.email || "not found"}
 LinkedIn: ${body.lead.linkedin_url || "not found"}
 Twitter/X: ${body.lead.twitter_url || "not found"}
 Source: ${body.lead.source || ""}
-Context & Notes: ${body.lead.notes || ""}
+Context & Notes: ${body.lead.deal_notes || ""}
 Additional Raw Content: ${body.raw_text || ""}`;
 
     let result: any = null;
@@ -268,8 +268,8 @@ Additional Raw Content: ${body.raw_text || ""}`;
         ? `twitter: ${body.lead.twitter_url}`
         : "Contact channel not found — needs manual research";
       result = {
-        subject: `Quick observation on ${body.lead.company}`,
-        draft_message: `Hi ${body.lead.prospect},\n\nI was looking at ${body.lead.company} and noticed something about the constraint you mentioned: "${body.lead.founder_thesis}". I put together a short 4-minute walkthrough of where I'd look first.\n\nWant me to send it over?`,
+        subject: `Quick observation on ${body.lead.organization_name}`,
+        draft_message: `Hi ${body.lead.prospect},\n\nI was looking at ${body.lead.organization_name} and noticed something about the constraint you mentioned: "${body.lead.founder_thesis}". I put together a short 4-minute walkthrough of where I'd look first.\n\nWant me to send it over?`,
         contact_channel: mockChannel
       };
     }

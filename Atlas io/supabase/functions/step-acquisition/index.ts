@@ -55,7 +55,7 @@ Deno.serve(async (req: Request) => {
     if (run.contacted_count >= run.target) {
       await supabase
         .from("acquisition_runs")
-        .update({ status: "completed", current_stage: "completed", completed_at: new Date().toISOString() })
+        .update({ status: "completed", current_pipeline_stage: "completed", completed_at: new Date().toISOString() })
         .eq("id", run_id);
       return new Response(JSON.stringify({ message: "Daily target reached. Run completed." }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -66,7 +66,7 @@ Deno.serve(async (req: Request) => {
     
     // Stage 1: Send Outreach (Requires Human Approval if enabled)
     const { data: draftedLeads } = await supabase
-      .from("kuro_pipeline_view")
+      .from("atlas_opportunities")
       .select("*")
       .eq("acquisition_run_id", run_id)
       .not("outreach_draft", "is", null)
@@ -81,7 +81,7 @@ Deno.serve(async (req: Request) => {
         // Pause for human approval
         await supabase
           .from("acquisition_runs")
-          .update({ status: "awaiting_approval", current_stage: "outreach", current_lead_id: lead.id })
+          .update({ status: "awaiting_approval", current_pipeline_stage: "outreach", current_lead_id: lead.id })
           .eq("id", run_id);
         
         return new Response(JSON.stringify({ message: "Paused for human approval", lead_id: lead.id }), {
@@ -90,13 +90,13 @@ Deno.serve(async (req: Request) => {
       } else {
         // Auto-send (Mock logic for now, mark as contacted)
         await supabase
-          .from("kuro_pipeline_view")
+          .from("atlas_opportunities")
           .update({ is_contacted: true })
           .eq("id", lead.id);
         
         await supabase
           .from("acquisition_runs")
-          .update({ contacted_count: run.contacted_count + 1, current_stage: "sending", current_lead_id: lead.id })
+          .update({ contacted_count: run.contacted_count + 1, current_pipeline_stage: "sending", current_lead_id: lead.id })
           .eq("id", run_id);
         
         return new Response(JSON.stringify({ message: "Sent outreach", lead_id: lead.id }), {
@@ -107,7 +107,7 @@ Deno.serve(async (req: Request) => {
 
     // Stage 2: Draft Outreach for Researched Leads
     const { data: researchedLeads } = await supabase
-      .from("kuro_pipeline_view")
+      .from("atlas_opportunities")
       .select("*")
       .eq("acquisition_run_id", run_id)
       .not("research_data", "is", null)
@@ -119,7 +119,7 @@ Deno.serve(async (req: Request) => {
       
       await supabase
         .from("acquisition_runs")
-        .update({ current_stage: "drafting", current_lead_id: lead.id })
+        .update({ current_pipeline_stage: "drafting", current_lead_id: lead.id })
         .eq("id", run_id);
         
       // Call sourcing-machine to generate outreach
@@ -129,8 +129,8 @@ Deno.serve(async (req: Request) => {
         headers: { "Authorization": `Bearer ${supabaseServiceKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "generate-outreach",
-          prospectName: lead.prospect || lead.company,
-          company: lead.company,
+          prospectName: lead.prospect || lead.organization_name,
+          organization_name: lead.organization_name,
           research: lead.research_data,
           acquisition_channel: lead.acquisition_channel || "Outbound",
           offer: "Automated Workflow Optimization", // Default fallback
@@ -152,7 +152,7 @@ Deno.serve(async (req: Request) => {
         if (draftData.email) draftEmail = draftData.email;
       } else {
         // Fallback draft so the pipeline NEVER gets stuck
-        const company = lead.company || "your team";
+        const company = lead.organization_name || "your team";
         const prospect = lead.prospect || "there";
         const greeting = prospect !== "there" && !prospect.includes("Founder") ? `Hey ${prospect.split(' ')[0]},` : "Hey team,";
         const fallbackObj = {
@@ -160,9 +160,9 @@ Deno.serve(async (req: Request) => {
           body: `${greeting}\n\nI was looking into ${company} and noticed how your team manages client onboarding and weekly operations.\n\nI recorded a short 3-minute video teardown showing 3 specific bottlenecks where automation could save ~10 hours a week.\n\nHappy to send it over if you'd find it useful?\n\nBest,\nBen`
         };
         draftContent = JSON.stringify(fallbackObj);
-        if (!draftEmail && lead.website) {
+        if (!draftEmail && lead.primary_domain) {
           try {
-            const domain = new URL(lead.website.startsWith('http') ? lead.website : `https://${lead.website}`).hostname.replace('www.', '');
+            const domain = new URL(lead.primary_domain.startsWith('http') ? lead.primary_domain : `https://${lead.primary_domain}`).hostname.replace('www.', '');
             draftEmail = `founder@${domain}`;
           } catch (_) {}
         }
@@ -172,7 +172,7 @@ Deno.serve(async (req: Request) => {
       if (draftEmail) updatePayload.email = draftEmail;
 
       await supabase
-        .from("kuro_pipeline_view")
+        .from("atlas_opportunities")
         .update(updatePayload)
         .eq("id", lead.id);
         
@@ -183,7 +183,7 @@ Deno.serve(async (req: Request) => {
 
     // Stage 3: Research Qualified Leads
     const { data: qualifiedLeads } = await supabase
-      .from("kuro_pipeline_view")
+      .from("atlas_opportunities")
       .select("*")
       .eq("acquisition_run_id", run_id)
       .gte("icp_score", 70) // Arbitrary qualified threshold
@@ -195,7 +195,7 @@ Deno.serve(async (req: Request) => {
       
       await supabase
         .from("acquisition_runs")
-        .update({ current_stage: "researching", current_lead_id: lead.id })
+        .update({ current_pipeline_stage: "researching", current_lead_id: lead.id })
         .eq("id", run_id);
         
       // Call sourcing-machine to analyze pain
@@ -205,8 +205,8 @@ Deno.serve(async (req: Request) => {
         headers: { "Authorization": `Bearer ${supabaseServiceKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "analyze-pain",
-          company: lead.company,
-          website: lead.website,
+          organization_name: lead.organization_name,
+          primary_domain: lead.primary_domain,
           user_id: run.user_id,
         })
       });
@@ -221,7 +221,7 @@ Deno.serve(async (req: Request) => {
       if (painError || !painData || (Array.isArray(painData) && painData.length === 0)) {
         painResult = [
           {
-            problem: `Manual client onboarding and reporting taking 10+ hours per week at ${lead.company}`,
+            problem: `Manual client onboarding and reporting taking 10+ hours per week at ${lead.organization_name}`,
             confidence: 85,
             reasoning: `Digital agencies frequently struggle with fragmented intake workflows and manual weekly reporting.`,
             opportunity: `Automated onboarding pipeline and reporting dashboard`,
@@ -232,7 +232,7 @@ Deno.serve(async (req: Request) => {
       }
 
       await supabase
-        .from("kuro_pipeline_view")
+        .from("atlas_opportunities")
         .update({ research_data: painResult })
         .eq("id", lead.id);
         
@@ -248,7 +248,7 @@ Deno.serve(async (req: Request) => {
 
     // Stage 3.5: Claim unassigned manual leads (from Sourcing page)
     const { data: unassignedLeads } = await supabase
-      .from("kuro_pipeline_view")
+      .from("atlas_opportunities")
       .select("id")
       .is("acquisition_run_id", null)
       .eq("user_id", run.user_id)
@@ -259,11 +259,11 @@ Deno.serve(async (req: Request) => {
       
       // Update them to belong to this run and boost scores to pass qualification
       await supabase
-        .from("kuro_pipeline_view")
+        .from("atlas_opportunities")
         .update({ 
           acquisition_run_id: run_id, 
-          stage: "discovered",
-          icp_score: 85, 
+          pipeline_stage: "discovered",
+          fit_score: 85, 
           opportunity_score: 80 
         })
         .in("id", leadIds);
@@ -273,7 +273,7 @@ Deno.serve(async (req: Request) => {
         .update({ 
           discovered_count: run.discovered_count + leadIds.length,
           qualified_count: run.qualified_count + leadIds.length,
-          current_stage: "sourcing"
+          current_pipeline_stage: "sourcing"
         })
         .eq("id", run_id);
         
@@ -286,7 +286,7 @@ Deno.serve(async (req: Request) => {
     // If we have no qualified leads to process, we need to discover more.
     await supabase
       .from("acquisition_runs")
-      .update({ current_stage: "sourcing", current_lead_id: null })
+      .update({ current_pipeline_stage: "sourcing", current_lead_id: null })
       .eq("id", run_id);
       
     const smUrl2 = supabaseUrl.replace(".co", ".co/functions/v1/sourcing-machine");
@@ -314,10 +314,10 @@ Deno.serve(async (req: Request) => {
       for (const extractedLead of discoverData) {
         // Deduplication check
         const { data: existing } = await supabase
-          .from("kuro_pipeline_view")
+          .from("atlas_opportunities")
           .select("id")
           .eq("user_id", run.user_id)
-          .eq("company", extractedLead.company) // kuro_pipeline_view uses company, not company_name
+          .eq("company", extractedLead.organization_name) // atlas_opportunities uses company, not company_name
           .maybeSingle();
 
         if (!existing) {
@@ -325,17 +325,17 @@ Deno.serve(async (req: Request) => {
           const icpScore = Math.floor(Math.random() * 40) + 60; // 60-100
           const oppScore = Math.floor(Math.random() * 50) + 50; // 50-100
           
-          await supabase.from("kuro_pipeline_view").insert({
+          await supabase.from("atlas_opportunities").insert({
             user_id: run.user_id,
             acquisition_run_id: run_id,
-            company: extractedLead.company,
-            website: extractedLead.website,
-            icp_score: icpScore,
+            organization_name: extractedLead.organization_name,
+            primary_domain: extractedLead.primary_domain,
+            fit_score: icpScore,
             opportunity_score: oppScore,
-            notes: extractedLead.description,
-            stage: "discovered",
+            deal_notes: extractedLead.description,
+            pipeline_stage: "discovered",
             source: "acquisition_runner",
-            prospect: extractedLead.company + " Founder"
+            prospect: extractedLead.organization_name + " Founder"
           });
           newCount++;
           if (icpScore >= 70 && oppScore >= 60) {
@@ -360,7 +360,7 @@ Deno.serve(async (req: Request) => {
     // If we reach here and no new leads were found, reset stage so it doesn't get stuck.
     await supabase
       .from("acquisition_runs")
-      .update({ current_stage: "sourcing" })
+      .update({ current_pipeline_stage: "sourcing" })
       .eq("id", run_id);
 
     return new Response(JSON.stringify({ message: "No action taken. Searching for more leads...", debug: { discoverError, discoverData } }), {

@@ -13,8 +13,6 @@ import AuthCallback from "./pages/AuthCallback";
 import MetaphorAuthCallback from "./pages/MetaphorAuthCallback";
 import HqShell from "./components/atlas/HqShell";
 import Landing from "./pages/Landing";
-import Index from "./pages/Index";
-import Privacy from "./pages/Privacy";
 import NotFound from "./pages/NotFound";
 
 const Onboarding = React.lazy(() => import("./pages/Onboarding"));
@@ -25,8 +23,13 @@ const HqProposal = React.lazy(() => import("./pages/hq/HqProposal"));
 const DailyBriefing = React.lazy(() => import("./pages/hq/DailyBriefing"));
 const CommandFeed = React.lazy(() => import("./pages/CommandFeed"));
 const HqSettings = React.lazy(() => import("./pages/hq/HqSettings"));
-const Objectives = React.lazy(() => import("./pages/Objectives"));
-const PublicProfile = React.lazy(() => import("./pages/PublicProfile"));
+
+const HqDashboard = React.lazy(() => import("./pages/hq/HqDashboard"));
+const HqDiscover = React.lazy(() => import("./pages/hq/HqDiscover"));
+const HqPartnerships = React.lazy(() => import("./pages/hq/HqPartnerships"));
+const HqTeam = React.lazy(() => import("./pages/hq/HqTeam"));
+const HqReport = React.lazy(() => import("./pages/hq/HqReport"));
+const HqMediaJobs = React.lazy(() => import("./pages/hq/HqMediaJobs"));
 
 const SovereignSyncWrapper = ({ children }: { children: React.ReactNode }) => {
   useSovereignSync();
@@ -68,6 +71,12 @@ const App = () => (
                   <Route path="/hq">
                     <Route index element={<Navigate to="/hq/engine" replace />} />
                     <Route path="engine" element={<HqRevenueEngine />} />
+                    <Route path="dashboard" element={<HqDashboard />} />
+                    <Route path="discover" element={<HqDiscover />} />
+                    <Route path="partnerships" element={<HqPartnerships />} />
+                    <Route path="team" element={<HqTeam />} />
+                    <Route path="report" element={<HqReport />} />
+                    <Route path="media-jobs" element={<HqMediaJobs />} />
                     <Route path="leads/:id" element={<HqLeadDetail />} />
                     <Route path="leads/:id/proposal" element={<HqProposal />} />
                     <Route path="settings" element={<HqSettings />} />
@@ -81,30 +90,11 @@ const App = () => (
                 <Route path="/auth/metaphor/callback" element={<MetaphorAuthCallback />} />
                 <Route path="/onboarding" element={<Onboarding />} />
 
-                {/* ── Legacy redirects ──────────────────────────────────────── */}
-                <Route path="/flow" element={<Navigate to="/hq/engine" replace />} />
-                <Route path="/hq/flow" element={<Navigate to="/hq/engine" replace />} />
-                <Route path="/hq/dashboard" element={<Navigate to="/hq/engine" replace />} />
-                <Route path="/hq/recon" element={<Navigate to="/hq/engine" replace />} />
-                <Route path="/hq/discover" element={<Navigate to="/hq/engine" replace />} />
-                <Route path="/hq/team" element={<Navigate to="/hq/settings" replace />} />
-                <Route path="/hq/prospects" element={<Navigate to="/hq/engine" replace />} />
-                <Route path="/hq/leads" element={<Navigate to="/hq/engine" replace />} />
-                <Route path="/hq/pipeline" element={<Navigate to="/hq/engine" replace />} />
-                <Route path="/hq/outreach" element={<Navigate to="/hq/engine" replace />} />
-                <Route path="/hq/icp" element={<Navigate to="/hq/engine" replace />} />
-                <Route path="/hq/report" element={<Navigate to="/hq/engine" replace />} />
-                <Route path="/hq/partnerships" element={<Navigate to="/hq/engine" replace />} />
-                <Route path="/hq/media-jobs" element={<Navigate to="/hq/engine" replace />} />
-                <Route path="/hq/proposal" element={<Navigate to="/hq/engine" replace />} />
-                <Route path="/start" element={<Navigate to="/hq/engine" replace />} />
-                <Route path="/map/starter" element={<Navigate to="/hq/engine" replace />} />
-                <Route path="/app" element={<Navigate to="/hq/engine" replace />} />
                 <Route path="/app/*" element={<Navigate to="/hq/engine" replace />} />
 
                 {/* ── Public ───────────────────────────────────────────────── */}
-                <Route path="/:handle" element={<PublicProfile />} />
                 <Route path="/privacy" element={<Privacy />} />
+                <Route path="/:handle" element={<PublicProfile />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

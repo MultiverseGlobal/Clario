@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Trail } from "@/components/atlas/Trail";
 import { supabase } from "@/integrations/supabase/client";
-import { CompassLoader } from "@/pages/app/Home";
+import { CompassLoader } from "@/components/ui/compass-loader";
 import { Compass } from "lucide-react";
 
 interface Waypoint {

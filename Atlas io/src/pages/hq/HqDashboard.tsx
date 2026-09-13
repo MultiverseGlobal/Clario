@@ -252,7 +252,7 @@ export default function HqDashboard() {
   return (
     <div className="min-h-screen bg-background text-foreground grain overflow-hidden">
       {/* Top bar */}
-      <div className="sticky top-0 z-20 border-b border-border-subtle bg-surface-1/40 backdrop-blur-2xl px-8 py-5 flex items-center justify-between pds-animate-enter" style={{ animationDelay: "50ms" }}>
+      <div className="sticky top-0 z-20 border-b border-border-subtle bg-surface-1/40 backdrop-blur-2xl px-4 sm:px-8 py-4 sm:py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-0 pds-animate-enter" style={{ animationDelay: "50ms" }}>
         <div>
           <h1 className="text-xl font-display text-foreground tracking-tight">14-Day Sprint · Mission Control</h1>
           <p className="text-xs text-muted-foreground font-mono mt-1">{today}</p>
@@ -275,7 +275,7 @@ export default function HqDashboard() {
         </div>
       </div>
 
-      <div className="p-8 space-y-8 max-w-7xl mx-auto pds-animate-enter" style={{ animationDelay: "100ms" }}>
+      <div className="p-4 sm:p-8 space-y-8 max-w-7xl mx-auto pds-animate-enter" style={{ animationDelay: "100ms" }}>
         {/* Acquisition Progress */}
         <div className="rounded-2xl border border-border-subtle pds-glass p-6 space-y-5 shadow-card hover:shadow-card-hover transition-all duration-300">
           <div className="flex items-center justify-between">

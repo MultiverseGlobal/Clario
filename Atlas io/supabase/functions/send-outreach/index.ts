@@ -133,10 +133,10 @@ serve(async (req) => {
     // ─── Mark lead as contacted in pipeline ─────────────────────────────────
     if (lead_id) {
       await supabase
-        .from("kuro_pipeline_view")
+        .from("atlas_opportunities")
         .update({
           is_contacted: true,
-          stage: "contacted",
+          pipeline_stage: "contacted",
           updated_at: sentAt,
         })
         .eq("id", lead_id)

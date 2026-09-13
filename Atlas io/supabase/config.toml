@@ -1,51 +1,129 @@
-project_id = "nfhlpihrqrbiaefmopnq"
+project_id = "sqthvliapkauoxieiwfb"
 
 [auth]
 enable_signup = true
-additional_redirect_urls = ["http://localhost:5173/onboarding", "http://localhost:5173/app/integrations", "https://atlas-scale.vercel.app/app/integrations", "https://atlas-scale.vercel.app/auth/callback"]
+additional_redirect_urls = ["http://localhost:5173/onboarding", "http://localhost:5173/app/integrations", "http://localhost:8080/auth/callback", "https://atlas-scale.vercel.app/app/integrations", "https://atlas-scale.vercel.app/auth/callback"]
 
 [auth.email]
 # enable_confirmations is managed via the Supabase Dashboard → Auth settings
+
 [functions.step-acquisition]
 enabled = true
-verify_jwt = false
+verify_jwt = true
 import_map = "./functions/step-acquisition/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
 entrypoint = "./functions/step-acquisition/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/step-acquisition/*.html" ]
 
 [functions.send-email]
 enabled = true
-verify_jwt = false
+verify_jwt = true
 import_map = "./functions/send-email/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
 entrypoint = "./functions/send-email/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/send-email/*.html" ]
 
-[functions.db-debug]
-enabled = true
-verify_jwt = false
-import_map = "./functions/db-debug/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
-entrypoint = "./functions/db-debug/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/db-debug/*.html" ]
-
+# submit-inbound-lead is public — called from the landing page without auth
 [functions.submit-inbound-lead]
 enabled = true
 verify_jwt = false
 import_map = "./functions/submit-inbound-lead/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
 entrypoint = "./functions/submit-inbound-lead/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/submit-inbound-lead/*.html" ]
+
+[functions.atlas-chat]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/atlas-chat/index.ts"
+
+[functions.daily-sync-cron]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/daily-sync-cron/index.ts"
+
+[functions.db-debug]
+enabled = true
+verify_jwt = true
+import_map = "./functions/db-debug/deno.json"
+entrypoint = "./functions/db-debug/index.ts"
+
+[functions.diagnose-map]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/diagnose-map/index.ts"
+
+[functions.draft-generator]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/draft-generator/index.ts"
+
+[functions.generate-outreach]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/generate-outreach/index.ts"
+
+[functions.generate-roadmap]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/generate-roadmap/index.ts"
+
+[functions.notion-sync]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/notion-sync/index.ts"
+
+[functions.oauth-callback]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/oauth-callback/index.ts"
+
+[functions.oauth-initiate]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/oauth-initiate/index.ts"
+
+[functions.queue-worker]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/queue-worker/index.ts"
+
+[functions.send-evening-reminders]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/send-evening-reminders/index.ts"
+
+[functions.send-outreach]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/send-outreach/index.ts"
+
+[functions.sourcing-machine]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/sourcing-machine/index.ts"
+
+[functions.sync-github]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/sync-github/index.ts"
+
+[functions.sync-google]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/sync-google/index.ts"
+
+[functions.sync-notion]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/sync-notion/index.ts"
+
+[functions.sync-slack]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/sync-slack/index.ts"
+
+[functions.sync-stripe]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/sync-stripe/index.ts"
+
+[functions.time-worth-check]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/time-worth-check/index.ts"
+

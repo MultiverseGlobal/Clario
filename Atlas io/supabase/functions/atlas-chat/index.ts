@@ -234,7 +234,7 @@ async function buildContext(supabase: any, userId: string): Promise<string> {
       .order("follow_up_due", { ascending: true })
       .limit(5),
     // Recent leads (for context)
-    supabase.from("kuro_pipeline_view")
+    supabase.from("atlas_opportunities")
       .select("company, stage, icp_score, is_contacted, created_at")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
@@ -265,8 +265,8 @@ async function buildContext(supabase: any, userId: string): Promise<string> {
   let fuCompanyMap: Record<string, string> = {};
   const fuCompanyIds = [...new Set(followUps.map((f: any) => f.company_id))];
   if (fuCompanyIds.length > 0) {
-    const { data: comps } = await supabase.from("kuro_pipeline_view").select("id, company").in("id", fuCompanyIds);
-    (comps ?? []).forEach((c: any) => { fuCompanyMap[c.id] = c.company; });
+    const { data: comps } = await supabase.from("atlas_opportunities").select("id, company").in("id", fuCompanyIds);
+    (comps ?? []).forEach((c: any) => { fuCompanyMap[c.id] = c.organization_name; });
   }
 
   const ctx: string[] = [];
@@ -298,7 +298,7 @@ async function buildContext(supabase: any, userId: string): Promise<string> {
     deals.forEach((d: any) => {
       const days = Math.floor((now.getTime() - new Date(d.updated_at).getTime()) / 86400000);
       const stall = days >= 5 ? ` [STALLED ${days}d]` : "";
-      ctx.push(`- ${d.company_name} | ${d.stage} | £${Number(d.value ?? 0).toLocaleString()} | ${d.probability ?? 0}% | Next: ${d.next_action ?? "none"}${stall}`);
+      ctx.push(`- ${d.company_name} | ${d.pipeline_stage} | £${Number(d.value ?? 0).toLocaleString()} | ${d.probability ?? 0}% | Next: ${d.next_action ?? "none"}${stall}`);
     });
   } else {
     ctx.push(`\nACTIVE PIPELINE: No active deals.`);
@@ -307,7 +307,7 @@ async function buildContext(supabase: any, userId: string): Promise<string> {
   if (recentLeads.length > 0) {
     ctx.push(`\nRECENT LEADS (last added)`);
     recentLeads.forEach((l: any) => {
-      ctx.push(`- ${l.company} | Stage: ${l.stage} | ICP: ${l.icp_score ?? 5}/10 | Contacted: ${l.is_contacted ? "Yes" : "No"}`);
+      ctx.push(`- ${l.organization_name} | Stage: ${l.pipeline_stage} | ICP: ${l.fit_score ?? 5}/10 | Contacted: ${l.is_contacted ? "Yes" : "No"}`);
     });
   }
 

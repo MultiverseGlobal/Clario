@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
-import { Video, CheckCircle2, Clock, AlertTriangle, FileVideo, RefreshCw, Loader2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Video, CheckCircle2, Clock, AlertTriangle, FileVideo, RefreshCw, Loader2, UploadCloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export default function HqMediaJobs() {
   const [loading, setLoading] = useState(false);
@@ -21,6 +22,44 @@ export default function HqMediaJobs() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("mode", "video_harvester");
+
+    try {
+      // Hardcoded local URL for Clario backend right now
+      const CLARIO_URL = import.meta.env.VITE_CLARIO_URL || "http://localhost:8000";
+      
+      const res = await fetch(`${CLARIO_URL}/api/v1/harvest/ingest-file`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        throw new Error(`Upload failed: ${res.statusText}`);
+      }
+
+      toast.success("Video successfully uploaded and queued for processing in Clario!");
+      fetchJobs();
+    } catch (err: any) {
+      console.error("Upload error:", err);
+      toast.error(`Failed to upload video: ${err.message}`);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
   };
 
@@ -62,9 +101,30 @@ export default function HqMediaJobs() {
           </h1>
           <p className="text-sm text-muted-foreground mt-1">Track and review media transcriptions and insights processed by Clario.</p>
         </div>
-        <Button onClick={fetchJobs} variant="outline" className="h-9 gap-1.5" disabled={loading}>
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
-        </Button>
+        <div className="flex gap-2">
+          <input 
+            type="file" 
+            accept="video/*" 
+            className="hidden" 
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+          />
+          <Button 
+            onClick={() => fileInputRef.current?.click()} 
+            className="h-9 gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white" 
+            disabled={uploading}
+          >
+            {uploading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <UploadCloud className="h-3.5 w-3.5" />
+            )}
+            {uploading ? "Uploading..." : "Upload Video to Clario"}
+          </Button>
+          <Button onClick={fetchJobs} variant="outline" className="h-9 gap-1.5" disabled={loading}>
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6">

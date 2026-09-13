@@ -152,7 +152,7 @@ export default function HqLeadDetail() {
     if (user) {
       try {
         const [leadRes, interactionsRes, contactsRes, dealRes, eventsRes, referralsRes] = await Promise.all([
-          supabase.from("kuro_pipeline_view" as any).select("*").eq("id", id).eq("user_id", user.id).maybeSingle(),
+          supabase.from("atlas_opportunities").select("id, company:organization_name, website:primary_domain, stage:pipeline_stage, icp_score:fit_score, notes:deal_notes, created_at, user_id, research_data, founder_thesis, acquisition_channel").eq("id", id).eq("user_id", user.id).maybeSingle(),
           supabase.from("atlas_interactions" as any).select("*").eq("company_id", id).eq("user_id", user.id).order("occurred_at", { ascending: false }).limit(50),
           supabase.from("atlas_contacts" as any).select("*").eq("company_id", id).eq("user_id", user.id),
           supabase.from("atlas_deals" as any).select("*").eq("company_id", id).eq("user_id", user.id).not("stage", "in", "(won,lost)").order("created_at", { ascending: false }).limit(1).maybeSingle(),
@@ -190,9 +190,9 @@ export default function HqLeadDetail() {
       if (error) throw new Error(error.message);
       if (!data) throw new Error("No data returned");
 
-      await supabase.from("kuro_pipeline_view").update({
+      await supabase.from("atlas_opportunities").update({
         research_data: data,
-        stage: lead.stage === "new" ? "researched" : lead.stage,
+        pipeline_stage: lead.stage === "new" ? "researched" : lead.stage,
       }).eq("id", id);
 
       // Log event
@@ -249,7 +249,7 @@ export default function HqLeadDetail() {
     if (!noteText.trim() || !user || !id) return;
     setSavingNote(true);
     try {
-      await supabase.from("kuro_pipeline_view").update({ notes: noteText }).eq("id", id);
+      await supabase.from("atlas_opportunities").update({ deal_notes: noteText }).eq("id", id);
       await (supabase as any).from("atlas_events").insert({
         user_id: user.id,
         company_id: id,
@@ -279,15 +279,14 @@ export default function HqLeadDetail() {
       });
       
       // Also automatically add this new company to the pipeline as a new lead
-      await supabase.from("kuro_pipeline_view").insert({
+      await supabase.from("atlas_opportunities").insert({
         user_id: user.id,
-        company: newReferral.company,
-        prospect: newReferral.contact || newReferral.company,
-        email: newReferral.email,
+        organization_name: newReferral.company,
+        primary_domain: newReferral.email,
         acquisition_channel: "Referral",
-        stage: "new",
-        notes: `Referred by ${lead?.company}`,
-        icp_score: lead?.icp_score || 50,
+        pipeline_stage: "discovered",
+        deal_notes: `Referred by ${lead?.company}`,
+        fit_score: lead?.icp_score || 50,
       });
 
       toast.success("Referral recorded and added to pipeline");
@@ -312,7 +311,7 @@ export default function HqLeadDetail() {
   const handleUpdateChannel = async (val: string) => {
     if (!lead || !id) return;
     try {
-      await supabase.from("kuro_pipeline_view").update({ acquisition_channel: val }).eq("id", id);
+      await supabase.from("atlas_opportunities").update({ acquisition_channel: val }).eq("id", id);
       setLead({ ...lead, acquisition_channel: val });
       toast.success("Channel updated");
     } catch (err: any) {

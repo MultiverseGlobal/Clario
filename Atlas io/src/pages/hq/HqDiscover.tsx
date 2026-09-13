@@ -141,7 +141,7 @@ export default function HqDiscover() {
         user_id: user.id,
         company_name: lead.company,
         company_url: lead.website || "https://unknown.com",
-        fit_score: 85, // Mocked high score initially
+        fit_score: lead.score || null,
         pain_signals: [{ source: lead.source, content: lead.description }],
         buying_signals: []
       }).select("id").single();
@@ -179,6 +179,7 @@ export default function HqDiscover() {
             }
           }).then(() => toast.success(`Pushed ${lead.company} to Notion!`))
             .catch((e) => console.warn("Notion auto-export error:", e));
+          }
         }
       }
     } catch (err: any) {

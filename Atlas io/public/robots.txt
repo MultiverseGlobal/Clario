@@ -1,8 +1,19 @@
+# Atlas — robots.txt
 User-agent: Googlebot
 Allow: /
+Disallow: /auth
+Disallow: /onboarding
+Disallow: /hq/
+Disallow: /briefing
+Disallow: /objectives
+Disallow: /workspace
+Disallow: /command
 
 User-agent: Bingbot
 Allow: /
+Disallow: /auth
+Disallow: /onboarding
+Disallow: /hq/
 
 User-agent: Twitterbot
 Allow: /
@@ -12,3 +23,10 @@ Allow: /
 
 User-agent: *
 Allow: /
+Disallow: /auth
+Disallow: /onboarding
+Disallow: /hq/
+Disallow: /briefing
+Disallow: /objectives
+Disallow: /workspace
+Disallow: /command

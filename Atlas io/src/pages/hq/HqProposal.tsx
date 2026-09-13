@@ -81,8 +81,8 @@ export default function HqProposal() {
   useEffect(() => {
     let leadsList: any[] = [];
     if (user) {
-      supabase.from("kuro_pipeline_view" as any)
-        .select("id, company, website, research_data, notes")
+      supabase.from("atlas_opportunities" as any)
+        .select("id, company:organization_name, website:primary_domain, research_data, notes:deal_notes")
         .eq("user_id", user.id)
         .order("company")
         .then(({ data, error }) => {
@@ -196,8 +196,8 @@ export default function HqProposal() {
         .eq("user_id", user.id)
         .not("stage", "in", "(won,lost)");
       // Update lead stage
-      await supabase.from("kuro_pipeline_view")
-        .update({ stage: "proposal_sent" })
+      await supabase.from("atlas_opportunities")
+        .update({ pipeline_stage: "engaged" })
         .eq("id", selectedLeadId);
       toast.success("Proposal saved — deal stage → Proposal Sent");
     } catch (err: any) {

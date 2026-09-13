@@ -19,48 +19,6 @@ export interface PartnerProfile {
   proximityScore: number;
 }
 
-const SAMPLE_PARTNERS: PartnerProfile[] = [
-  {
-    id: "part_01",
-    companyName: "Vanguard Web Studio",
-    founderName: "Marcus Vance",
-    website: "https://vanguardstudio.example",
-    serviceCategory: "Web Agency",
-    targetIcp: "5–30 person marketing agencies & e-commerce brands",
-    whyComplementary: "Builds premium Webflow/Shopify sites, but loses clients when they need backend CRM/Ops automation.",
-    referralModel: "Implementation Layer",
-    stage: "Identified",
-    recommendedApproach: "Position as their dedicated backend automation implementation layer so they can sell $10k+ retainers without hiring ops engineers.",
-    proximityScore: 9.2
-  },
-  {
-    id: "part_02",
-    companyName: "Apex RevOps Collective",
-    founderName: "Elena Rostova",
-    website: "https://apexrevops.example",
-    serviceCategory: "RevOps / CRM",
-    targetIcp: "B2B SaaS and 10–50 person boutique agencies",
-    whyComplementary: "Designs HubSpot architecture and GTM strategy, but lacks bandwidth for custom n8n/webhook data pipelines.",
-    referralModel: "Strategic Alliance",
-    stage: "In Conversation",
-    recommendedApproach: "Offer a seamless 2-way referral handshake: they handle HubSpot strategy, Atlas handles deep workflow execution.",
-    proximityScore: 8.8
-  },
-  {
-    id: "part_03",
-    companyName: "Scale COO Advisory",
-    founderName: "David Sterling",
-    website: "https://scalecoo.example",
-    serviceCategory: "Fractional COO",
-    targetIcp: "Founder-led agencies doing $1M–$5M ARR",
-    whyComplementary: "Audits operational chaos and identifies bottlenecks, looking for trusted execution partners to implement fixes.",
-    referralModel: "White-Label Partner",
-    stage: "Contacted",
-    recommendedApproach: "Deliver the 3-minute diagnostic teardown template for his client audits to prove execution speed.",
-    proximityScore: 9.5
-  }
-];
-
 interface PartnerEngineModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -71,7 +29,7 @@ export function PartnerEngineModal({ isOpen, onClose, onSelectPartner }: Partner
   const [query, setQuery] = useState("Agencies & consultants serving 5–30 person marketing agencies without automation execution");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [loading, setLoading] = useState(false);
-  const [partners, setPartners] = useState<PartnerProfile[]>(SAMPLE_PARTNERS);
+  const [partners, setPartners] = useState<PartnerProfile[]>([]);
 
   if (!isOpen) return null;
 

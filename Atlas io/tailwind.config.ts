@@ -26,6 +26,7 @@ const config: Config = {
         muted: "var(--pds-text-muted)",
         accent: {
           DEFAULT: "var(--pds-accent)",
+          foreground: "var(--pds-accent-inv)",
           dim: "var(--pds-accent-dim)",
           glow: "var(--pds-accent-glow)",
         },

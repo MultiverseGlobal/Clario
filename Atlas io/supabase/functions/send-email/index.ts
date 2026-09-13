@@ -26,7 +26,7 @@ serve(async (req) => {
 
     // 1. Fetch the lead and the drafted message
     const { data: lead, error: leadError } = await supabaseClient
-      .from('kuro_pipeline_view')
+      .from('atlas_opportunities')
       .select('*')
       .eq('id', lead_id)
       .single()
@@ -36,7 +36,7 @@ serve(async (req) => {
     }
 
     // Parse draft
-    let emailSubject = `Quick question regarding ${lead.company}`
+    let emailSubject = `Quick question regarding ${lead.organization_name}`
     let emailBody = lead.outreach_draft || lead.draft_message || "Hello"
 
     // If it's a JSON string from AI (containing subject/body), try to parse it
@@ -69,15 +69,15 @@ serve(async (req) => {
     // 3. Construct recipient
     // Extract domain from website, fallback to company name
     let domain = "example.com"
-    if (lead.website) {
+    if (lead.primary_domain) {
       try {
-        const url = new URL(lead.website.startsWith('http') ? lead.website : `https://${lead.website}`)
+        const url = new URL(lead.primary_domain.startsWith('http') ? lead.primary_domain : `https://${lead.primary_domain}`)
         domain = url.hostname.replace('www.', '')
       } catch (e) {
-        domain = lead.website.replace('www.', '')
+        domain = lead.primary_domain.replace('www.', '')
       }
     } else {
-      domain = `${lead.company.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`
+      domain = `${lead.organization_name.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`
     }
     
     // We send to the founder's domain, but we BCC the user's email so they can verify it sent!
@@ -97,8 +97,8 @@ serve(async (req) => {
 
     // 5. Update the lead in DB as contacted
     await supabaseClient
-      .from('kuro_pipeline_view')
-      .update({ is_contacted: true, stage: 'contacted' })
+      .from('atlas_opportunities')
+      .update({ is_contacted: true, pipeline_stage: 'contacted' })
       .eq('id', lead_id)
 
     return new Response(

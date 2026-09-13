@@ -12,16 +12,16 @@ interface NotionSyncRequest {
   lead?: {
     id?: string;
     prospect: string;
-    company: string;
-    website: string;
+    organization_name: string;
+    primary_domain: string;
     founder_thesis: string;
     goal?: string | null;
-    icp_score: number;
+    fit_score: number;
     next_action?: string | null;
     notes?: string | null;
     priority?: string | null;
     source: string;
-    stage: string;
+    pipeline_stage: string;
     draft_message?: string | null;
     contact_channel?: string | null;
     stale_data_warning?: boolean;
@@ -236,7 +236,7 @@ Deno.serve(async (req: Request) => {
       if (!pageId && leadId) {
         // Look up in Supabase
         const { data: localLead } = await dbClient
-          .from("pipeline_crm")
+          .from("atlas_opportunities")
           .select("notion_page_id")
           .eq("id", leadId)
           .maybeSingle();
@@ -247,10 +247,10 @@ Deno.serve(async (req: Request) => {
         if (leadId) {
           // Prospect has not been pushed to Notion (table only lead). Graduate locally in database.
           await dbClient
-            .from("pipeline_crm")
+            .from("atlas_opportunities")
             .update({
               is_hq_dump: false,
-              stage: "Sourced"
+              pipeline_stage: "Sourced"
             })
             .eq("id", leadId);
 
@@ -317,20 +317,20 @@ Deno.serve(async (req: Request) => {
       // Update Supabase CRM table: graduate to Pipeline
       if (leadId) {
         await dbClient
-          .from("pipeline_crm")
+          .from("atlas_opportunities")
           .update({
             is_hq_dump: false,
-            stage: "Sourced",
+            pipeline_stage: "Sourced",
             notion_sync_status: "synced"
           })
           .eq("id", leadId);
       } else {
         // fallback match by notion page id
         await dbClient
-          .from("pipeline_crm")
+          .from("atlas_opportunities")
           .update({
             is_hq_dump: false,
-            stage: "Sourced",
+            pipeline_stage: "Sourced",
             notion_sync_status: "synced"
           })
           .eq("notion_page_id", pageId);
@@ -353,7 +353,7 @@ Deno.serve(async (req: Request) => {
 
       if (lead.id) {
         await dbClient
-          .from("pipeline_crm")
+          .from("atlas_opportunities")
           .update({ notion_sync_status: "syncing", notion_sync_error: null })
           .eq("id", lead.id);
       }
@@ -384,13 +384,13 @@ Deno.serve(async (req: Request) => {
       };
 
       setField("prospect", lead.prospect);
-      setField("company", lead.company);
-      setField("website", lead.website);
+      setField("company", lead.organization_name);
+      setField("website", lead.primary_domain);
       setField("founder_thesis", lead.founder_thesis);
       setField("goal", lead.goal);
-      setField("icp_score", lead.icp_score);
+      setField("icp_score", lead.fit_score);
       setField("next_action", lead.next_action);
-      setField("notes", lead.notes);
+      setField("notes", lead.deal_notes);
       setField("priority", lead.priority);
       setField("source", lead.source);
       setField("draft_message", lead.draft_message);
@@ -425,7 +425,7 @@ Deno.serve(async (req: Request) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          filter: { property: companyFieldInNotion, [filterType]: { equals: lead.company } },
+          filter: { property: companyFieldInNotion, [filterType]: { equals: lead.organization_name } },
           page_size: 1
         })
       });
@@ -440,12 +440,12 @@ Deno.serve(async (req: Request) => {
       if (existingPageId) {
         if (!body.duplicate_behavior) {
           if (lead.id) {
-            await dbClient.from("pipeline_crm").update({ notion_sync_status: "not_synced" }).eq("id", lead.id);
+            await dbClient.from("atlas_opportunities").update({ notion_sync_status: "not_synced" }).eq("id", lead.id);
           }
           return new Response(JSON.stringify({ 
             duplicate_detected: true, 
             existing_page_id: existingPageId, 
-            company_name: lead.company 
+            company_name: lead.organization_name 
           }), {
             status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
@@ -454,7 +454,7 @@ Deno.serve(async (req: Request) => {
         if (body.duplicate_behavior === "skip") {
           if (lead.id) {
             await dbClient
-              .from("pipeline_crm")
+              .from("atlas_opportunities")
               .update({
                 notion_sync_status: "synced",
                 notion_page_id: existingPageId,
@@ -485,7 +485,7 @@ Deno.serve(async (req: Request) => {
 
           if (lead.id) {
             await dbClient
-              .from("pipeline_crm")
+              .from("atlas_opportunities")
               .update({
                 notion_sync_status: "synced",
                 notion_page_id: existingPageId,
@@ -526,7 +526,7 @@ Deno.serve(async (req: Request) => {
         }
       ];
 
-      const notesBlocks = parseNotesToNotionBlocks(lead.notes || "");
+      const notesBlocks = parseNotesToNotionBlocks(lead.deal_notes || "");
       const notionBlocks = [...introBlocks, ...notesBlocks];
 
       const createRes = await fetch("https://api.notion.com/v1/pages", {
@@ -553,7 +553,7 @@ Deno.serve(async (req: Request) => {
       // Update Supabase DB with sync logs + staging status
       if (lead.id) {
         await dbClient
-          .from("pipeline_crm")
+          .from("atlas_opportunities")
           .update({
             notion_sync_status: "synced",
             notion_page_id: newPageId,

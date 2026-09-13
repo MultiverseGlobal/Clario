@@ -12,7 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTheme } from "@/hooks/useTheme";
 import { AtlasChat } from "@/components/atlas/ChatDrawer";
 import { TheVaultDrawer } from "@/components/atlas/TheVaultDrawer";
-import { CompassLoader } from "@/pages/app/Home";
+import { CompassLoader } from "@/components/ui/compass-loader";
 import {
   DropdownMenu,
   DropdownMenuContent,

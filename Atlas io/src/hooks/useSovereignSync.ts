@@ -20,7 +20,7 @@ export function useSovereignSync() {
     };
 
     fetchContext();
-    const interval = setInterval(fetchContext, 3000);
+    const interval = setInterval(fetchContext, 60000); // Changed from 3s to 60s to prevent spamming
     return () => clearInterval(interval);
   }, []);
 
