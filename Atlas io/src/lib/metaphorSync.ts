@@ -4,7 +4,7 @@
  * Uses Metaphor's MCP sync_chat_drop tool via the REST API.
  */
 
-const METAPHOR_API = import.meta.env.VITE_METAPHOR_API_URL || "http://localhost:8000/api/v1";
+const METAPHOR_API = import.meta.env.VITE_METAPHOR_API_URL || "https://metaphor-backend.onrender.com/api/v1";
 import { supabase } from "./../integrations/supabase/client";
 
 async function getToken(): Promise<string | null> {

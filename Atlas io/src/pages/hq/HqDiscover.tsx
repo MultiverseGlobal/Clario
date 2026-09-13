@@ -195,7 +195,7 @@ export default function HqDiscover() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="text-foreground">
       {/* Header */}
       <div className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur-sm px-6 py-4">
         <div className="flex items-center justify-between">

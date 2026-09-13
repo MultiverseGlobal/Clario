@@ -52,6 +52,7 @@ export default function HqRevenueEngine() {
   const [activeOpportunityId, setActiveOpportunityId] = useState<string | null>(null);
   const [activeContact, setActiveContact] = useState<Contact | null>(null);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Generator state
   const [generating, setGenerating] = useState(false);
@@ -86,16 +87,17 @@ export default function HqRevenueEngine() {
       if (error) throw error;
       if (data) {
         setOpportunities(data);
-        if (!activeOpportunityId && data.length > 0) {
-          setActiveOpportunityId(data[0].id);
-        }
+        setActiveOpportunityId(prev => {
+          if (!prev && data.length > 0) return data[0].id;
+          return prev;
+        });
       }
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, [user, activeOpportunityId]);
+  }, [user]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -150,8 +152,29 @@ export default function HqRevenueEngine() {
       )
       .subscribe();
     realtimeRef.current = channel;
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      if (realtimeRef.current) supabase.removeChannel(realtimeRef.current);
+    };
   }, [user, loadWaitingDrafts]);
+
+  const handleUpdateStage = async () => {
+    const activeOpp = opportunities.find((o) => o.id === activeOpportunityId);
+    if (!activeOpp) return;
+    
+    const stages = ["discovered", "contacted", "qualified"];
+    const currentIndex = stages.indexOf(activeOpp.pipeline_stage);
+    const nextStage = stages[(currentIndex + 1) % stages.length];
+    
+    setOpportunities(prev => prev.map(o => o.id === activeOpp.id ? { ...o, pipeline_stage: nextStage } : o));
+    
+    try {
+      const { error } = await supabase.from("atlas_opportunities").update({ pipeline_stage: nextStage }).eq("id", activeOpp.id);
+      if (error) throw error;
+      toast.success(`Stage updated to ${nextStage}`);
+    } catch (e: any) {
+      toast.error(`Failed to update stage: ${e.message}`);
+    }
+  };
 
   const activeOpp = opportunities.find((o) => o.id === activeOpportunityId);
 
@@ -362,7 +385,7 @@ export default function HqRevenueEngine() {
 
   if (loading) {
     return (
-      <div className="flex h-screen pt-[72px] bg-background items-center justify-center">
+      <div className="flex items-center justify-center">
         <div className="flex flex-col items-center gap-6">
           <motion.div
             animate={{ scale: [1, 1.05, 1], opacity: [0.3, 1, 0.3] }}
@@ -380,7 +403,7 @@ export default function HqRevenueEngine() {
   }
 
   return (
-    <div className="flex flex-col md:flex-row h-screen pt-[72px] bg-background grain text-foreground font-sans overflow-hidden">
+    <div className="flex flex-col md:flex-row text-foreground font-sans overflow-hidden">
 
       {/* ── Top/Left Sidebar: Pipeline ──────────────────────────────────────── */}
       <div className="w-full md:w-[340px] h-[35vh] md:h-auto border-b md:border-b-0 md:border-r border-border/60 bg-card/20 backdrop-blur-xl flex flex-col shrink-0">
@@ -390,12 +413,21 @@ export default function HqRevenueEngine() {
             <p className="text-[11px] font-mono text-muted-foreground mt-0.5">{opportunities.length} active opportunities</p>
           </div>
           <Button
-            onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "n", metaKey: true }))}
+            onClick={() => window.location.href = "/command"}
             size="sm"
             className="h-8 px-3 rounded-lg bg-foreground text-background text-xs font-medium flex items-center gap-1.5"
           >
             <Plus className="w-3.5 h-3.5" /> Add Lead
           </Button>
+        </div>
+
+        <div className="p-4 border-b border-border/60 bg-card/20">
+          <Input 
+            placeholder="Search leads..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-8 text-xs bg-background/50 border-border/40 focus-visible:ring-1 focus-visible:ring-foreground/20"
+          />
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -413,7 +445,12 @@ export default function HqRevenueEngine() {
               </Button>
             </div>
           )}
-          {opportunities.map((opp) => {
+          {opportunities
+            .filter(opp => 
+              opp.organization_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+              (opp.industry || "").toLowerCase().includes(searchQuery.toLowerCase())
+            )
+            .map((opp) => {
             const isSelected = opp.id === activeOpportunityId;
             return (
               <button
@@ -465,7 +502,7 @@ export default function HqRevenueEngine() {
                     </a>
                   )}
                 </div>
-                <Button variant="outline" size="sm" className="h-8 text-xs font-semibold">
+                <Button variant="outline" size="sm" onClick={handleUpdateStage} className="h-8 text-xs font-semibold">
                   Update Stage
                 </Button>
               </div>

@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
-const isProd = window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1";
-const METAPHOR_API = isProd ? "https://metaphor-backend.onrender.com/api/v1/mcp" : "http://localhost:8000/api/v1/mcp";
+const METAPHOR_API = import.meta.env.VITE_METAPHOR_API_URL ? `${import.meta.env.VITE_METAPHOR_API_URL}/mcp` : "https://metaphor-backend.onrender.com/api/v1/mcp";
 const ATLAS_CLIENT_ID = "atlas";
 // Fix 4: redirect_uri uses the correct host dynamically
 const ATLAS_REDIRECT_URI = `${window.location.origin}/auth/metaphor/callback`;

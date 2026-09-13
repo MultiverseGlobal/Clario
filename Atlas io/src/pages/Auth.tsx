@@ -108,7 +108,7 @@ export default function Auth() {
         <Link to="/" className="text-sm font-mono text-xs uppercase tracking-widest text-muted-foreground/60 hover:text-foreground">← Back</Link>
       </header>
 
-      <main className="relative z-10 flex-1 flex items-center justify-center px-6 py-12">
+      <main className="relative z-10 flex-1 w-full flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm rounded-[24px] border border-border/60 bg-card p-8 shadow-sm">
           <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">
             System Unlock.

@@ -4,7 +4,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import {
   Sun, Moon, Plus, Command,
-  Radar, Crosshair, Gauge, SlidersHorizontal, Zap, User
+  Coffee, Target, Gauge, Settings, BarChart, Users,
+  Compass, Handshake, Film, User
 } from "lucide-react";
 import { AtlasIcon } from "@/components/atlas/EcosystemIcons";
 import {
@@ -17,16 +18,16 @@ import {
 
 // ── Route metadata ────────────────────────────────────────────────────────────
 const ROUTES: Record<string, { label: string; icon: React.ElementType }> = {
-  "/":            { label: "Command",         icon: Zap },
-  "/briefing":    { label: "Briefing",        icon: Radar },
-  "/objectives":  { label: "Hunt",            icon: Crosshair },
+  "/":            { label: "Command",         icon: Command },
+  "/briefing":    { label: "Briefing",        icon: Coffee },
+  "/objectives":  { label: "Hunt",            icon: Target },
   "/hq/engine":   { label: "Engine",          icon: Gauge },
-  "/hq/discover": { label: "Discover",        icon: Crosshair },
-  "/hq/partnerships":{label: "Partners",      icon: Zap },
-  "/hq/team":     { label: "Team",            icon: User },
-  "/hq/report":   { label: "Report",          icon: SlidersHorizontal },
-  "/hq/media-jobs": { label: "Media",         icon: Radar },
-  "/hq/settings": { label: "Settings",        icon: SlidersHorizontal },
+  "/hq/discover": { label: "Discover",        icon: Compass },
+  "/hq/partnerships":{label: "Partners",      icon: Handshake },
+  "/hq/team":     { label: "Team",            icon: Users },
+  "/hq/report":   { label: "Report",          icon: BarChart },
+  "/hq/media-jobs": { label: "Media",         icon: Film },
+  "/hq/settings": { label: "Settings",        icon: Settings },
 };
 
 interface FloatingNavProps {

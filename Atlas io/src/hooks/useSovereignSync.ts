@@ -6,7 +6,7 @@ export function useSovereignSync() {
   useEffect(() => {
     const fetchContext = async () => {
       try {
-        const url = import.meta.env.VITE_METAPHOR_API_URL || "http://localhost:8000";
+        const url = import.meta.env.VITE_METAPHOR_API_URL || "https://metaphor-backend.onrender.com";
         const res = await fetch(`${url}/api/v1/system/active-context`);
         if (res.ok) {
           const data = await res.json();

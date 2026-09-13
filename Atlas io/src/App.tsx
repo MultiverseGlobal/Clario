@@ -39,15 +39,7 @@ const SovereignSyncWrapper = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// Sleek suspense fallback for lazy loaded routes
-const PageLoader = () => (
-  <div className="flex h-[50vh] w-full items-center justify-center">
-    <div className="flex flex-col items-center gap-4">
-      <div className="h-4 w-4 animate-spin rounded-full border-2 border-foreground border-t-transparent" />
-      <span className="font-mono text-xs text-muted-foreground uppercase tracking-widest">Loading...</span>
-    </div>
-  </div>
-);
+import { PageLoader } from "@/components/ui/PageLoader";
 
 const queryClient = new QueryClient();
 

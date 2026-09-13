@@ -51,7 +51,7 @@ export default function DailyBriefing() {
   }, []);
 
   return (
-    <div className="pt-[72px] px-8 pb-8 bg-background grain min-h-screen text-foreground relative overflow-y-auto">
+    <div className="px-8 pb-8 pt-4 text-foreground relative overflow-y-auto">
       <div className="w-full max-w-4xl mx-auto space-y-8">
         
         {/* Header section */}

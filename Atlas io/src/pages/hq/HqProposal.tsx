@@ -208,7 +208,7 @@ export default function HqProposal() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground print:bg-white print:text-black">
+    <div className="text-foreground print:bg-white print:text-black print:min-h-screen">
       {/* Header */}
       <div className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur-sm px-6 py-3 print:hidden">
         <div className="flex items-center gap-3">

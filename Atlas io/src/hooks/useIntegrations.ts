@@ -161,10 +161,9 @@ export function useIntegrations() {
     // Uses localhost or vercel URL dynamically
     const redirectUri = `${window.location.origin}/auth/metaphor/callback`;
     
-    const isProd = window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1";
-    const metaphorBase = isProd 
-      ? "https://metaphor-backend.onrender.com/api/v1/mcp"
-      : "http://localhost:8000/api/v1/mcp";
+    const metaphorBase = import.meta.env.VITE_METAPHOR_API_URL 
+      ? `${import.meta.env.VITE_METAPHOR_API_URL}/mcp`
+      : "https://metaphor-backend.onrender.com/api/v1/mcp";
       
     const metaphorAuthUrl = `${metaphorBase}/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
     window.location.href = metaphorAuthUrl;

@@ -139,7 +139,7 @@ export default function HqSettings() {
   };
 
   return (
-    <div className="pt-[72px] px-8 pb-8 bg-background grain min-h-screen text-foreground overflow-y-auto">
+    <div className="px-8 pb-8 pt-4 text-foreground overflow-y-auto">
       <div className="max-w-3xl mx-auto space-y-8">
         <div className="border-b border-border/60 pb-5">
           <h1 className="text-3xl font-display font-bold tracking-tight flex items-center gap-3">

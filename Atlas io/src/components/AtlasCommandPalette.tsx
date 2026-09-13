@@ -112,7 +112,7 @@ export function AtlasCommandPalette({
 
           <CommandGroup heading="Switch Pseudonyms Apps" className="text-[var(--pds-text-muted)] font-mono text-[10px] uppercase tracking-wider px-2">
             <CommandItem
-              onSelect={() => runCommand(() => window.open("http://localhost:3000", "_blank"))}
+              onSelect={() => runCommand(() => window.open(import.meta.env.VITE_METAPHOR_URL || "https://metaphor-backend.onrender.com", "_blank"))}
               className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-[var(--pds-surface-2)] rounded-xl text-xs text-[var(--pds-text-primary)] transition-colors"
             >
               <div className="flex items-center gap-2.5">
@@ -122,7 +122,7 @@ export function AtlasCommandPalette({
               <ExternalLink className="h-3 w-3 text-[var(--pds-text-muted)]" />
             </CommandItem>
             <CommandItem
-              onSelect={() => runCommand(() => window.open("http://localhost:49843", "_blank"))}
+              onSelect={() => runCommand(() => window.open(import.meta.env.VITE_CLARIO_URL || "https://clariovid.vercel.app", "_blank"))}
               className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-[var(--pds-surface-2)] rounded-xl text-xs text-[var(--pds-text-primary)] transition-colors"
             >
               <div className="flex items-center gap-2.5">
@@ -132,7 +132,7 @@ export function AtlasCommandPalette({
               <ExternalLink className="h-3 w-3 text-[var(--pds-text-muted)]" />
             </CommandItem>
             <CommandItem
-              onSelect={() => runCommand(() => window.open("http://localhost:3005", "_blank"))}
+              onSelect={() => runCommand(() => window.open(import.meta.env.VITE_PSEUDONYMS_ID_URL || "http://localhost:3005", "_blank"))}
               className="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-[var(--pds-surface-2)] rounded-xl text-xs text-[var(--pds-text-primary)] transition-colors"
             >
               <div className="flex items-center gap-2.5">

@@ -302,7 +302,7 @@ export default function HqLeadDetail() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
+      <div className="flex items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
@@ -321,7 +321,7 @@ export default function HqLeadDetail() {
 
   if (!lead) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-background gap-3">
+      <div className="flex flex-col items-center justify-center gap-3">
         <p className="text-muted-foreground">Company not found</p>
         <Button variant="ghost" size="sm" onClick={() => navigate("/hq/leads")}>Back to Leads</Button>
       </div>
@@ -332,7 +332,7 @@ export default function HqLeadDetail() {
   const stageIdx = STAGE_STEPS.indexOf(lead.stage);
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col pt-[72px]">
+    <div className="text-foreground flex flex-col pt-4">
       {/* Top bar */}
       <div className="sticky top-[72px] z-30 border-b border-border/60 bg-background/90 backdrop-blur-sm">
         <div className="flex items-center gap-3 px-5 py-3">

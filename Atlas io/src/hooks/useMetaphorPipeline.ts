@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-const isProd = window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1";
-const METAPHOR_API = isProd ? "https://metaphor-backend.onrender.com/api/v1/pipeline" : "http://localhost:8000/api/v1/pipeline";
+const METAPHOR_API = import.meta.env.VITE_METAPHOR_API_URL ? `${import.meta.env.VITE_METAPHOR_API_URL}/pipeline` : "https://metaphor-backend.onrender.com/api/v1/pipeline";
 
 export type MetaphorBrief = {
   brief_id: string;

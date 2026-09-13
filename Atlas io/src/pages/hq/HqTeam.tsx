@@ -68,7 +68,7 @@ export default function HqTeam() {
   }, [user]);
 
   return (
-    <div className="p-6 md:p-8 space-y-8 bg-background min-h-screen text-foreground relative overflow-hidden">
+    <div className="p-6 md:p-8 space-y-8 text-foreground relative overflow-hidden">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/60 pb-5">
         <div>

@@ -240,7 +240,7 @@ export default function HqDashboard() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
           <span className="text-xs text-muted-foreground font-mono">Loading mission control...</span>
@@ -250,7 +250,7 @@ export default function HqDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground grain overflow-hidden">
+    <div className="text-foreground grain overflow-hidden">
       {/* Top bar */}
       <div className="sticky top-0 z-20 border-b border-border-subtle bg-surface-1/40 backdrop-blur-2xl px-4 sm:px-8 py-4 sm:py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-0 pds-animate-enter" style={{ animationDelay: "50ms" }}>
         <div>

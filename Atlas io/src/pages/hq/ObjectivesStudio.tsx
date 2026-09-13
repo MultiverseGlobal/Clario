@@ -90,7 +90,7 @@ export default function ObjectivesStudio() {
   };
 
   return (
-    <div className="pt-[72px] px-8 pb-8 space-y-8 bg-background grain min-h-screen text-foreground relative overflow-y-auto">
+    <div className="px-8 pb-8 pt-4 space-y-8 text-foreground relative overflow-y-auto">
       <div className="w-full max-w-4xl mx-auto space-y-8">
         {/* Header */}
         <div className="border-b border-border/60 pb-5 text-center flex flex-col items-center">

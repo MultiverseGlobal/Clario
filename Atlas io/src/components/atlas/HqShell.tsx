@@ -163,7 +163,7 @@ export default function HqShell() {
       <FloatingNav onNewLead={() => setNewLeadOpen(true)} />
 
       {/* ── Main Full-Width Process Workspace ───────────────────────────────── */}
-      <main className="flex-1 min-w-0 w-full">
+      <main className="flex-1 min-w-0 w-full pt-24">
         <AnimatePresence mode="wait">
           <motion.div
             key={location.pathname}
