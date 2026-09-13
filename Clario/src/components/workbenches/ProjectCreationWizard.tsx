@@ -5,6 +5,7 @@ import { RecordingStudio } from './RecordingStudio';
 import { ClarioProject, saveProject } from '../../lib/projectStore';
 import { generateClaudeCodePrompt } from '../../lib/gemini';
 import { getApiBase } from '../../lib/apiClient';
+import { supabase } from '../../lib/supabase';
 
 interface ProjectCreationWizardProps {
   onClose: () => void;
@@ -41,6 +42,14 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const fetchAuth = async (url: string, options: RequestInit = {}) => {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    const headers = new Headers(options.headers || {});
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    return fetch(url, { ...options, headers });
+  };
+
   useEffect(() => {
     return () => {
       if (pollTimer.current) clearInterval(pollTimer.current);
@@ -51,7 +60,7 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
     if (pollTimer.current) clearInterval(pollTimer.current);
     pollTimer.current = setInterval(async () => {
       try {
-        const res = await fetch(`${serverBase}/harvest/jobs/${jobId}`);
+        const res = await fetchAuth(`${serverBase}/harvest/jobs/${jobId}`);
         const job = await res.json();
         
         setProgress(job.progress_pct || 0);
@@ -93,7 +102,7 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
     form.append('mode', projectType === 'video' ? 'video_harvester' : 'slide_harvester');
 
     try {
-      const res = await fetch(`${serverBase}/harvest/ingest-file`, {
+      const res = await fetchAuth(`${serverBase}/harvest/ingest-file`, {
         method: 'POST',
         body: form,
       });
@@ -116,7 +125,7 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
     setStatusText('Queuing URL...');
 
     try {
-      const res = await fetch(`${serverBase}/harvest/ingest-url`, {
+      const res = await fetchAuth(`${serverBase}/harvest/ingest-url`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
@@ -161,7 +170,7 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
     form.append('mode', 'video_harvester');
 
     try {
-      const res = await fetch(`${serverBase}/harvest/ingest-file`, {
+      const res = await fetchAuth(`${serverBase}/harvest/ingest-file`, {
         method: 'POST',
         body: form,
       });
