@@ -145,6 +145,11 @@ class IngestUrlRequest(BaseModel):
     mode: Literal["video_harvester", "slide_harvester"] = "video_harvester"
     project_name: Optional[str] = None
 
+class IngestRemoteRequest(BaseModel):
+    file_path: str
+    filename: str
+    mode: Literal["video_harvester", "slide_harvester"] = "video_harvester"
+
 class CutSegmentRequest(BaseModel):
     shot_id: str
     start_seconds: float

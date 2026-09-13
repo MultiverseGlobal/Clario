@@ -95,17 +95,34 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
 
     setStep(projectType === 'video' ? 'processing_video' : 'processing_slides');
     setProgress(0);
-    setStatusText('Uploading...');
-
-    const form = new FormData();
-    form.append('file', file);
-    form.append('mode', projectType === 'video' ? 'video_harvester' : 'slide_harvester');
+    setStatusText('Uploading to secure storage...');
 
     try {
-      const res = await fetchAuth(`${serverBase}/harvest/ingest-file`, {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+      const filePath = `uploads/${fileName}`;
+
+      // 1. Direct upload to Supabase
+      const { error: uploadError } = await supabase.storage
+        .from('clario-raw')
+        .upload(filePath, file, { cacheControl: '3600', upsert: false });
+
+      if (uploadError) throw uploadError;
+
+      setStatusText('Initializing remote processor...');
+      setProgress(100);
+
+      // 2. Ping backend remote ingest
+      const res = await fetchAuth(`${serverBase}/harvest/ingest-remote`, {
         method: 'POST',
-        body: form,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          file_path: filePath,
+          filename: file.name,
+          mode: projectType === 'video' ? 'video_harvester' : 'slide_harvester'
+        })
       });
+
       if (!res.ok) {
         throw new Error('Backend URL unreachable or server error');
       }
@@ -113,7 +130,7 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
       startPolling(data.job_id, projectType);
     } catch (err: any) {
       console.error(err);
-      setStatusText(err.message.includes('fetch') ? 'Upload failed: Backend URL unreachable. Configure Settings.' : 'Upload failed');
+      setStatusText(err.message.includes('fetch') ? 'Upload failed: Backend URL unreachable. Configure Settings.' : 'Upload failed: ' + err.message);
     }
   };
 

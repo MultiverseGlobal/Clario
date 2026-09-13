@@ -35,6 +35,7 @@ from models.schemas import (
     SlideHarvestRecord,
     ProvenanceRecord,
     IngestUrlRequest,
+    IngestRemoteRequest,
     JobStatusResponse,
     CutSegmentRequest
 )
@@ -150,23 +151,36 @@ def download_from_supabase(bucket: str, source_path: str, destination_path: str)
 # Global semaphore to limit heavy FFmpeg concurrent processing
 processing_semaphore = asyncio.Semaphore(2)
 
-async def process_video_harvest_job(job_id: str, project_id: str, video_path: str, user_id: str, reference_url: str = ""):
+async def process_video_harvest_job(job_id: str, project_id: str, video_path: str, user_id: str, reference_url: str = "", is_remote: bool = False):
     async with processing_semaphore:
         try:
             update_job(job_id, {
                 "status": "processing",
-                "progress_pct": 10,
-                "status_msg": "Detecting shot boundaries with FFmpeg…"
+                "progress_pct": 5,
+                "status_msg": "Downloading remote asset..." if is_remote else "Detecting shot boundaries with FFmpeg…"
             })
 
             project_dir = os.path.join(MEDIA_ROOT, project_id)
             os.makedirs(project_dir, exist_ok=True)
 
             video_filename = os.path.basename(video_path)
-            video_media_url = upload_to_supabase(video_path, "clario-exports", f"{project_id}/{video_filename}")
+            local_video_path = video_path
+
+            if is_remote:
+                local_video_path = os.path.join(project_dir, video_filename)
+                success = download_from_supabase("clario-raw", video_path, local_video_path)
+                if not success:
+                    raise Exception("Failed to download remote asset from clario-raw bucket.")
+                update_job(job_id, {"progress_pct": 10, "status_msg": "Detecting shot boundaries with FFmpeg…"})
+
+            video_media_url = upload_to_supabase(local_video_path, "clario-exports", f"{project_id}/{video_filename}")
 
             # 1. Scene detection
-            intervals = detect_scenes_ffmpeg(video_path, threshold=0.3)
+            intervals = detect_scenes_ffmpeg(local_video_path, threshold=0.3)
+            # If no scene breaks found, treat whole video as one shot
+            if not intervals:
+                dur = get_video_duration(local_video_path)
+                intervals = [(0.0, dur)]
             update_job(job_id, {
                 "progress_pct": 30,
                 "status_msg": f"Extracted {len(intervals)} shots. Slicing keyframes…"
@@ -178,12 +192,14 @@ async def process_video_harvest_job(job_id: str, project_id: str, video_path: st
     
             # 2. Keyframe extraction & multimodal vision
             for idx, (start_sec, end_sec) in enumerate(intervals):
-                shot_id = f"shot_{str(idx + 1).zfill(3)}"
-                mid_sec = round((start_sec + end_sec) / 2.0, 2)
+                shot_id = f"shot_{uuid.uuid4().hex[:8]}"
+                dur = end_sec - start_sec
+                # Extract keyframe in middle of shot
+                mid_sec = start_sec + (dur / 2.0)
                 frame_filename = f"{shot_id}.jpg"
                 frame_disk_path = os.path.join(project_dir, frame_filename)
     
-                extract_frame_at_timestamp(video_path, mid_sec, frame_disk_path)
+                extract_frame_at_timestamp(local_video_path, mid_sec, frame_disk_path)
                 frame_paths.append(frame_disk_path)
                 labels.append(f"{shot_id.upper()} · {start_sec}s-{end_sec}s")
     
@@ -273,7 +289,9 @@ async def process_video_harvest_job(job_id: str, project_id: str, video_path: st
             })
         finally:
             try:
-                if 'video_path' in locals():
+                if 'local_video_path' in locals() and os.path.exists(local_video_path):
+                    os.unlink(local_video_path)
+                if not is_remote and 'video_path' in locals() and os.path.exists(video_path) and video_path != local_video_path:
                     os.unlink(video_path)
             except Exception:
                 pass
@@ -460,6 +478,34 @@ async def ingest_file(
     background_tasks.add_task(process_video_harvest_job, job_id, project_id, file_path, user_id)
 
     return {"job_id": job_id, "project_id": project_id, "status": "queued"}
+
+@app.post("/api/v1/harvest/ingest-remote")
+async def ingest_remote(
+    background_tasks: BackgroundTasks,
+    req: IngestRemoteRequest,
+    user_id: str = Depends(get_current_user_id)
+):
+    project_id = f"proj_{uuid.uuid4().hex[:10]}"
+    job_id = f"job_{uuid.uuid4().hex[:10]}"
+    project_dir = os.path.join(MEDIA_ROOT, project_id)
+    os.makedirs(project_dir, exist_ok=True)
+
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    update_job(job_id, {
+        "title": req.filename or "Video Harvest",
+        "user_id": user_id,
+        "status": "queued",
+        "progress_pct": 0,
+        "status_msg": "Queued for remote processing",
+        "input_url": req.filename
+    })
+
+    background_tasks.add_task(process_video_harvest_job, job_id, project_id, req.file_path, user_id, is_remote=True)
+
+    return {"job_id": job_id, "project_id": project_id, "status": "queued"}
+
 
 @app.post("/api/v1/harvest/ingest-url")
 async def ingest_url(
