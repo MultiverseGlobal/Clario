@@ -160,7 +160,7 @@ export default function App() {
                 </label>
                 <input
                   type="text"
-                  placeholder="http://localhost:8000"
+                  placeholder="https://clario-l5d0.onrender.com"
                   value={apiBaseInput}
                   onChange={e => setApiBaseInput(e.target.value)}
                   style={{

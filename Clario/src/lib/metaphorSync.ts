@@ -3,7 +3,7 @@
  * Pushes creative project events into Metaphor OS as context nodes.
  */
 
-const METAPHOR_API = (import.meta as any).env?.VITE_METAPHOR_API_URL || "http://localhost:8000/api/v1";
+const METAPHOR_API = (import.meta as any).env?.VITE_METAPHOR_API_URL || "https://metaphor-backend.onrender.com/api/v1";
 const METAPHOR_TOKEN_KEY = "metaphor_access_token";
 
 function getToken(): string | null {
