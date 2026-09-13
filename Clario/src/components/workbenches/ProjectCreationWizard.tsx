@@ -332,7 +332,7 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
                   <button 
                     onClick={() => handleUrlIngest(urlInput)}
                     disabled={!urlInput}
-                    className="w-full py-3 rounded-xl bg-accent text-accent-foreground font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                    className="w-full py-3 rounded-xl bg-accent text-accent-inv font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
                   >
                     Import Source
                   </button>
