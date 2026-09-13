@@ -220,7 +220,7 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
                   <h3 className="text-2xl font-bold mb-2">What are we building today?</h3>
                   <p className="text-muted-foreground">Select the primary asset type for this project.</p>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Card 
                     icon={Video} title="Video Project" 
                     description="Analyze footage, clean inpainted captions, and generate editorial sequences." 
@@ -245,7 +245,7 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
                   <h3 className="text-2xl font-bold mb-2">Select Video Category</h3>
                   <p className="text-muted-foreground">Tailor the workflow to the type of video.</p>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Card 
                     icon={Target} title="Sales / Outreach" 
                     description="Record a personalized pitch with the AI Teleprompter and Director cues." 
@@ -273,7 +273,7 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
                   <h3 className="text-2xl font-bold mb-2">Provide Source Material</h3>
                   <p className="text-muted-foreground">Upload your files or paste a link to begin ingestion.</p>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {step === 'sales_source' && (
                     <Card 
                       icon={Camera} title="Record Now" 

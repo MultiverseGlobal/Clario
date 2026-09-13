@@ -114,7 +114,7 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
     if (isRecording) {
       mediaRecorderRef.current?.stop();
       if (compositorRef.current !== null) {
-        cancelAnimationFrame(compositorRef.current);
+        clearTimeout(compositorRef.current);
         compositorRef.current = null;
       }
       setIsRecording(false);
@@ -163,9 +163,9 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
           ctx.restore();
         }
 
-        compositorRef.current = requestAnimationFrame(drawFrame);
+        compositorRef.current = window.setTimeout(drawFrame, 1000 / 30);
       };
-      compositorRef.current = requestAnimationFrame(drawFrame);
+      compositorRef.current = window.setTimeout(drawFrame, 1000 / 30);
 
       // Capture the composed canvas as a stream at 30fps
       const canvasStream = canvas.captureStream(30);
@@ -182,7 +182,7 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
       mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       mr.onstop = () => {
         if (compositorRef.current !== null) {
-          cancelAnimationFrame(compositorRef.current);
+          clearTimeout(compositorRef.current);
           compositorRef.current = null;
         }
         onFinish(new Blob(chunksRef.current, { type: 'video/webm' }));
@@ -218,7 +218,7 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
 
       {/* Top Bar */}
       <div className="flex items-center justify-between p-6 w-full z-20">
-        <button onClick={onBack} className="pds-btn-ghost bg-white/5 border-white/10 text-white hover:bg-white/10 flex items-center gap-2 rounded-full px-5 py-2.5 backdrop-blur-md">
+        <button onClick={onBack} className="bg-white/5 border border-white/10 text-white hover:bg-white/10 flex items-center gap-2 rounded-full px-5 py-2.5 backdrop-blur-md transition-colors">
           <ArrowLeft className="w-4 h-4" />
           <span className="font-medium text-sm">Exit Studio</span>
         </button>
@@ -236,10 +236,10 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
       </div>
 
       {/* Main Studio Area */}
-      <div className="flex-1 relative flex items-center justify-center p-12 gap-12 z-10">
+      <div className="flex-1 relative flex flex-col lg:flex-row items-center justify-center p-6 lg:p-12 pt-0 lg:pt-0 gap-6 lg:gap-12 z-10 pb-32 overflow-y-auto lg:overflow-hidden">
 
         {/* Screen Canvas */}
-        <div className="relative w-full max-w-5xl aspect-video rounded-[24px] shadow-2xl clario-frame-card overflow-hidden ring-1 ring-white/10 bg-black">
+        <div className="relative w-full max-w-5xl aspect-video rounded-[24px] shadow-2xl clario-frame-card overflow-hidden ring-1 ring-white/10 bg-black shrink-0">
 
           {/* Pre-flight overlay */}
           <AnimatePresence>
@@ -297,7 +297,7 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
         </div>
 
         {/* Teleprompter Sidebar */}
-        <div className="w-[340px] h-full max-h-[600px] clario-glass-panel rounded-[24px] flex flex-col shadow-2xl border border-white/10 relative overflow-hidden group">
+        <div className="w-full lg:w-[340px] h-[300px] lg:h-full lg:max-h-[600px] bg-white/5 backdrop-blur-md rounded-[24px] flex flex-col shadow-2xl border border-white/10 relative overflow-hidden group shrink-0">
           <div className="flex items-center justify-between p-6 pb-4 border-b border-white/10 text-white shrink-0">
             <div className="flex items-center gap-2">
               <Activity className={`w-4 h-4 ${isRecording ? 'text-red-400' : 'text-accent'}`} />
@@ -320,7 +320,7 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
       </div>
 
       {/* Floating Bottom Controls */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 clario-glass-capsule rounded-full px-8 py-4 flex items-center gap-6 shadow-2xl z-20">
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-white/5 border border-white/10 backdrop-blur-xl rounded-full px-8 py-4 flex items-center gap-6 shadow-[0_20px_40px_rgba(0,0,0,0.4)] z-50">
         <button onClick={toggleMic} title={micOn ? 'Mute mic' : 'Unmute mic'} className={`p-3 rounded-full hover:bg-white/10 transition-colors ${micOn ? 'text-white/70' : 'text-red-400'}`}>
           {micOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
         </button>
