@@ -83,10 +83,13 @@ def update_job(job_id: str, updates: dict):
     except Exception as e:
         print(f"Error updating job in Supabase: {e}")
 
-def get_job(job_id: str):
+def get_job(job_id: str, user_id: str = None):
     if not supabase: return None
     try:
-        res = supabase.table("clario_jobs").select("*").eq("id", job_id).execute()
+        query = supabase.table("clario_jobs").select("*").eq("id", job_id)
+        if user_id:
+            query = query.eq("user_id", user_id)
+        res = query.execute()
         return res.data[0] if res.data else None
     except Exception:
         return None
@@ -104,10 +107,13 @@ def update_project(project_id: str, user_id: str, project_data: dict):
     except Exception as e:
         print(f"Error updating project in Supabase: {e}")
 
-def get_project(project_id: str):
+def get_project(project_id: str, user_id: str = None):
     if not supabase: return None
     try:
-        res = supabase.table("clario_projects").select("*").eq("id", project_id).execute()
+        query = supabase.table("clario_projects").select("*").eq("id", project_id)
+        if user_id:
+            query = query.eq("user_id", user_id)
+        res = query.execute()
         if res.data:
             return res.data[0].get("project_data")
         return None
@@ -342,7 +348,10 @@ async def generate_media_insights(req: InsightsRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/download-video")
-async def download_video(req: DownloadVideoRequest):
+async def download_video(
+    req: DownloadVideoRequest,
+    user_id: str = Depends(get_current_user_id)
+):
     if not req.url:
         raise HTTPException(status_code=400, detail="URL is required")
         
@@ -510,8 +519,8 @@ async def ingest_url(
     return {"job_id": job_id, "project_id": project_id, "status": "queued"}
 
 @app.get("/api/v1/harvest/jobs/{job_id}")
-async def get_job_status(job_id: str):
-    job = get_job(job_id)
+async def get_job_status(job_id: str, user_id: str = Depends(get_current_user_id)):
+    job = get_job(job_id, user_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return job
@@ -524,15 +533,19 @@ async def get_user_jobs(user_id: str = Depends(get_current_user_id)):
     return res.data
 
 @app.get("/api/v1/projects/{project_id}/manifest")
-async def get_project_manifest(project_id: str):
-    project_data = get_project(project_id)
+async def get_project_manifest(project_id: str, user_id: str = Depends(get_current_user_id)):
+    project_data = get_project(project_id, user_id)
     if not project_data:
         raise HTTPException(status_code=404, detail="Project not found")
     return project_data
 
 @app.post("/api/v1/projects/{project_id}/segments/cut")
-async def cut_segment(project_id: str, req: CutSegmentRequest):
-    project_data = get_project(project_id)
+async def cut_segment(
+    project_id: str, 
+    req: CutSegmentRequest,
+    user_id: str = Depends(get_current_user_id)
+):
+    project_data = get_project(project_id, user_id)
     if not project_data:
         raise HTTPException(status_code=404, detail="Project not found")
 
@@ -565,36 +578,61 @@ async def cut_segment(project_id: str, req: CutSegmentRequest):
     }
 
 @app.post("/api/v1/projects/{project_id}/export-zip")
-async def export_project_zip(project_id: str):
-    if project_id not in PROJECTS_DB:
+async def export_project_zip(project_id: str, user_id: str = Depends(get_current_user_id)):
+    project_data = get_project(project_id, user_id)
+    if not project_data:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    project = PROJECTS_DB[project_id]
-    project_dir = os.path.join(MEDIA_ROOT, project_id)
-    zip_path = os.path.join(project_dir, f"{project_id}_harvest_pack.zip")
+    project = HarvestProject(**project_data)
+    temp_dir = tempfile.mkdtemp(prefix=f"clario_export_{project_id}_")
+    
+    # Download source video if available
+    if project.source_file_name:
+        download_from_supabase("clario-media", f"{project_id}/{project.source_file_name}", os.path.join(temp_dir, project.source_file_name))
+        
+    # Download contact sheet
+    download_from_supabase("clario-media", f"{project_id}/contact_sheet.jpg", os.path.join(temp_dir, "contact_sheet.jpg"))
+    
+    # Download keyframes
+    for shot in project.shots:
+        frame_filename = f"{shot.shot_id}.jpg"
+        download_from_supabase("clario-media", f"{project_id}/{frame_filename}", os.path.join(temp_dir, frame_filename))
+
+    zip_filename = f"{project_id}_harvest_pack.zip"
+    zip_path = os.path.join(tempfile.gettempdir(), zip_filename)
 
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-        for root, _, files in os.walk(project_dir):
+        for root, _, files in os.walk(temp_dir):
             for file in files:
-                if file.endswith(".zip"):
-                    continue
                 file_full = os.path.join(root, file)
-                arcname = os.path.relpath(file_full, project_dir)
+                arcname = os.path.relpath(file_full, temp_dir)
                 zipf.write(file_full, arcname)
 
-    return FileResponse(zip_path, filename=f"{project.name.replace(' ', '_')}_pack.zip")
+    # Cleanup temp directory
+    shutil.rmtree(temp_dir, ignore_errors=True)
+
+    from starlette.background import BackgroundTask
+    def cleanup_zip():
+        try:
+            os.unlink(zip_path)
+        except Exception:
+            pass
+
+    return FileResponse(
+        path=zip_path, 
+        filename=f"{project.name.replace(' ', '_')}_pack.zip",
+        background=BackgroundTask(cleanup_zip)
+    )
 
 
 # ── Reference Library Endpoints ──────────────────────────────────────────────
 
 class ReferenceIngestUrlRequest(BaseModel):
     url: str
-    user_id: str | None = None
     gemini_api_key: str | None = None
 
 class ScriptMatchRequest(BaseModel):
     script_text: str
-    user_id: str
     top_k: int = 8
     gemini_api_key: str | None = None
 
@@ -698,6 +736,7 @@ async def _process_reference_ingest(
 async def reference_ingest_url(
     background_tasks: BackgroundTasks,
     req: ReferenceIngestUrlRequest,
+    user_id: str = Depends(get_current_user_id)
 ):
     """
     Download a YouTube/Instagram/Drive URL via yt-dlp, detect scenes,
@@ -707,7 +746,6 @@ async def reference_ingest_url(
     if not req.url:
         raise HTTPException(status_code=400, detail="URL is required")
 
-    user_id = req.user_id or "anonymous"
     job_id = f"ref_job_{uuid.uuid4().hex[:10]}"
     unique_prefix = f"clario_ref_{uuid.uuid4().hex}"
     out_template = os.path.join(tempfile.gettempdir(), f"{unique_prefix}.%(ext)s")
@@ -766,7 +804,7 @@ async def reference_ingest_url(
 async def reference_ingest_file(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    user_id: str = Form("anonymous"),
+    user_id: str = Depends(get_current_user_id),
     gemini_api_key: str = Form(""),
 ):
     """Upload a video file directly into the Reference Library."""
@@ -795,7 +833,7 @@ async def reference_ingest_file(
 
 @app.get("/api/v1/reference/library")
 async def get_reference_library(
-    user_id: str,
+    user_id: str = Depends(get_current_user_id),
     page: int = 1,
     page_size: int = 24,
 ):
@@ -816,7 +854,10 @@ async def get_reference_library(
 
 
 @app.post("/api/v1/script/match")
-async def script_match(req: ScriptMatchRequest):
+async def script_match(
+    req: ScriptMatchRequest,
+    user_id: str = Depends(get_current_user_id)
+):
     """
     Match a script against the Reference Library using pgvector cosine similarity.
     Chunks the script by line/sentence, embeds each chunk via Gemini text-embedding-004,
@@ -862,7 +903,7 @@ async def script_match(req: ScriptMatchRequest):
             "match_reference_library",
             {
                 "query_embedding": embedding,
-                "match_user_id": req.user_id,
+                "match_user_id": user_id,
                 "match_count": req.top_k,
             },
         ).execute()
