@@ -13,7 +13,7 @@ import {
 import { useTheme } from "@/hooks/useTheme";
 import { soundManager } from "@/lib/audioFeedback";
 import { toast } from "sonner";
-import { Send, CheckCircle2, SkipForward, RefreshCw } from "lucide-react";
+import { Send, CheckCircle2, SkipForward, RefreshCw, Bot, Terminal } from "lucide-react";
 
 // ── Initial campaign state ──────────────────────────────────────────────────
 const INITIAL_STATE: CampaignState = {

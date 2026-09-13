@@ -163,7 +163,7 @@ async def process_video_harvest_job(job_id: str, project_id: str, video_path: st
             os.makedirs(project_dir, exist_ok=True)
 
             video_filename = os.path.basename(video_path)
-            video_media_url = upload_to_supabase(video_path, "clario-media", f"{project_id}/{video_filename}")
+            video_media_url = upload_to_supabase(video_path, "clario-exports", f"{project_id}/{video_filename}")
 
             # 1. Scene detection
             intervals = detect_scenes_ffmpeg(video_path, threshold=0.3)
@@ -190,7 +190,7 @@ async def process_video_harvest_job(job_id: str, project_id: str, video_path: st
                 # Vision intelligence
                 intel = analyze_shot_frame(frame_disk_path, shot_id, start_sec, end_sec)
     
-                frame_web_url = upload_to_supabase(frame_disk_path, "clario-media", f"{project_id}/{frame_filename}")
+                frame_web_url = upload_to_supabase(frame_disk_path, "clario-frames", f"{project_id}/{frame_filename}")
     
                 shot_record = ShotRecord(
                     project_id=project_id,
@@ -226,7 +226,7 @@ async def process_video_harvest_job(job_id: str, project_id: str, video_path: st
             contact_sheet_filename = "contact_sheet.jpg"
             contact_sheet_path = os.path.join(project_dir, contact_sheet_filename)
             generate_contact_sheet_pillow(frame_paths, labels, contact_sheet_path)
-            upload_to_supabase(contact_sheet_path, "clario-media", f"{project_id}/{contact_sheet_filename}")
+            upload_to_supabase(contact_sheet_path, "clario-frames", f"{project_id}/{contact_sheet_filename}")
     
             # 4. Assemble Project Record
             video_filename = os.path.basename(video_path)
@@ -287,7 +287,12 @@ async def process_video_harvest_job(job_id: str, project_id: str, video_path: st
 
 @app.get("/api/v1/health")
 def health_check():
-    return {"status": "ok", "service": "Clario Media Intelligence Studio"}
+    return {
+        "status": "ok", 
+        "service": "Clario Media Intelligence Studio",
+        "supabase_connected": supabase is not None,
+        "gemini_configured": bool(os.getenv("GEMINI_API_KEY"))
+    }
 
 from pydantic import BaseModel
 import google.generativeai as genai
@@ -569,7 +574,7 @@ async def cut_segment(
     video_path = os.path.join(project_dir, project.source_file_name)
     if not os.path.exists(video_path):
         os.makedirs(project_dir, exist_ok=True)
-        success = download_from_supabase("clario-media", f"{project_id}/{project.source_file_name}", video_path)
+        success = download_from_supabase("clario-exports", f"{project_id}/{project.source_file_name}", video_path)
         if not success:
             raise HTTPException(status_code=404, detail="Original source file not found on server or Supabase.")
 
@@ -580,7 +585,7 @@ async def cut_segment(
     if not success:
         raise HTTPException(status_code=500, detail="Failed to cut segment.")
 
-    segment_url = upload_to_supabase(output_path, "clario-media", f"{project_id}/{segment_filename}")
+    segment_url = upload_to_supabase(output_path, "clario-exports", f"{project_id}/{segment_filename}")
 
     return {
         "status": "success",
@@ -599,15 +604,15 @@ async def export_project_zip(project_id: str, user_id: str = Depends(get_current
     
     # Download source video if available
     if project.source_file_name:
-        download_from_supabase("clario-media", f"{project_id}/{project.source_file_name}", os.path.join(temp_dir, project.source_file_name))
+        download_from_supabase("clario-exports", f"{project_id}/{project.source_file_name}", os.path.join(temp_dir, project.source_file_name))
         
     # Download contact sheet
-    download_from_supabase("clario-media", f"{project_id}/contact_sheet.jpg", os.path.join(temp_dir, "contact_sheet.jpg"))
+    download_from_supabase("clario-frames", f"{project_id}/contact_sheet.jpg", os.path.join(temp_dir, "contact_sheet.jpg"))
     
     # Download keyframes
     for shot in project.shots:
         frame_filename = f"{shot.shot_id}.jpg"
-        download_from_supabase("clario-media", f"{project_id}/{frame_filename}", os.path.join(temp_dir, frame_filename))
+        download_from_supabase("clario-frames", f"{project_id}/{frame_filename}", os.path.join(temp_dir, frame_filename))
 
     zip_filename = f"{project_id}_harvest_pack.zip"
     zip_path = os.path.join(tempfile.gettempdir(), zip_filename)

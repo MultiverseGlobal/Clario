@@ -16,17 +16,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-// ── Route metadata ────────────────────────────────────────────────────────────
 const ROUTES: Record<string, { label: string; icon: React.ElementType }> = {
   "/":            { label: "Command",         icon: Command },
   "/briefing":    { label: "Briefing",        icon: Coffee },
-  "/objectives":  { label: "Hunt",            icon: Target },
   "/hq/radar":   { label: "Radar",           icon: Gauge },
-  "/hq/autopilot": { label: "Autopilot",     icon: Bot },
-  "/hq/partnerships":{label: "Partners",      icon: Handshake },
-  "/hq/team":     { label: "Team",            icon: Users },
   "/hq/report":   { label: "Report",          icon: BarChart },
-  "/hq/media-jobs": { label: "Media",         icon: Film },
   "/hq/settings": { label: "Settings",        icon: Settings },
 };
 

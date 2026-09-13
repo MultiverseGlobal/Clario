@@ -4,7 +4,7 @@ import {
   Sparkles, ArrowRight, Activity, Users, Send, RotateCcw, 
   CheckCircle2, ChevronRight, ExternalLink, ShieldCheck, 
   Radar, Cpu, Flame, Target, Compass, Terminal, Radio,
-  Brain, PenTool, Zap, Globe, Layers, AlertCircle
+  Brain, PenTool, Zap, Globe, Layers, AlertCircle, Bot
 } from "lucide-react";
 import { 
   decomposeCampaignPrompt, 
@@ -143,11 +143,13 @@ export function CommandEngine({
         currentDraft: draft,
       }));
 
-      soundManager.playChime();
-      onRequireIntervention(foundLeads[0], draft);
-      toast("Outreach ready for review. System paused for authorization.", {
-        icon: <CheckCircle2 className="h-4 w-4 text-emerald-500" />,
-      });
+      if (!isAutoPilot) {
+        soundManager.playChime();
+        onRequireIntervention(foundLeads[0], draft);
+        toast("Outreach ready for review. System paused for authorization.", {
+          icon: <CheckCircle2 className="h-4 w-4 text-emerald-500" />,
+        });
+      }
 
     } catch (err: any) {
       toast.error(err.message || "Failed to run campaign.");
@@ -158,6 +160,16 @@ export function CommandEngine({
       }));
     }
   };
+
+  useEffect(() => {
+    if (isAutoPilot && campaignState.status === "reviewing_icp") {
+      toast.info("Auto-Pilot: Target parameters acquired. Commencing scan...");
+      const timer = setTimeout(() => {
+        handleApproveIcp();
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [isAutoPilot, campaignState.status, tempIcp]);
 
   const handleLaunchCampaign = (e: React.FormEvent) => {
     e.preventDefault();
@@ -246,6 +258,24 @@ export function CommandEngine({
 
             {/* Tactical Controls */}
             <div className="pr-4 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onToggleAutoPilot}
+                className={`flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-xs font-semibold transition-all cursor-pointer shadow-sm ${
+                  isDark
+                    ? "border-white/20 bg-white/[0.08] text-white hover:bg-white/15"
+                    : "border-neutral-300 bg-white text-neutral-900 hover:bg-neutral-50 shadow-md"
+                } ${
+                  isAutoPilot 
+                    ? isDark ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400" : "border-emerald-500/30 bg-emerald-50 text-emerald-700" 
+                    : ""
+                }`}
+                title="Toggle Autopilot Mode"
+              >
+                {isAutoPilot ? <Sparkles className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
+                {isAutoPilot ? "Autopilot" : "Supervised"}
+              </button>
+
               <AnimatePresence>
                 {!isRunning && (
                   <motion.button
@@ -550,17 +580,7 @@ export function CommandEngine({
                 </div>
 
                 <div className="flex items-center justify-between text-[10px] border-t pt-2 text-muted-foreground border-border">
-                  <div className="flex items-center gap-1.5">
-                    <span>Mode:</span>
-                    <button
-                      type="button"
-                      onClick={onToggleAutoPilot}
-                      className="font-semibold cursor-pointer underline hover:text-foreground transition-colors text-foreground"
-                    >
-                      {isAutoPilot ? "Auto-Pilot" : "Supervised"}
-                    </button>
-                  </div>
-                  <span className="text-foreground flex items-center gap-1 font-semibold">
+                  <span className="text-foreground flex items-center gap-1 font-semibold ml-auto">
                     <span className="h-1.5 w-1.5 rounded-full bg-foreground animate-pulse" />
                     Active
                   </span>

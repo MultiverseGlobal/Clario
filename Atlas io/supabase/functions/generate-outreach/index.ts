@@ -141,7 +141,7 @@ async function callGemini(systemPrompt: string, userPrompt: string, apiKey: stri
 }
 
 // ── Build a hard fallback if LLM fails ──────────────────────────────────────
-function buildFallback(organization_name: string, founderName: string, bottleneckArea: string, hypothesis: string) {
+function buildFallback(company: string, founderName: string, bottleneckArea: string, hypothesis: string) {
   const first = founderName && !founderName.toLowerCase().includes("founder") ? founderName.split(" ")[0] : "there";
   return {
     email: {
@@ -213,10 +213,10 @@ Deno.serve(async (req: Request) => {
     const teamSize       = team_size    || rd.team_size    || "growing team";
 
     const openRouterApiKey = Deno.env.get("OPENROUTER_API_KEY");
-    const groqApiKey = Deno.env.get("GROQ_API_KEY");
+    const groqApiKey = dbSettings?.groq_api_key || Deno.env.get("GROQ_API_KEY");
     const kimiApiKey = Deno.env.get("KIMI_API_KEY") || Deno.env.get("MOONSHOT_API_KEY");
     const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
-    const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
+    const openaiApiKey = dbSettings?.openai_api_key || Deno.env.get("OPENAI_API_KEY");
     
     const providers = [
       { name: "openrouter", key: openRouterApiKey },
@@ -226,9 +226,7 @@ Deno.serve(async (req: Request) => {
       { name: "openai", key: openaiApiKey },
     ].filter(p => !!p.key);
 
-    if (providers.length === 0) {
-      throw new Error("No LLM API keys configured.");
-    }
+
 
     const systemPrompt = `You are an expert B2B sales copywriter for an AI automation agency.
 Your job is to write outreach messages that sound like a curious, intelligent human — NOT a sales robot.
@@ -274,6 +272,11 @@ Return ONLY this JSON (no markdown, no explanation):
     let finalRes: Response | null = null;
     let result: any = null;
     let usedProvider = "";
+
+    if (providers.length === 0) {
+      console.warn("No LLM API keys configured. Using fallback.");
+      result = buildFallback(company, founderName, bottleneckArea, hypothesis);
+    }
 
     for (const provider of providers) {
       try {
@@ -339,7 +342,8 @@ Return ONLY this JSON (no markdown, no explanation):
     }
 
     if (!finalRes && !result) {
-      throw new Error("All AI models failed to generate valid outreach copy.");
+      console.warn("All AI models failed, using hardcoded fallback.");
+      result = buildFallback(company, founderName, bottleneckArea, hypothesis);
     }
 
     if (isStream) {
