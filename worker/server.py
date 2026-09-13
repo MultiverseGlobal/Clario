@@ -31,9 +31,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-MEDIA_DIR = Path("media")
-MEDIA_DIR.mkdir(exist_ok=True)
-app.mount("/media", StaticFiles(directory=str(MEDIA_DIR)), name="media")
+from main import supabase
 
 # In-memory job store (replace with Supabase for production)
 JOBS: dict = {}
@@ -86,12 +84,9 @@ async def ingest_file(
         "error": None,
     }
 
-    # Save uploaded file to disk
-    project_dir = MEDIA_DIR / project_id
-    project_dir.mkdir(parents=True, exist_ok=True)
-
     if file:
-        file_path = project_dir / file.filename
+        temp_dir = Path(tempfile.mkdtemp())
+        file_path = temp_dir / file.filename
         with open(file_path, "wb") as f:
             content = await file.read()
             f.write(content)
@@ -104,7 +99,7 @@ async def ingest_file(
         raise HTTPException(status_code=400, detail="Provide either a file or a url")
 
     # Fire and forget the background task
-    asyncio.create_task(process_video_job(job_id, project_id, project_dir, source_path, source_label, mode))
+    asyncio.create_task(process_video_job(job_id, project_id, source_path, source_label, mode))
 
     return {"job_id": job_id, "project_id": project_id}
 
@@ -126,35 +121,44 @@ def cut_segment(project_id: str, body: dict):
     start = float(body.get("start_seconds", 0))
     end = float(body.get("end_seconds", 5))
 
-    project_dir = MEDIA_DIR / project_id
-    if not project_dir.exists():
-        raise HTTPException(status_code=404, detail="Project not found")
-
-    # Find the source video in the project dir
-    video_files = list(project_dir.glob("*.mp4")) + list(project_dir.glob("*.webm")) + list(project_dir.glob("*.mov"))
-    if not video_files:
-        raise HTTPException(status_code=404, detail="No video found for project")
-
-    source_video = str(video_files[0])
     output_name = f"{shot_id}_{int(start*10)}_{int(end*10)}.mp4"
-    output_path = project_dir / output_name
+    
+    with tempfile.TemporaryDirectory() as tmpdir:
+        temp_dir = Path(tmpdir)
+        output_path = temp_dir / output_name
+        
+        # We need the source video URL to cut from. We saved it as source.mp4 in Supabase
+        source_url = supabase.storage.from_("clario-media").get_public_url(f"{project_id}/source.mp4")
 
-    try:
-        run_cmd([
-            "ffmpeg", "-y",
-            "-ss", str(start),
-            "-to", str(end),
-            "-i", source_video,
-            "-c:v", "libx264", "-c:a", "aac",
-            str(output_path)
-        ])
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        try:
+            run_cmd([
+                "ffmpeg", "-y",
+                "-ss", str(start),
+                "-to", str(end),
+                "-i", source_url,
+                "-c:v", "libx264", "-c:a", "aac",
+                str(output_path)
+            ])
+            
+            # Upload the cut segment to Supabase
+            with open(output_path, "rb") as f:
+                supabase.storage.from_("clario-media").upload(
+                    file=f,
+                    path=f"{project_id}/{output_name}",
+                    file_options={"content-type": "video/mp4"}
+                )
+                
+        except RuntimeError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    public_url = supabase.storage.from_("clario-media").get_public_url(f"{project_id}/{output_name}")
 
     return {
         "status": "ok",
-        "url": f"/media/{project_id}/{output_name}",
+        "url": public_url,
         "filename": output_name
+    }
+
 from pydantic import BaseModel
 class ScriptMatchRequest(BaseModel):
     script_text: str
@@ -171,7 +175,6 @@ async def match_script(req: ScriptMatchRequest):
     # Try to fetch actual processed shots from Supabase clario_jobs
     shots = []
     try:
-        from main import supabase
         res = supabase.table("clario_jobs").select("result").eq("status", "completed").order("updated_at", desc=True).limit(1).execute()
         if res.data and res.data[0].get("result"):
             shots = res.data[0]["result"].get("shots", [])
@@ -209,13 +212,17 @@ async def match_script(req: ScriptMatchRequest):
 
 # ── Background Processing: Video Pipeline ─────────────────────────────────────
 
-async def process_video_job(job_id: str, project_id: str, project_dir: Path, source: str, label: str, mode: str, update_db=None):
+async def process_video_job(job_id: str, project_id: str, source: str, label: str, mode: str, update_db=None):
     import httpx
 
     def _update(**kwargs):
         update_job(job_id, **kwargs)
         if update_db:
             update_db(job_id, kwargs)
+
+    # We will do everything inside a temporary directory
+    tmpdir_obj = tempfile.TemporaryDirectory()
+    project_dir = Path(tmpdir_obj.name)
 
     try:
         # ── Step 1: Download if URL ───────────────────────────────────────────
@@ -229,8 +236,24 @@ async def process_video_job(job_id: str, project_id: str, project_dir: Path, sou
             video_path = str(video_files[0])
         else:
             video_path = source
+            # Copy to temp dir if it's not already there so we can process safely
+            if not video_path.startswith(str(project_dir)):
+                dest_path = str(project_dir / Path(video_path).name)
+                shutil.copy2(video_path, dest_path)
+                video_path = dest_path
 
         video_file = Path(video_path)
+        
+        # Upload the source video to Supabase so it can be used for cutting later
+        _update(progress_pct=15, status_msg="Uploading source video to Supabase...")
+        with open(video_path, "rb") as f:
+            supabase.storage.from_("clario-media").upload(
+                file=f,
+                path=f"{project_id}/source.mp4",
+                file_options={"content-type": "video/mp4"}
+            )
+        reference_url = supabase.storage.from_("clario-media").get_public_url(f"{project_id}/source.mp4")
+
         _update(progress_pct=20, status_msg="Extracting audio for transcription...")
 
         # ── Step 2: Extract audio (WAV mono 16kHz for Whisper) ───────────────
@@ -306,8 +329,17 @@ async def process_video_job(job_id: str, project_id: str, project_dir: Path, sou
                     "-frames:v", "1", "-q:v", "3",
                     str(thumb_path)
                 ])
+                
+                # Upload thumbnail to Supabase
+                with open(thumb_path, "rb") as f:
+                    supabase.storage.from_("clario-media").upload(
+                        file=f,
+                        path=f"{project_id}/{thumb_name}",
+                        file_options={"content-type": "image/jpeg"}
+                    )
+                thumb_url = supabase.storage.from_("clario-media").get_public_url(f"{project_id}/{thumb_name}")
             except Exception:
-                pass
+                thumb_url = ""
 
             # Find transcript text that overlaps this scene
             shot_text = " ".join([
@@ -320,7 +352,7 @@ async def process_video_job(job_id: str, project_id: str, project_dir: Path, sou
                 "start_seconds": scene["start"],
                 "end_seconds": scene["end"],
                 "duration": round(scene["end"] - scene["start"], 1),
-                "frame_url": f"/media/{project_id}/{thumb_name}" if thumb_path.exists() else "",
+                "frame_url": thumb_url,
                 "transcript_text": shot_text,
                 "content_type": "a_roll" if i % 3 == 0 else "b_roll",
                 "source_type": "original",
@@ -379,7 +411,7 @@ Return ONLY the JSON array, no explanation."""
             "project_id": project_id,
             "title": label,
             "mode": mode,
-            "reference_url": f"/media/{project_id}/{video_file.name}" if not source.startswith("http") else source,
+            "reference_url": reference_url,
             "shots": shots,
             "slides": [],
             "transcript": transcript_segments,
@@ -392,6 +424,15 @@ Return ONLY the JSON array, no explanation."""
     except Exception as e:
         print(f"Job {job_id} failed: {e}")
         _update(status="failed", error=str(e), status_msg=f"Failed: {e}")
+    finally:
+        # Cleanup temporary files (if source was an uploaded file, we clean it up too)
+        tmpdir_obj.cleanup()
+        if not source.startswith("http"):
+            try:
+                Path(source).unlink(missing_ok=True)
+                Path(source).parent.rmdir() # Might fail if it's the system tmp dir, that's fine
+            except Exception:
+                pass
 
 
 # ── Utilities ──────────────────────────────────────────────────────────────────
