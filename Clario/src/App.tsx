@@ -12,6 +12,10 @@ import { HomeView } from './components/workbenches/HomeView';
 import { DeliverableView } from './components/workbenches/DeliverableView';
 import { RecordingStudio } from './components/workbenches/RecordingStudio';
 import { RecordingPreview } from './components/workbenches/RecordingPreview';
+import { VideoCanvas } from './components/canvas/VideoCanvas';
+import { SlideCanvas } from './components/canvas/SlideCanvas';
+import { ResolveShotWorkbench } from './components/workbenches/ResolveShotWorkbench';
+import { DeconstructionDrawer } from './components/blocks/DeconstructionDrawer';
 
 export default function App() {
   const [currentProject, setCurrentProject] = useState<ClarioProject | null>(null);
@@ -255,6 +259,54 @@ export default function App() {
                console.error('Failed to save blob to Vault');
              }
           }}
+        />
+      ) : currentPhase === 'video_canvas' ? (
+        <VideoCanvas 
+          trackItems={[]}
+          assets={[]}
+          duration={30}
+          currentTime={0}
+          isPlaying={false}
+          selectedItemId={null}
+          onChange={() => {}}
+          onSeek={() => {}}
+          onTogglePlay={() => {}}
+          onSelectItem={() => {}}
+        />
+      ) : currentPhase === 'slide_canvas' ? (
+        <SlideCanvas
+          slides={[]}
+          assets={[]}
+          activeIdx={0}
+          selectedTextId={null}
+          selectedElementId={null}
+          onChange={() => {}}
+          onActiveChange={() => {}}
+          onSelectText={() => {}}
+          onSelectElement={() => {}}
+        />
+      ) : currentPhase === 'resolve_shot' ? (
+        <ResolveShotWorkbench
+          shot={{
+            project_id: 'local', shot_id: 'shot_1', start_seconds: 0, end_seconds: 5, duration: 5,
+            frame_url: '', visual_description: 'Test Shot', editor_text: '', source_text: '',
+            content_type: 'b_roll', source_type: 'original', likely_source: 'Test',
+            confidence: 'confirmed', exact_source_found: true, clean_source_url: '',
+            license_status: 'unresolved', replacement_needed: false, replacement_prompt: '',
+            search_queries: [], notes: ''
+          }}
+          onClose={() => setCurrentPhase('home')}
+          onResolveAsset={() => {}}
+        />
+      ) : currentPhase === 'deconstruction' ? (
+        <DeconstructionDrawer
+          asset={{
+            id: 'test', projectId: 'local', assetKind: 'reference_evidence',
+            rightsStatus: 'unresolved', productionEligible: false, title: 'Test Asset',
+            createdAt: 0, updatedAt: 0
+          }}
+          onClose={() => setCurrentPhase('home')}
+          onApplyRemix={() => {}}
         />
       ) : (
         <HomeView

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Loader2, Zap, Copy, Check, Video, FileText, ArrowRight, ShieldCheck, X, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface ProofAsset {
   title: string;

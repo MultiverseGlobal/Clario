@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { 
-  Settings, Key, Users, Building2, Save, Globe, Lock, Mail, AtSign
+  Settings, Key, Users, Building2, Save, Globe, Lock, Mail, AtSign, Trash2, UserPlus
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,6 +26,12 @@ export default function HqSettings() {
   const [proxyUrl, setProxyUrl] = useState("");
   const [proxyAuth, setProxyAuth] = useState("");
   
+  // Team management
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [newMemberEmail, setNewMemberEmail] = useState("");
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [inviting, setInviting] = useState(false);
+  
   useEffect(() => {
     async function loadSettings() {
       if (!user) return;
@@ -43,7 +50,19 @@ export default function HqSettings() {
         setSenderEmail(data.sender_email || "");
         setProxyUrl(data.proxy_url || "");
         setProxyAuth(data.proxy_auth || "");
+        setWorkspaceName(data.workspace_name || "Multiverse Global");
+        setDomain(data.workspace_domain || "multiverse.global");
       }
+      
+      const { data: teamData } = await supabase
+        .from('atlas_team_members')
+        .select('*')
+        .eq('workspace_id', user.id);
+        
+      if (teamData) {
+        setTeamMembers(teamData);
+      }
+      
       setLoading(false);
     }
     loadSettings();
@@ -61,6 +80,8 @@ export default function HqSettings() {
       sender_email: senderEmail,
       proxy_url: proxyUrl || null,
       proxy_auth: proxyAuth || null,
+      workspace_name: workspaceName,
+      workspace_domain: domain,
       updated_at: new Date().toISOString(),
     };
 
@@ -73,6 +94,48 @@ export default function HqSettings() {
       return;
     }
     toast.success(`${section} settings saved.`);
+  };
+
+  const handleInvite = async () => {
+    if (!user || !newMemberEmail) return;
+    setInviting(true);
+    
+    const { data, error } = await supabase
+      .from('atlas_team_members')
+      .insert({
+        workspace_id: user.id,
+        email: newMemberEmail.toLowerCase(),
+        role: 'admin',
+        status: 'active'
+      })
+      .select()
+      .single();
+      
+    if (error) {
+      toast.error(`Failed to invite user: ${error.message}`);
+    } else if (data) {
+      setTeamMembers([...teamMembers, data]);
+      setNewMemberEmail("");
+      setInviteDialogOpen(false);
+      toast.success("User invited successfully.");
+    }
+    
+    setInviting(false);
+  };
+  
+  const handleRemoveMember = async (id: string) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from('atlas_team_members')
+      .delete()
+      .eq('id', id);
+      
+    if (error) {
+      toast.error(`Failed to remove user: ${error.message}`);
+    } else {
+      setTeamMembers(teamMembers.filter(m => m.id !== id));
+      toast.success("User removed from workspace.");
+    }
   };
 
   return (
@@ -301,32 +364,104 @@ export default function HqSettings() {
                   <h2 className="text-base font-semibold tracking-tight">Team Access</h2>
                   <p className="text-xs text-muted-foreground mt-0.5">Manage operator permissions.</p>
                 </div>
-                <Button size="sm" className="h-9 bg-foreground text-background px-4 text-xs font-semibold">
-                  Invite User
-                </Button>
+                
+                <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="h-9 bg-foreground text-background px-4 text-xs font-semibold">
+                      Invite User
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px] bg-background border-border/60">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <UserPlus className="h-4 w-4" /> Invite Team Member
+                      </DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="email" className="text-xs font-semibold text-muted-foreground uppercase">Email Address</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="operator@company.com"
+                          value={newMemberEmail}
+                          onChange={(e) => setNewMemberEmail(e.target.value)}
+                          className="bg-background/50 border-border/60"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" onClick={() => setInviteDialogOpen(false)}>Cancel</Button>
+                      <Button onClick={handleInvite} disabled={inviting || !newMemberEmail.includes('@')}>
+                        {inviting ? "Inviting..." : "Send Invite"}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
 
               <div className="border border-border/60 rounded-lg overflow-hidden bg-background">
-                <div className="grid grid-cols-[1fr_100px_100px] gap-4 p-3 bg-muted/20 border-b border-border/60 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <div className="grid grid-cols-[1fr_100px_80px_40px] gap-4 p-3 bg-muted/20 border-b border-border/60 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                   <div>Operator</div>
                   <div>Clearance</div>
                   <div className="text-right">Status</div>
+                  <div></div>
                 </div>
-                <div className="grid grid-cols-[1fr_100px_100px] gap-4 p-4 items-center text-sm">
+                
+                {/* Current User (Owner) */}
+                <div className="grid grid-cols-[1fr_100px_80px_40px] gap-4 p-4 items-center text-sm border-b border-border/40">
                   <div className="flex items-center gap-3">
                     <div className="h-8 w-8 rounded bg-foreground text-background flex items-center justify-center font-bold font-display text-sm">
-                      A
+                      {user?.email?.charAt(0).toUpperCase() || 'U'}
                     </div>
                     <div>
-                      <div className="font-semibold text-sm">Alex Founder</div>
-                      <div className="text-[11px] font-mono text-muted-foreground mt-0.5">alex@multiverse.global</div>
+                      <div className="font-semibold text-sm">Workspace Owner</div>
+                      <div className="text-[11px] font-mono text-muted-foreground mt-0.5">{user?.email}</div>
                     </div>
                   </div>
-                  <div className="text-xs font-semibold">Admin</div>
+                  <div className="text-xs font-semibold">Owner</div>
                   <div className="text-right">
                     <span className="text-[9px] uppercase font-mono tracking-wider font-bold bg-emerald-500/10 text-emerald-500 px-2 py-1 rounded border border-emerald-500/20">Active</span>
                   </div>
+                  <div></div>
                 </div>
+                
+                {/* Invited Members */}
+                {teamMembers.map((member) => (
+                  <div key={member.id} className="grid grid-cols-[1fr_100px_80px_40px] gap-4 p-4 items-center text-sm border-b border-border/40 last:border-0">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded bg-muted/50 flex items-center justify-center font-bold font-display text-sm text-muted-foreground">
+                        {member.email.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-sm">Team Member</div>
+                        <div className="text-[11px] font-mono text-muted-foreground mt-0.5">{member.email}</div>
+                      </div>
+                    </div>
+                    <div className="text-xs font-semibold capitalize">{member.role}</div>
+                    <div className="text-right">
+                      <span className="text-[9px] uppercase font-mono tracking-wider font-bold bg-emerald-500/10 text-emerald-500 px-2 py-1 rounded border border-emerald-500/20">
+                        {member.status}
+                      </span>
+                    </div>
+                    <div className="flex justify-end">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-muted-foreground hover:text-red-400 hover:bg-red-500/10"
+                        onClick={() => handleRemoveMember(member.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                
+                {teamMembers.length === 0 && (
+                  <div className="p-8 text-center text-sm text-muted-foreground">
+                    No team members invited yet.
+                  </div>
+                )}
               </div>
             </div>
           </TabsContent>
@@ -335,3 +470,4 @@ export default function HqSettings() {
     </div>
   );
 }
+

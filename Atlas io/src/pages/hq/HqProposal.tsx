@@ -208,9 +208,9 @@ export default function HqProposal() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground print:bg-white print:text-black">
       {/* Header */}
-      <div className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur-sm px-6 py-3">
+      <div className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur-sm px-6 py-3 print:hidden">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => navigate(id ? `/hq/leads/${id}` : "/hq/leads")} className="h-7 w-7 p-0">
             <ArrowLeft className="h-4 w-4" />
@@ -220,7 +220,11 @@ export default function HqProposal() {
             <p className="text-xs text-muted-foreground font-mono">Scope · Deliverables · Timeline · Investment</p>
           </div>
           {proposal && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 print:hidden">
+              <Button variant="outline" size="sm" onClick={() => window.print()} className="h-8 text-xs border-border/60 gap-1.5">
+                <Download className="h-3.5 w-3.5" />
+                PDF Export
+              </Button>
               <Button variant="outline" size="sm" onClick={handleCopy} className="h-8 text-xs border-border/60 gap-1.5">
                 {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
                 {copied ? "Copied" : "Copy"}
@@ -234,9 +238,9 @@ export default function HqProposal() {
         </div>
       </div>
 
-      <div className="p-6 max-w-4xl mx-auto space-y-6">
+      <div className="p-6 max-w-4xl mx-auto space-y-6 print:p-0 print:m-0 print:max-w-none">
         {/* Form */}
-        <div className="rounded-xl border border-border/60 bg-card p-5 space-y-5">
+        <div className="rounded-xl border border-border/60 bg-card p-5 space-y-5 print:hidden">
           <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Project Details</h2>
 
           {/* Company selector */}
@@ -408,7 +412,11 @@ export default function HqProposal() {
             )}
 
             {/* Actions */}
-            <div className="flex gap-2 pt-2">
+            <div className="flex gap-2 pt-2 print:hidden">
+              <Button variant="outline" onClick={() => window.print()} className="h-9 text-xs border-border/60 gap-1.5">
+                <Download className="h-3.5 w-3.5" />
+                Export PDF
+              </Button>
               <Button variant="outline" onClick={handleCopy} className="h-9 text-xs border-border/60 gap-1.5">
                 {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
                 {copied ? "Copied!" : "Copy full proposal"}
@@ -434,8 +442,8 @@ function ProposalSection({ title, icon, content, highlight }: { title: string; i
   const titleColor = highlight === "amber" ? "text-amber-400" : highlight === "primary" ? "text-primary" : "text-muted-foreground";
 
   return (
-    <div className={`rounded-xl border ${borderColor} ${bgColor} p-5 space-y-2`}>
-      <h3 className={`text-xs font-semibold ${titleColor} uppercase tracking-wider`}>{icon} {title}</h3>
+    <div className={`rounded-xl border ${borderColor} ${bgColor} p-5 space-y-2 print:border-none print:bg-transparent print:p-0 print:mb-6`}>
+      <h3 className={`text-xs font-semibold ${titleColor} uppercase tracking-wider print:text-black print:font-bold`}>{icon} {title}</h3>
       <p className="text-sm leading-relaxed whitespace-pre-wrap">{content}</p>
     </div>
   );

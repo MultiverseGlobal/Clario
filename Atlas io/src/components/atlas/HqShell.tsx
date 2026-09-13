@@ -6,6 +6,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { NewLeadModal } from "@/components/atlas/NewLeadModal";
 import { FloatingNav } from "@/components/atlas/FloatingNav";
+import { TheVaultDrawer } from "@/components/atlas/TheVaultDrawer";
+import { ChatDrawer } from "@/components/atlas/ChatDrawer";
 
 
 
@@ -118,6 +120,8 @@ export default function HqShell() {
   const location = useLocation();
 
   const [newLeadOpen, setNewLeadOpen] = useState(false);
+  const [vaultOpen, setVaultOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) navigate("/auth");
@@ -184,6 +188,8 @@ export default function HqShell() {
             accent: "currentColor",
             commands: [
               { id: "newlead",  label: "New Lead",       description: "Add to pipeline",       accent: "currentColor", shortcut: "⌘N", action: () => setNewLeadOpen(true) },
+              { id: "vault",    label: "The Vault",      description: "Browse resources and tools", action: () => setVaultOpen(true) },
+              { id: "chat",     label: "Atlas AI Chat",  description: "Talk to Atlas",         action: () => setChatOpen(true) },
               { id: "engine",   label: "Revenue Engine", description: "Run today's prospects", accent: "currentColor", action: () => navigate("/hq/engine") },
               { id: "briefing", label: "Daily Briefing", description: "Review today's top 3 qualified opportunities", shortcut: "G B", action: () => navigate("/briefing") },
               { id: "objectives",label: "Define Hunt",   description: "Declare commercial intent & lock search thesis", shortcut: "G O", action: () => navigate("/objectives") },
@@ -197,6 +203,10 @@ export default function HqShell() {
 
       {/* ── New Lead Modal ──────────────────────────────────────────────────── */}
       <NewLeadModal open={newLeadOpen} onClose={() => setNewLeadOpen(false)} />
+      
+      {/* ── Drawers ─────────────────────────────────────────────────────────── */}
+      <TheVaultDrawer open={vaultOpen} onClose={() => setVaultOpen(false)} onOpenChat={() => setChatOpen(true)} />
+      <ChatDrawer open={chatOpen} onClose={() => setChatOpen(false)} />
     </div>
   );
 }

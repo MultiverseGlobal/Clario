@@ -7,9 +7,12 @@ import { ALLOWED_TEAM_EMAILS } from "@/lib/adminConfig";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function HqTeam() {
+  const { user } = useAuth();
   const [testingFunction, setTestingFunction] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [systemCheck, setSystemCheck] = useState<{
     functionOk: boolean;
     aiKeyOk: boolean;
@@ -48,7 +51,21 @@ export default function HqTeam() {
 
   useEffect(() => {
     performSystemCheck();
-  }, []);
+    
+    async function loadTeam() {
+      if (!user) return;
+      const { data } = await supabase
+        .from('atlas_team_members')
+        .select('*')
+        .eq('workspace_id', user.id);
+      
+      if (data) {
+        setTeamMembers(data);
+      }
+    }
+    
+    loadTeam();
+  }, [user]);
 
   return (
     <div className="p-6 md:p-8 space-y-8 bg-background min-h-screen text-foreground relative overflow-hidden">
@@ -78,15 +95,25 @@ export default function HqTeam() {
             </div>
 
             <div className="divide-y divide-border/40 max-h-[350px] overflow-y-auto">
-              {ALLOWED_TEAM_EMAILS.map((email, idx) => (
-                <div key={idx} className="flex items-center justify-between py-3">
+              <div className="flex items-center justify-between py-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center border border-border/30">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <span className="text-sm font-medium">{user?.email || 'Owner'}</span>
+                </div>
+                <span className="text-[10px] font-mono uppercase bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 rounded">Owner</span>
+              </div>
+              
+              {teamMembers.map((member, idx) => (
+                <div key={member.id} className="flex items-center justify-between py-3">
                   <div className="flex items-center gap-3">
                     <div className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center border border-border/30">
                       <Mail className="h-4 w-4 text-muted-foreground" />
                     </div>
-                    <span className="text-sm font-medium">{email}</span>
+                    <span className="text-sm font-medium">{member.email}</span>
                   </div>
-                  <span className="text-[10px] font-mono uppercase bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 rounded">Owner / Admin</span>
+                  <span className="text-[10px] font-mono uppercase bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 rounded capitalize">{member.role}</span>
                 </div>
               ))}
             </div>
@@ -94,7 +121,7 @@ export default function HqTeam() {
             <div className="rounded-lg border border-border/40 bg-muted/20 p-4 flex gap-3.5 items-start mt-4">
               <HelpCircle className="h-5 w-5 text-muted-foreground/60 shrink-0 mt-0.5" />
               <div className="text-xs text-muted-foreground leading-relaxed">
-                To expand team access, append allowed email addresses to the `ALLOWED_TEAM_EMAILS` array inside [adminConfig.ts](file:///c:/Users/SUDO/Documents/Atlas%20io/src/lib/adminConfig.ts).
+                To expand team access, invite users from the [Workspace Settings](file:///c:/Users/SUDO/Documents/Pseudonyms/Atlas%20io/src/pages/hq/HqSettings.tsx) Team Access panel. They will automatically be granted workspace administrative access.
               </div>
             </div>
           </div>

@@ -51,9 +51,23 @@ export default function HqReport() {
     if (!user) return;
     setLoading(true);
     try {
-      // Load from atlas-specific reports in Supabase reports table or a local cache
-      // For now, generate fresh report data from actual data
-      setReports([]);
+      const { data, error } = await (supabase as any)
+        .from("atlas_reports")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      
+      if (error) throw error;
+      
+      if (data) {
+        setReports(data.map((r: any) => ({
+          id: r.id,
+          week_start: r.week_start,
+          week_end: r.week_end,
+          generated_at: r.created_at,
+          content: r.content
+        })));
+      }
     } catch (err: any) {
       toast.error("Failed to load reports: " + err.message);
     } finally {
@@ -129,32 +143,47 @@ export default function HqReport() {
         aiContent.whats_not = generateNotWorkingInsight(stalledDeals.length, outreach_sent, replyRate);
         aiContent.the_decision = generateDecision(outreach_sent, stalledDeals, activeDeals, pct);
       }
+      
+      const reportContent = {
+        revenue_this_month,
+        pipeline_weighted,
+        deals_won: wonDeals.length,
+        deals_lost: lostDeals.length,
+        outreach_sent,
+        replies,
+        advanced: [],
+        stalled: stalledDeals.map((d) => ({ company: d.company_name, days: d.daysSince })),
+        lost_deals: lostDeals.slice(0, 3).map((d) => ({ company: d.company_name, reason: d.lost_reason })),
+        whats_working: aiContent.whats_working,
+        whats_not: aiContent.whats_not,
+        next_week_priorities: generatePriorities(stalledDeals, outreach_sent, activeDeals, pct),
+        the_decision: aiContent.the_decision,
+      };
+
+      const { data: insertedReport, error: insertError } = await (supabase as any)
+        .from("atlas_reports")
+        .insert({
+          user_id: user.id,
+          week_start: weekStart.toISOString(),
+          week_end: weekEnd.toISOString(),
+          content: reportContent
+        })
+        .select()
+        .single();
+        
+      if (insertError) throw insertError;
 
       const report: WeeklyReport = {
-        id: `report-${Date.now()}`,
-        week_start: weekStart.toISOString(),
-        week_end: weekEnd.toISOString(),
-        generated_at: now.toISOString(),
-        content: {
-          revenue_this_month,
-          pipeline_weighted,
-          deals_won: wonDeals.length,
-          deals_lost: lostDeals.length,
-          outreach_sent,
-          replies,
-          advanced: [],
-          stalled: stalledDeals.map((d) => ({ company: d.company_name, days: d.daysSince })),
-          lost_deals: lostDeals.slice(0, 3).map((d) => ({ company: d.company_name, reason: d.lost_reason })),
-          whats_working: aiContent.whats_working,
-          whats_not: aiContent.whats_not,
-          next_week_priorities: generatePriorities(stalledDeals, outreach_sent, activeDeals, pct),
-          the_decision: aiContent.the_decision,
-        },
+        id: insertedReport.id,
+        week_start: insertedReport.week_start,
+        week_end: insertedReport.week_end,
+        generated_at: insertedReport.created_at,
+        content: insertedReport.content as any,
       };
 
       setReports((prev) => [report, ...prev]);
       setCurrentIdx(0);
-      toast.success("Weekly report generated");
+      toast.success("Weekly report generated and saved");
     } catch (err: any) {
       toast.error("Report generation failed: " + err.message);
     } finally {

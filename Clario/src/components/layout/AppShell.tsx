@@ -10,7 +10,11 @@ export type ClarioPhase =
   | 'reference_library'
   | 'deliverable'
   | 'studio'
-  | 'preview';
+  | 'preview'
+  | 'video_canvas'
+  | 'slide_canvas'
+  | 'resolve_shot'
+  | 'deconstruction';
 
 interface AppShellProps {
   children: ReactNode;
@@ -89,6 +93,10 @@ export function AppShell({
           commands: [
             { id: 'projects',          label: 'All Projects',      accent: 'var(--pds-accent)', action: () => onNavigatePhase('home') },
             { id: 'reference-library', label: 'Reference Library', accent: 'var(--pds-accent)', action: () => onNavigatePhase('reference_library') },
+            { id: 'video-canvas',      label: 'Video Canvas',      accent: 'var(--pds-accent)', action: () => onNavigatePhase('video_canvas') },
+            { id: 'slide-canvas',      label: 'Slide Canvas',      accent: 'var(--pds-accent)', action: () => onNavigatePhase('slide_canvas') },
+            { id: 'resolve-shot',      label: 'Resolve Shot',      accent: 'var(--pds-accent)', action: () => onNavigatePhase('resolve_shot') },
+            { id: 'deconstruction',    label: 'Deconstruction',    accent: 'var(--pds-accent)', action: () => onNavigatePhase('deconstruction') },
           ],
         }]}
       />

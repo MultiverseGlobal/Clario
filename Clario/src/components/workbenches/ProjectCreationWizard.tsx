@@ -102,7 +102,7 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
     form.append('mode', projectType === 'video' ? 'video_harvester' : 'slide_harvester');
 
     try {
-      const res = await fetchAuth(`${serverBase}/harvest/ingest-file`, {
+      const res = await fetchAuth(`${serverBase}/reference/ingest-file`, {
         method: 'POST',
         body: form,
       });
@@ -170,7 +170,7 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
     form.append('mode', 'video_harvester');
 
     try {
-      const res = await fetchAuth(`${serverBase}/harvest/ingest-file`, {
+      const res = await fetchAuth(`${serverBase}/reference/ingest-file`, {
         method: 'POST',
         body: form,
       });

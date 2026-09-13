@@ -132,6 +132,9 @@ export function ClipPreviewModal({
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="preview-modal-title"
         onClick={e => e.stopPropagation()}
         style={{
           width: '100%',
@@ -241,8 +244,9 @@ export function ClipPreviewModal({
 
             {/* Center Big Play Button Overlay on Pause */}
             {!isPlaying && (
-              <div
+              <button
                 onClick={togglePlay}
+                aria-label="Play video"
                 style={{
                   position: 'absolute',
                   inset: 0,
@@ -270,7 +274,7 @@ export function ClipPreviewModal({
                 >
                   ▶
                 </div>
-              </div>
+              </button>
             )}
           </div>
 
@@ -283,6 +287,7 @@ export function ClipPreviewModal({
               </span>
               <input
                 type="range"
+                aria-label="Seek video"
                 min={0}
                 max={duration}
                 step={0.01}
@@ -305,6 +310,7 @@ export function ClipPreviewModal({
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <button
                   onClick={togglePlay}
+                  aria-label={isPlaying ? "Pause" : "Play"}
                   style={{
                     width: 32,
                     height: 32,
@@ -324,6 +330,7 @@ export function ClipPreviewModal({
 
                 <button
                   onClick={() => setIsLooping(!isLooping)}
+                  aria-label={isLooping ? "Disable loop" : "Enable loop"}
                   style={{
                     padding: '4px 8px',
                     borderRadius: 6,
@@ -344,6 +351,7 @@ export function ClipPreviewModal({
                     if (videoRef.current) videoRef.current.muted = !isMuted;
                     setIsMuted(!isMuted);
                   }}
+                  aria-label={isMuted ? "Unmute" : "Mute"}
                   style={{
                     padding: '4px 8px',
                     borderRadius: 6,
@@ -364,6 +372,7 @@ export function ClipPreviewModal({
                 {[0.5, 1, 2].map(spd => (
                   <button
                     key={spd}
+                    aria-label={`Set playback speed to ${spd}x`}
                     onClick={() => {
                       setPlaybackSpeed(spd);
                       if (videoRef.current) videoRef.current.playbackRate = spd;
@@ -412,12 +421,13 @@ export function ClipPreviewModal({
                 </span>
                 <RightsBadge status={shot.rights_status || shot.license_status} size="sm" />
               </div>
-              <h2 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
+              <h2 id="preview-modal-title" style={{ fontSize: 18, fontWeight: 800, margin: 0, color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
                 {shot.likely_source !== 'Unresolved' ? shot.likely_source : shot.visual_description}
               </h2>
             </div>
             <button
               onClick={onClose}
+              aria-label="Close preview"
               style={{
                 width: 32,
                 height: 32,

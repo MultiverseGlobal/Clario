@@ -8,10 +8,12 @@ import {
   Settings,
   Layers,
   Video,
+  Server,
 } from "lucide-react";
 import { EcosystemSwitcher } from "../ui/EcosystemSwitcher";
 import { ClarioLogo } from "../ui/ClarioLogo";
 import { ClarioPhase } from "./AppShell";
+import { checkServerHealth } from "../../lib/apiClient";
 
 interface FloatingNavProps {
   currentPhase: ClarioPhase;
@@ -32,7 +34,22 @@ export function FloatingNav({
   onOpenApiKeyModal,
 }: FloatingNavProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [serverHealthy, setServerHealthy] = useState(true);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const check = async () => {
+      const healthy = await checkServerHealth();
+      if (mounted) setServerHealthy(healthy);
+    };
+    check();
+    const interval = setInterval(check, 30000);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -138,6 +155,42 @@ export function FloatingNav({
           </button>
 
 
+          {/* Video Canvas */}
+          <button
+            onClick={() => onNavigatePhase("video_canvas")}
+            title="Video Canvas"
+            className={`group flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all duration-300 ease-out ${
+              currentPhase === "video_canvas"
+                ? "bg-foreground text-background shadow-sm"
+                : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+            }`}
+          >
+            <Video className={`w-3.5 h-3.5 ${currentPhase === "video_canvas" ? "" : "opacity-70 group-hover:opacity-100 transition-opacity"}`} />
+            <span className={`text-[11px] font-semibold font-mono tracking-wide whitespace-nowrap overflow-hidden transition-all duration-300 ease-out ${
+              currentPhase === "video_canvas" ? "max-w-24 opacity-100" : "max-w-0 opacity-0 group-hover:max-w-24 group-hover:opacity-100 group-hover:ml-2"
+            }`}>
+              Video
+            </span>
+          </button>
+
+          {/* Slide Canvas */}
+          <button
+            onClick={() => onNavigatePhase("slide_canvas")}
+            title="Slide Canvas"
+            className={`group flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all duration-300 ease-out ${
+              currentPhase === "slide_canvas"
+                ? "bg-foreground text-background shadow-sm"
+                : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+            }`}
+          >
+            <Layers className={`w-3.5 h-3.5 ${currentPhase === "slide_canvas" ? "" : "opacity-70 group-hover:opacity-100 transition-opacity"}`} />
+            <span className={`text-[11px] font-semibold font-mono tracking-wide whitespace-nowrap overflow-hidden transition-all duration-300 ease-out ${
+              currentPhase === "slide_canvas" ? "max-w-24 opacity-100" : "max-w-0 opacity-0 group-hover:max-w-24 group-hover:opacity-100 group-hover:ml-2"
+            }`}>
+              Slides
+            </span>
+          </button>
+
           {/* Record */}
           <button
             onClick={() => onNavigatePhase("studio")}
@@ -173,6 +226,15 @@ export function FloatingNav({
           </button>
 
           <div className="w-px h-4 bg-border/50 mx-1 shrink-0" />
+
+          {/* Server Health */}
+          <div className="group relative flex items-center justify-center px-2 cursor-help" title={serverHealthy ? "Backend Connected" : "Backend Offline"}>
+            <Server className={`w-3.5 h-3.5 ${serverHealthy ? 'text-emerald-500' : 'text-red-500'} transition-colors`} />
+            {!serverHealthy && <div className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
+            <span className="absolute top-full right-0 mt-2 bg-card border border-border p-1.5 rounded-md text-[10px] font-mono text-foreground opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-xl z-50">
+              {serverHealthy ? "API: Online" : "API: Offline (Check Settings)"}
+            </span>
+          </div>
 
           <div className="px-1.5 flex items-center justify-center">
             <EcosystemSwitcher />

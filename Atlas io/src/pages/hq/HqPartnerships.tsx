@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Users2, Loader2, Plus, Building2, Mail, Network, ArrowUpRight, DollarSign } from "lucide-react";
+import { Users2, Loader2, Plus, Building2, Mail, Network, ArrowUpRight, DollarSign, MoreVertical, Trash2, Edit2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 export default function HqPartnerships() {
   const { user } = useAuth();
@@ -16,6 +17,10 @@ export default function HqPartnerships() {
   
   const [showAddPartner, setShowAddPartner] = useState(false);
   const [newPartner, setNewPartner] = useState({ name: "", company: "", email: "", type: "agency" });
+  
+  const [showEditPartner, setShowEditPartner] = useState(false);
+  const [editPartner, setEditPartner] = useState<any>(null);
+  
   const [saving, setSaving] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -56,6 +61,42 @@ export default function HqPartnerships() {
     }
   };
 
+  const handleUpdatePartner = async () => {
+    if (!editPartner?.partner_name?.trim() || !user) return;
+    setSaving(true);
+    try {
+      await (supabase as any).from("atlas_partnerships").update({
+        partner_name: editPartner.partner_name,
+        partner_company: editPartner.partner_company,
+        partner_email: editPartner.partner_email,
+        partner_type: editPartner.partner_type,
+      }).eq("id", editPartner.id);
+      toast.success("Partner updated");
+      setShowEditPartner(false);
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeletePartner = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this partner?")) return;
+    try {
+      await (supabase as any).from("atlas_partnerships").delete().eq("id", id);
+      toast.success("Partner deleted");
+      loadData();
+    } catch (err: any) {
+      toast.error("Failed to delete partner");
+    }
+  };
+
+  const openEditModal = (p: any) => {
+    setEditPartner({ ...p });
+    setShowEditPartner(true);
+  };
+
   return (
     <div className="p-6 md:p-10 max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col gap-2">
@@ -91,9 +132,26 @@ export default function HqPartnerships() {
                   <h3 className="font-bold text-foreground">{p.partner_company || "Independent Partner"}</h3>
                   <div className="text-sm text-muted-foreground">{p.partner_name}</div>
                 </div>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-indigo-500/30 bg-indigo-500/10 text-indigo-400 uppercase">
-                  {p.partner_type}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-indigo-500/30 bg-indigo-500/10 text-indigo-400 uppercase">
+                    {p.partner_type}
+                  </span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md">
+                        <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => openEditModal(p)}>
+                        <Edit2 className="h-4 w-4 mr-2" /> Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDeletePartner(p.id)} className="text-destructive focus:text-destructive">
+                        <Trash2 className="h-4 w-4 mr-2" /> Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
               
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -101,7 +159,7 @@ export default function HqPartnerships() {
               </div>
 
               <div className="pt-4 border-t border-border/40 flex justify-between items-center">
-                <div className="text-xs font-mono font-medium">{p.commission_rate}% Commission</div>
+                <div className="text-xs font-mono font-medium">{p.commission_rate || 0}% Commission</div>
                 <Button variant="ghost" size="sm" className="h-7 text-[10px] uppercase tracking-wider">
                   View Referrals <ArrowUpRight className="h-3 w-3 ml-1" />
                 </Button>
@@ -149,6 +207,51 @@ export default function HqPartnerships() {
             <Button variant="ghost" onClick={() => setShowAddPartner(false)}>Cancel</Button>
             <Button onClick={handleCreatePartner} disabled={!newPartner.name.trim() || saving}>
               {saving ? "Saving..." : "Add Partner"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Edit Partner Dialog */}
+      <Dialog open={showEditPartner} onOpenChange={setShowEditPartner}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Partner</DialogTitle>
+          </DialogHeader>
+          {editPartner && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label className="text-xs font-medium">Partner Name *</label>
+                <Input value={editPartner.partner_name || ""} onChange={e => setEditPartner({...editPartner, partner_name: e.target.value})} placeholder="e.g. John Smith" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-medium">Company / Agency Name</label>
+                <Input value={editPartner.partner_company || ""} onChange={e => setEditPartner({...editPartner, partner_company: e.target.value})} placeholder="e.g. Acme Agency" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-medium">Email</label>
+                <Input type="email" value={editPartner.partner_email || ""} onChange={e => setEditPartner({...editPartner, partner_email: e.target.value})} placeholder="john@acme.com" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-medium">Partner Type</label>
+                <Select value={editPartner.partner_type || "agency"} onValueChange={v => setEditPartner({...editPartner, partner_type: v})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="agency">Agency</SelectItem>
+                    <SelectItem value="vc">VC / Investor</SelectItem>
+                    <SelectItem value="fractional">Fractional Exec</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowEditPartner(false)}>Cancel</Button>
+            <Button onClick={handleUpdatePartner} disabled={!editPartner?.partner_name?.trim() || saving}>
+              {saving ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>

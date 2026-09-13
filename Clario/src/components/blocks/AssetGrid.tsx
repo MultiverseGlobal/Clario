@@ -71,7 +71,7 @@ export function AssetGrid({ assets, onToggle, onPreview, label }: AssetGridProps
             {/* Grid */}
             {type === 'audio' ? (
               // Audio is full width, stacked
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div role="group" aria-label={`${typeLabels[type] ?? type} assets`} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {groupAssets.map((asset, i) => (
                   <AssetCard
                     key={asset.id}
@@ -85,7 +85,7 @@ export function AssetGrid({ assets, onToggle, onPreview, label }: AssetGridProps
               </div>
             ) : type === 'palette' ? (
               // Palettes: horizontal strip
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
+              <div role="group" aria-label={`${typeLabels[type] ?? type} assets`} style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
                 {groupAssets.map((asset, i) => (
                   <AssetCard
                     key={asset.id}
@@ -98,7 +98,7 @@ export function AssetGrid({ assets, onToggle, onPreview, label }: AssetGridProps
                 ))}
               </div>
             ) : (
-              <div style={{
+              <div role="group" aria-label={`${typeLabels[type] ?? type} assets`} style={{
                 display: 'grid',
                 gridTemplateColumns: colsMap[type] ?? 'repeat(auto-fill, minmax(200px, 1fr))',
                 gap: 8,

@@ -92,6 +92,16 @@ export function AssetCard({ asset, selected, onToggle, onPreview, delay = 0 }: A
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={onToggle}
+      role="button"
+      tabIndex={0}
+      aria-pressed={selected}
+      aria-label={`Select ${asset.label} of type ${asset.type}`}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onToggle();
+        }
+      }}
     >
       <div
         style={{
@@ -129,11 +139,12 @@ export function AssetCard({ asset, selected, onToggle, onPreview, delay = 0 }: A
 
         {/* Hover Play / Preview Button */}
         {onPreview && (isVideo || hasThumb) && (
-          <div
+          <button
             onClick={(e) => {
               e.stopPropagation();
               onPreview(asset);
             }}
+            aria-label={`Preview ${asset.label}`}
             style={{
               position: 'absolute',
               inset: 0,
@@ -144,6 +155,8 @@ export function AssetCard({ asset, selected, onToggle, onPreview, delay = 0 }: A
               opacity: hovered ? 1 : 0,
               transition: 'opacity 0.15s ease',
               backdropFilter: 'blur(2px)',
+              border: 'none',
+              cursor: 'pointer',
             }}
           >
             <div style={{
@@ -163,7 +176,7 @@ export function AssetCard({ asset, selected, onToggle, onPreview, delay = 0 }: A
                 <path d="M4 2.5v11a1 1 0 001.5.86l9-5.5a1 1 0 000-1.72l-9-5.5A1 1 0 004 2.5z"/>
               </svg>
             </div>
-          </div>
+          </button>
         )}
 
         {/* Duration overlay for clips */}

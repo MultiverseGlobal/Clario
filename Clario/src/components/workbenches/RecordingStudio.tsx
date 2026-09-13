@@ -239,7 +239,7 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
       <div className="flex-1 relative flex flex-col lg:flex-row items-center justify-center p-6 lg:p-12 pt-0 lg:pt-0 gap-6 lg:gap-12 z-10 pb-32 overflow-y-auto lg:overflow-hidden">
 
         {/* Screen Canvas */}
-        <div className="relative w-full max-w-5xl aspect-video rounded-[24px] shadow-2xl clario-frame-card overflow-hidden ring-1 ring-white/10 bg-black shrink-0">
+        <div ref={(el) => { if (el) (window as any).clarioStudioContainer = el; }} className="relative w-full max-w-5xl aspect-video rounded-[24px] shadow-2xl clario-frame-card overflow-hidden ring-1 ring-white/10 bg-black shrink-0">
 
           {/* Pre-flight overlay */}
           <AnimatePresence>
@@ -353,7 +353,11 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
         </button>
         <button
           className="p-3 rounded-full hover:bg-white/10 text-white/70 transition-colors"
-          onClick={() => screenVideoRef.current?.requestFullscreen?.()}
+          onClick={() => {
+            const el = (window as any).clarioStudioContainer;
+            if (el && el.requestFullscreen) el.requestFullscreen();
+            else if (screenVideoRef.current?.requestFullscreen) screenVideoRef.current.requestFullscreen();
+          }}
           title="Fullscreen"
         >
           <Maximize className="w-5 h-5" />

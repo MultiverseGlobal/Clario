@@ -21,6 +21,11 @@ const ROUTES: Record<string, { label: string; icon: React.ElementType }> = {
   "/briefing":    { label: "Briefing",        icon: Radar },
   "/objectives":  { label: "Hunt",            icon: Crosshair },
   "/hq/engine":   { label: "Engine",          icon: Gauge },
+  "/hq/discover": { label: "Discover",        icon: Crosshair },
+  "/hq/partnerships":{label: "Partners",      icon: Zap },
+  "/hq/team":     { label: "Team",            icon: User },
+  "/hq/report":   { label: "Report",          icon: SlidersHorizontal },
+  "/hq/media-jobs": { label: "Media",         icon: Radar },
   "/hq/settings": { label: "Settings",        icon: SlidersHorizontal },
 };
 

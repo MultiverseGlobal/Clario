@@ -30,6 +30,8 @@ const HqPartnerships = React.lazy(() => import("./pages/hq/HqPartnerships"));
 const HqTeam = React.lazy(() => import("./pages/hq/HqTeam"));
 const HqReport = React.lazy(() => import("./pages/hq/HqReport"));
 const HqMediaJobs = React.lazy(() => import("./pages/hq/HqMediaJobs"));
+const Privacy = React.lazy(() => import("./pages/Privacy"));
+const PublicProfile = React.lazy(() => import("./pages/PublicProfile"));
 
 const SovereignSyncWrapper = ({ children }: { children: React.ReactNode }) => {
   useSovereignSync();
@@ -77,6 +79,7 @@ const App = () => (
                     <Route path="team" element={<HqTeam />} />
                     <Route path="report" element={<HqReport />} />
                     <Route path="media-jobs" element={<HqMediaJobs />} />
+                    <Route path="leads" element={<Navigate to="/hq/engine" replace />} />
                     <Route path="leads/:id" element={<HqLeadDetail />} />
                     <Route path="leads/:id/proposal" element={<HqProposal />} />
                     <Route path="settings" element={<HqSettings />} />

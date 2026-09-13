@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { listProjects, deleteProject, ClarioProject } from '../../lib/projectStore';
-import { Play, Plus, Clock, FileVideo, Trash2 } from 'lucide-react';
+import { listProjects, deleteProject, saveProject, ClarioProject } from '../../lib/projectStore';
+import { Play, Plus, Clock, FileVideo, Trash2, Edit2 } from 'lucide-react';
 import { ProjectCreationWizard } from './ProjectCreationWizard';
 
 export function HomeView({ onSelectProject }: { onSelectProject: (p: ClarioProject) => void }) {
@@ -24,6 +24,8 @@ export function HomeView({ onSelectProject }: { onSelectProject: (p: ClarioProje
   }, []);
 
   const [projectToDelete, setProjectToDelete] = useState<ClarioProject | null>(null);
+  const [projectToEdit, setProjectToEdit] = useState<ClarioProject | null>(null);
+  const [editName, setEditName] = useState('');
 
   const handleCreate = () => {
     setShowWizard(true);
@@ -34,10 +36,24 @@ export function HomeView({ onSelectProject }: { onSelectProject: (p: ClarioProje
     setProjectToDelete(p);
   };
 
+  const handleEdit = (e: React.MouseEvent, p: ClarioProject) => {
+    e.stopPropagation();
+    setProjectToEdit(p);
+    setEditName(p.name);
+  };
+
   const confirmDelete = async () => {
     if (projectToDelete) {
       await deleteProject(projectToDelete.id);
       setProjectToDelete(null);
+      load();
+    }
+  };
+
+  const confirmEdit = async () => {
+    if (projectToEdit && editName.trim()) {
+      await saveProject({ ...projectToEdit, name: editName.trim() });
+      setProjectToEdit(null);
       load();
     }
   };
@@ -96,6 +112,13 @@ export function HomeView({ onSelectProject }: { onSelectProject: (p: ClarioProje
                 
                 <div className="flex items-center gap-2">
                   <button 
+                    onClick={(e) => handleEdit(e, p)}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-2 text-muted-foreground hover:text-foreground hover:bg-surface-3 rounded-lg"
+                    title="Rename Project"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button 
                     onClick={(e) => handleDelete(e, p)}
                     className="opacity-0 group-hover:opacity-100 transition-opacity p-2 text-red-500/70 hover:text-red-500 hover:bg-red-500/10 rounded-lg"
                     title="Delete Project"
@@ -148,6 +171,27 @@ export function HomeView({ onSelectProject }: { onSelectProject: (p: ClarioProje
             <div className="flex justify-end gap-3">
               <button className="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" onClick={() => setProjectToDelete(null)}>Cancel</button>
               <button className="px-4 py-2 text-sm font-medium rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors shadow-sm shadow-red-500/20" onClick={confirmDelete}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {projectToEdit && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fade-in" onClick={() => setProjectToEdit(null)}>
+          <div className="clario-glass-card max-w-sm w-full p-6 rounded-2xl shadow-2xl border border-border" onClick={e => e.stopPropagation()}>
+            <h3 className="font-display text-xl font-bold mb-4">Rename Project</h3>
+            <input
+              type="text"
+              value={editName}
+              onChange={e => setEditName(e.target.value)}
+              className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent mb-6"
+              placeholder="Project Name"
+              autoFocus
+              onKeyDown={e => e.key === 'Enter' && confirmEdit()}
+            />
+            <div className="flex justify-end gap-3">
+              <button className="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" onClick={() => setProjectToEdit(null)}>Cancel</button>
+              <button className="px-4 py-2 text-sm font-medium rounded-lg bg-accent text-white hover:bg-accent/90 transition-colors shadow-sm shadow-accent/20" onClick={confirmEdit}>Save</button>
             </div>
           </div>
         </div>
