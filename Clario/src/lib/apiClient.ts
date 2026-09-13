@@ -10,44 +10,27 @@ export function getApiBase(): string {
 
 export async function fetchApiBaseFromDb(): Promise<void> {
   try {
-    const { data: userAuth } = await supabase.auth.getUser();
-    if (userAuth.user) {
-      const { data } = await supabase
-        .from('clario_user_settings')
-        .select('api_base_url')
-        .eq('user_id', userAuth.user.id)
-        .maybeSingle();
-      if (data?.api_base_url) {
-        memoryApiBase = data.api_base_url;
-        return;
-      }
-    }
-  } catch (err) {
-    console.error("Failed to fetch api base from DB:", err);
-  }
-  
-  // Fallback migration from local storage
-  try {
     const custom = typeof window !== 'undefined' ? localStorage.getItem('clario_api_base') : null;
     if (custom) {
       memoryApiBase = custom;
-      await setApiBase(custom); // migrate
-      localStorage.removeItem('clario_api_base');
     }
-  } catch {}
+  } catch (err) {
+    console.error("Failed to fetch api base from local storage:", err);
+  }
 }
 
 export async function setApiBase(url: string) {
   memoryApiBase = url.trim();
   try {
-    const { data: userAuth } = await supabase.auth.getUser();
-    if (userAuth.user) {
-      await supabase
-        .from('clario_user_settings')
-        .upsert({ user_id: userAuth.user.id, api_base_url: memoryApiBase as any }, { onConflict: 'user_id' });
+    if (typeof window !== 'undefined') {
+      if (memoryApiBase) {
+        localStorage.setItem('clario_api_base', memoryApiBase);
+      } else {
+        localStorage.removeItem('clario_api_base');
+      }
     }
   } catch (err) {
-    console.error("Failed to save api base to DB:", err);
+    console.error("Failed to save api base to local storage:", err);
   }
 }
 
