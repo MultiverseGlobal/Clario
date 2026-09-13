@@ -50,9 +50,11 @@ from worker.vision_worker import analyze_shot_frame
 
 app = FastAPI(title="Clario Asset Intelligence Engine", version="1.0.0")
 
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:4173").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -60,6 +62,7 @@ app.add_middleware(
 
 MEDIA_ROOT = os.path.join(os.path.dirname(__file__), "storage")
 os.makedirs(MEDIA_ROOT, exist_ok=True)
+MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(200 * 1024 * 1024)))  # 200MB default
 
 class CORSMediaStaticFiles(StaticFiles):
     async def get_response(self, path: str, scope):
@@ -71,9 +74,6 @@ class CORSMediaStaticFiles(StaticFiles):
         return response
 
 app.mount("/media", CORSMediaStaticFiles(directory=MEDIA_ROOT), name="media")
-
-# Projects in-memory (TODO: move to Supabase as well)
-PROJECTS_DB: Dict[str, HarvestProject] = {}
 
 def update_job(job_id: str, updates: dict):
     if not supabase: return
@@ -91,12 +91,60 @@ def get_job(job_id: str):
     except Exception:
         return None
 
+def update_project(project_id: str, user_id: str, project_data: dict):
+    if not supabase: return
+    try:
+        supabase.table("clario_projects").upsert({
+            "id": project_id,
+            "user_id": user_id,
+            "name": project_data.get("name", "Untitled Project"),
+            "mode": project_data.get("mode", "video_harvester"),
+            "project_data": project_data
+        }).execute()
+    except Exception as e:
+        print(f"Error updating project in Supabase: {e}")
+
+def get_project(project_id: str):
+    if not supabase: return None
+    try:
+        res = supabase.table("clario_projects").select("*").eq("id", project_id).execute()
+        if res.data:
+            return res.data[0].get("project_data")
+        return None
+    except Exception:
+        return None
+
+def upload_to_supabase(file_path: str, bucket: str, destination_path: str) -> str:
+    if not supabase: return f"/media/{destination_path}"
+    try:
+        with open(file_path, 'rb') as f:
+            supabase.storage.from_(bucket).upload(
+                path=destination_path,
+                file=f,
+                file_options={"upsert": "true"}
+            )
+        return supabase.storage.from_(bucket).get_public_url(destination_path)
+    except Exception as e:
+        print(f"Error uploading to Supabase: {e}")
+        return f"/media/{destination_path}"
+
+def download_from_supabase(bucket: str, source_path: str, destination_path: str) -> bool:
+    if not supabase: return False
+    try:
+        res = supabase.storage.from_(bucket).download(source_path)
+        with open(destination_path, "wb") as f:
+            f.write(res)
+        return True
+    except Exception as e:
+        print(f"Error downloading from Supabase: {e}")
+        return False
+
 # ── Async Media Pipeline Worker ──────────────────────────────────────────────
 
 # Global semaphore to limit heavy FFmpeg concurrent processing
 processing_semaphore = asyncio.Semaphore(2)
 
-async def process_video_harvest_job(job_id: str, project_id: str, video_path: str, reference_url: str = ""):
+async def process_video_harvest_job(job_id: str, project_id: str, video_path: str, user_id: str, reference_url: str = ""):
     async with processing_semaphore:
         try:
             update_job(job_id, {
@@ -107,6 +155,9 @@ async def process_video_harvest_job(job_id: str, project_id: str, video_path: st
 
             project_dir = os.path.join(MEDIA_ROOT, project_id)
             os.makedirs(project_dir, exist_ok=True)
+
+            video_filename = os.path.basename(video_path)
+            video_media_url = upload_to_supabase(video_path, "clario-media", f"{project_id}/{video_filename}")
 
             # 1. Scene detection
             intervals = detect_scenes_ffmpeg(video_path, threshold=0.3)
@@ -133,7 +184,7 @@ async def process_video_harvest_job(job_id: str, project_id: str, video_path: st
                 # Vision intelligence
                 intel = analyze_shot_frame(frame_disk_path, shot_id, start_sec, end_sec)
     
-                frame_web_url = f"/media/{project_id}/{frame_filename}"
+                frame_web_url = upload_to_supabase(frame_disk_path, "clario-media", f"{project_id}/{frame_filename}")
     
                 shot_record = ShotRecord(
                     project_id=project_id,
@@ -169,6 +220,7 @@ async def process_video_harvest_job(job_id: str, project_id: str, video_path: st
             contact_sheet_filename = "contact_sheet.jpg"
             contact_sheet_path = os.path.join(project_dir, contact_sheet_filename)
             generate_contact_sheet_pillow(frame_paths, labels, contact_sheet_path)
+            upload_to_supabase(contact_sheet_path, "clario-media", f"{project_id}/{contact_sheet_filename}")
     
             # 4. Assemble Project Record
             video_filename = os.path.basename(video_path)
@@ -198,12 +250,13 @@ async def process_video_harvest_job(job_id: str, project_id: str, video_path: st
                 updated_at=int(asyncio.get_event_loop().time() * 1000),
             )
     
-            PROJECTS_DB[project_id] = project
+            project_dump = project.model_dump()
+            update_project(project_id, user_id, project_dump)
             update_job(job_id, {
                 "status": "completed",
                 "progress_pct": 100,
                 "status_msg": "Harvest completed successfully.",
-                "result": project.model_dump()
+                "result": project_dump
             })
     
         except Exception as e:
@@ -271,7 +324,7 @@ async def generate_media_insights(req: InsightsRequest):
         # Upload to Gemini using new File API
         uploaded_file = genai.upload_file(path=file_path)
         
-        model = genai.GenerativeModel('gemini-1.5-pro')
+        model = genai.GenerativeModel(os.getenv('GEMINI_MODEL', 'gemini-2.0-flash'))
         prompt = "Listen to this audio. Provide a detailed transcription, and then write a 'Core Idea & Key Takeaways' section summarizing the absolute most useful information. Format it beautifully with markdown headers and bullet points."
         
         response = model.generate_content([prompt, uploaded_file])
@@ -347,6 +400,7 @@ async def ingest_file(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     mode: str = Form("video_harvester"),
+    user_id: str = Depends(get_current_user_id)
 ):
     project_id = f"proj_{uuid.uuid4().hex[:10]}"
     job_id = f"job_{uuid.uuid4().hex[:10]}"
@@ -360,22 +414,33 @@ async def ingest_file(
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    # Make sure we grab the user_id if we want to secure it, but for ingest it might be unauth'd for now
+    # Reject files that are too large
+    file_size = os.path.getsize(file_path)
+    if file_size > MAX_UPLOAD_BYTES:
+        os.unlink(file_path)
+        raise HTTPException(status_code=413, detail=f"File too large ({file_size} bytes). Max: {MAX_UPLOAD_BYTES} bytes.")
+
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
     update_job(job_id, {
+        "title": file.filename or "Video Harvest",
+        "user_id": user_id,
         "status": "queued",
         "progress_pct": 0,
         "status_msg": "Queued for processing",
         "input_url": file.filename
     })
 
-    background_tasks.add_task(process_video_harvest_job, job_id, project_id, file_path)
+    background_tasks.add_task(process_video_harvest_job, job_id, project_id, file_path, user_id)
 
     return {"job_id": job_id, "project_id": project_id, "status": "queued"}
 
 @app.post("/api/v1/harvest/ingest-url")
 async def ingest_url(
     background_tasks: BackgroundTasks,
-    req: IngestUrlRequest
+    req: IngestUrlRequest,
+    user_id: str = Depends(get_current_user_id)
 ):
     if not req.url:
         raise HTTPException(status_code=400, detail="URL is required")
@@ -401,7 +466,7 @@ async def ingest_url(
     # Download synchronously so we can queue the correct file path, or we can queue the download itself.
     # We will queue a wrapper task that downloads then processes.
     
-    async def download_and_process(job_id_inner, project_id_inner, url_inner, out_template_inner, project_dir_inner):
+    async def download_and_process(job_id_inner, project_id_inner, url_inner, out_template_inner, project_dir_inner, user_id_inner):
         update_job(job_id_inner, {
             "status": "processing",
             "progress_pct": 5,
@@ -420,7 +485,7 @@ async def ingest_url(
                 raise Exception("Downloaded file not found")
                 
             file_path = os.path.join(project_dir_inner, downloaded_file)
-            await process_video_harvest_job(job_id_inner, project_id_inner, file_path, url_inner)
+            await process_video_harvest_job(job_id_inner, project_id_inner, file_path, user_id_inner, url_inner)
             
         except Exception as e:
             update_job(job_id_inner, {
@@ -429,14 +494,19 @@ async def ingest_url(
                 "result": {"error": str(e)}
             })
             
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
     update_job(job_id, {
+        "title": req.url,
+        "user_id": user_id,
         "status": "queued",
         "progress_pct": 0,
         "status_msg": "Queued for download and processing",
         "input_url": req.url
     })
     
-    background_tasks.add_task(download_and_process, job_id, project_id, req.url, out_template, project_dir)
+    background_tasks.add_task(download_and_process, job_id, project_id, req.url, out_template, project_dir, user_id)
     return {"job_id": job_id, "project_id": project_id, "status": "queued"}
 
 @app.get("/api/v1/harvest/jobs/{job_id}")
@@ -455,16 +525,18 @@ async def get_user_jobs(user_id: str = Depends(get_current_user_id)):
 
 @app.get("/api/v1/projects/{project_id}/manifest")
 async def get_project_manifest(project_id: str):
-    if project_id not in PROJECTS_DB:
+    project_data = get_project(project_id)
+    if not project_data:
         raise HTTPException(status_code=404, detail="Project not found")
-    return PROJECTS_DB[project_id]
+    return project_data
 
 @app.post("/api/v1/projects/{project_id}/segments/cut")
 async def cut_segment(project_id: str, req: CutSegmentRequest):
-    if project_id not in PROJECTS_DB:
+    project_data = get_project(project_id)
+    if not project_data:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    project = PROJECTS_DB[project_id]
+    project = HarvestProject(**project_data)
     project_dir = os.path.join(MEDIA_ROOT, project_id)
     
     if not project.source_file_name:
@@ -472,7 +544,10 @@ async def cut_segment(project_id: str, req: CutSegmentRequest):
         
     video_path = os.path.join(project_dir, project.source_file_name)
     if not os.path.exists(video_path):
-        raise HTTPException(status_code=404, detail="Original source file not found on server.")
+        os.makedirs(project_dir, exist_ok=True)
+        success = download_from_supabase("clario-media", f"{project_id}/{project.source_file_name}", video_path)
+        if not success:
+            raise HTTPException(status_code=404, detail="Original source file not found on server or Supabase.")
 
     segment_filename = f"{req.shot_id}_reference_segment.mp4"
     output_path = os.path.join(project_dir, segment_filename)
@@ -481,9 +556,11 @@ async def cut_segment(project_id: str, req: CutSegmentRequest):
     if not success:
         raise HTTPException(status_code=500, detail="Failed to cut segment.")
 
+    segment_url = upload_to_supabase(output_path, "clario-media", f"{project_id}/{segment_filename}")
+
     return {
         "status": "success",
-        "url": f"/media/{project_id}/{segment_filename}",
+        "url": segment_url,
         "filename": segment_filename
     }
 

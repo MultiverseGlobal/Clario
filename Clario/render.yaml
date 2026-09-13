@@ -6,7 +6,17 @@ services:
     plan: free
     rootDir: server
     dockerfilePath: Dockerfile
-    healthCheckPath: /
+    healthCheckPath: /api/v1/health
     envVars:
       - key: PORT
         value: 8000
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
