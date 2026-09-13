@@ -60,7 +60,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-MEDIA_ROOT = os.path.join(os.path.dirname(__file__), "storage")
+MEDIA_ROOT = "/tmp/clario_media"
 os.makedirs(MEDIA_ROOT, exist_ok=True)
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(200 * 1024 * 1024)))  # 200MB default
 
@@ -271,7 +271,18 @@ async def process_video_harvest_job(job_id: str, project_id: str, video_path: st
                 "status_msg": f"Failed: {str(e)}",
                 "result": {"error": str(e)}
             })
-    
+        finally:
+            try:
+                if 'video_path' in locals():
+                    os.unlink(video_path)
+            except Exception:
+                pass
+            try:
+                if 'project_dir' in locals():
+                    shutil.rmtree(project_dir, ignore_errors=True)
+            except Exception:
+                pass
+
 # ── API Endpoints ────────────────────────────────────────────────────────────
 
 @app.get("/api/v1/health")
@@ -725,9 +736,9 @@ async def _process_reference_ingest(
         except Exception as e:
             update_job(job_id, {"status": "failed", "status_msg": f"Failed: {str(e)}", "result": {"error": str(e)}})
         finally:
-            # Clean up downloaded video
+            # Clean up the entire temporary project directory to prevent cloud disk filling
             try:
-                os.unlink(video_path)
+                shutil.rmtree(project_dir, ignore_errors=True)
             except Exception:
                 pass
     
