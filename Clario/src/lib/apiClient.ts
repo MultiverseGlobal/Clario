@@ -4,7 +4,7 @@ import type { HarvestProject } from '../types/assets';
 let memoryApiBase: string | null = null;
 
 export function getApiBase(): string {
-  const base = memoryApiBase || 'http://localhost:8000';
+  const base = memoryApiBase || (import.meta.env.DEV ? 'http://localhost:8000' : 'https://clario-l5d0.onrender.com');
   return base.replace(/\/+$/, '') + (base.endsWith('/api/v1') ? '' : '/api/v1');
 }
 

@@ -50,7 +50,7 @@ from worker.vision_worker import analyze_shot_frame
 
 app = FastAPI(title="Clario Asset Intelligence Engine", version="1.0.0")
 
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:4173").split(",")
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:4173,https://clariovid.vercel.app").split(",")
 
 app.add_middleware(
     CORSMiddleware,
