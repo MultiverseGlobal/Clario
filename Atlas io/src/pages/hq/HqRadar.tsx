@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
 import { AtlasIcon } from "@/components/atlas/EcosystemIcons";
+import RadarDiscover from "@/components/atlas/RadarDiscover";
 
 interface Opportunity {
   id: string;
@@ -44,7 +45,7 @@ interface OutreachDraft {
   created_at: string;
 }
 
-export default function HqRevenueEngine() {
+export default function HqRadar() {
   const { user } = useAuth();
 
   // Core state
@@ -413,7 +414,7 @@ export default function HqRevenueEngine() {
             <p className="text-[11px] font-mono text-muted-foreground mt-0.5">{opportunities.length} active opportunities</p>
           </div>
           <Button
-            onClick={() => window.location.href = "/command"}
+            onClick={() => setActiveOpportunityId(null)}
             size="sm"
             className="h-8 px-3 rounded-lg bg-foreground text-background text-xs font-medium flex items-center gap-1.5"
           >
@@ -437,7 +438,7 @@ export default function HqRevenueEngine() {
               <span className="text-[13px] font-medium text-foreground mb-1">Pipeline Empty</span>
               <span className="text-[11px] text-muted-foreground mb-4">You have no active opportunities.</span>
               <Button 
-                onClick={() => window.location.href = "/hq/discover"}
+                onClick={() => setActiveOpportunityId(null)}
                 size="sm" 
                 className="text-xs h-8 bg-slate-900 hover:bg-slate-800 text-white"
               >
@@ -742,10 +743,8 @@ export default function HqRevenueEngine() {
             </div>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground relative z-10">
-            <Target className="w-16 h-16 mb-6 opacity-10" />
-            <h3 className="font-display text-xl text-foreground/60 mb-2">No Target Selected</h3>
-            <p className="text-[13px] max-w-sm text-center">Select an opportunity from the pipeline to initialize the Revenue Engine and begin tactical outreach.</p>
+          <div className="flex-1 flex flex-col relative z-10 bg-background/50 backdrop-blur-sm overflow-hidden border-l border-border/40">
+            <RadarDiscover onLeadSaved={loadData} />
           </div>
         )}
       </div>

@@ -34,7 +34,7 @@ const SOURCES = [
 
 const INDUSTRIES = ["Agency", "Marketing", "SaaS", "E-commerce", "Fintech", "Healthtech", "Real Estate", "Consulting", "Any"];
 
-export default function HqDiscover() {
+export default function RadarDiscover({ onLeadSaved }: { onLeadSaved?: () => void }) {
   const { user } = useAuth();
   const { data: integrations = [] } = useIntegrations();
   const notionIntegration = integrations.find(i => i.provider === "notion" && i.status === "active");
@@ -149,6 +149,7 @@ export default function HqDiscover() {
       if (error) throw error;
       setSaved((s) => new Set([...s, key]));
       toast.success(`${lead.company} added — Lead Intelligence Engine running in background...`);
+      onLeadSaved?.();
 
       // Fire auto-enrich pipeline asynchronously
       if (inserted?.id) {
@@ -195,21 +196,7 @@ export default function HqDiscover() {
   };
 
   return (
-    <div className="text-foreground">
-      {/* Header */}
-      <div className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur-sm px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-base font-bold tracking-tight">Find Leads</h1>
-            <p className="text-xs text-muted-foreground font-mono">Discover companies that match your ICP</p>
-          </div>
-          {results.length > 0 && (
-            <Button onClick={handleSaveAll} size="sm" className="h-8 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90">
-              <Plus className="h-3.5 w-3.5" /> Save all ({results.length - saved.size} left)
-            </Button>
-          )}
-        </div>
-      </div>
+    <div className="text-foreground w-full h-full overflow-y-auto">
 
       <div className="p-6 max-w-5xl mx-auto space-y-6">
         {/* Source selector */}
