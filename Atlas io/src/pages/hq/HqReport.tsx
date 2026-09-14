@@ -127,15 +127,17 @@ export default function HqReport() {
 
       const stalledDeals = [
         ...activeDeals.map((d) => ({
-          company_name: d.company_name,
+          company: d.company_name || d.name || "Target Account",
+          company_name: d.company_name || d.name || "Target Account",
           daysSince: Math.floor((Date.now() - new Date(d.updated_at).getTime()) / 86400000),
         })),
         ...activeOpps.map((o) => ({
-          company_name: o.organization_name,
+          company: o.organization_name || o.title || "Target Prospect",
+          company_name: o.organization_name || o.title || "Target Prospect",
           daysSince: Math.floor((Date.now() - new Date(o.updated_at || o.created_at).getTime()) / 86400000),
         })),
       ]
-        .filter((d) => d.daysSince >= 5)
+        .filter((d) => d.daysSince >= 5 && Boolean(d.company || d.company_name))
         .slice(0, 3);
 
       // Generate AI narrative for the key sections
@@ -193,8 +195,8 @@ export default function HqReport() {
         outreach_sent,
         replies,
         advanced: [],
-        stalled: stalledDeals.map((d) => ({ company: d.company_name, days: d.daysSince })),
-        lost_deals: lostDeals.slice(0, 3).map((d) => ({ company: d.company_name, reason: d.lost_reason })),
+        stalled: stalledDeals.map((d) => ({ company: d.company || d.company_name || "Stalled Account", days: d.daysSince || 5 })),
+        lost_deals: lostDeals.slice(0, 3).map((d) => ({ company: d.company_name || "Closed Account", reason: d.lost_reason || "Unspecified" })),
         whats_working: aiContent.whats_working,
         whats_not: aiContent.whats_not,
         next_week_priorities: generatePriorities(stalledDeals, outreach_sent, [...activeDeals, ...activeOpps], pct),
@@ -250,7 +252,9 @@ export default function HqReport() {
   function generateDecision(sent: number, stalled: any[], active: any[], pct: number): string {
     if (stalled.length > 0) {
       const topStall = stalled[0];
-      return `Follow up with ${topStall.company} — it's been ${topStall.daysSince} days. One message could reopen this. If no reply in 3 more days, close it and move on.`;
+      const targetName = topStall.company || topStall.company_name || topStall.name || "top stalled prospect";
+      const days = topStall.daysSince || topStall.days || 5;
+      return `Follow up with ${targetName} — it's been ${days} days. One message could reopen this. If no reply in 3 more days, close it and move on.`;
     }
     if (sent < 5) return "Send 10 outreach messages before the end of the week. Nothing else matters more than this right now.";
     if (pct >= 80) return `You're ${pct}% of the way to your £10,000 goal. One deal closes it. Focus exclusively on the most likely deal to close this week.`;
@@ -260,7 +264,14 @@ export default function HqReport() {
 
   function generatePriorities(stalled: any[], sent: number, active: any[], pct: number): string[] {
     const p: string[] = [];
-    if (stalled.length > 0) p.push(`Follow up with ${stalled.map((d) => d.company).join(", ")} — all stalled 5+ days`);
+    if (stalled.length > 0) {
+      const validNames = stalled
+        .map((d) => d.company || d.company_name || d.name)
+        .filter(Boolean);
+      if (validNames.length > 0) {
+        p.push(`Follow up with ${validNames.join(", ")} — all stalled 5+ days`);
+      }
+    }
     if (sent < 10) p.push("Send at least 10 outreach messages this week");
     if (active.length < 5) p.push("Add 5 new leads to the pipeline");
     if (pct < 50) p.push("Research 5 companies and generate personalized outreach for each");

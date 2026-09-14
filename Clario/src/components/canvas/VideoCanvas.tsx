@@ -51,6 +51,8 @@ export function VideoCanvas({
   const [waveformSamples, setWaveformSamples] = useState<number[]>([]);
   const [isReassembling, setIsReassembling] = useState(false);
   const [videoError, setVideoError] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
 
   const rulerRef = useRef<HTMLDivElement>(null);
   const videoElemRef = useRef<HTMLVideoElement | null>(null);
@@ -393,6 +395,58 @@ export function VideoCanvas({
   }, [trimming, zoom, trackItems, onChange]);
 
   const selectedItem = trackItems.find(i => i.id === selectedItemId);
+
+  // ── Export Video Pipeline ───────────────────────────────────────────────────
+  const handleExportVideo = async () => {
+    if (!currentVideoSrc) return;
+    setIsExporting(true);
+    setExportProgress(15);
+
+    try {
+      const safeName = (projectName || "clario_export").replace(/[^a-z0-9]/gi, "_").toLowerCase();
+      setExportProgress(45);
+
+      let blob: Blob | null = null;
+      try {
+        const res = await fetch(currentVideoSrc);
+        if (res.ok) {
+          blob = await res.blob();
+        }
+      } catch (e) {
+        console.warn("Direct blob fetch fallback:", e);
+      }
+
+      setExportProgress(85);
+      if (blob) {
+        const ext = blob.type.includes("mp4") ? "mp4" : "webm";
+        const downloadUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = downloadUrl;
+        a.download = `${safeName}.${ext}`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000);
+      } else {
+        const a = document.createElement("a");
+        a.href = currentVideoSrc;
+        a.download = `${safeName}.webm`;
+        a.target = "_blank";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+      setExportProgress(100);
+    } catch (err) {
+      console.error("Export failed:", err);
+      alert("Failed to export video. Please ensure video source is valid.");
+    } finally {
+      setTimeout(() => {
+        setIsExporting(false);
+        setExportProgress(0);
+      }, 800);
+    }
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", background: "var(--base)" }}>
@@ -776,6 +830,36 @@ export function VideoCanvas({
               🪄 Make New Video
             </button>
           )}
+
+          {/* Export / Download Video */}
+          <button
+            onClick={handleExportVideo}
+            disabled={isExporting || !currentVideoSrc}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "4px 14px", borderRadius: 7,
+              background: "linear-gradient(135deg, #10B981, #059669)",
+              border: "1px solid rgba(16,185,129,0.4)",
+              color: "#FFFFFF", fontSize: 11, fontWeight: 700,
+              cursor: isExporting || !currentVideoSrc ? "not-allowed" : "pointer",
+              boxShadow: "0 2px 10px rgba(16,185,129,0.3)",
+              opacity: isExporting || !currentVideoSrc ? 0.6 : 1,
+              transition: "all 0.15s ease",
+            }}
+            title="Download the rendered video cut to your computer"
+          >
+            {isExporting ? (
+              <>
+                <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", border: "2px solid #fff", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }} />
+                <span>Exporting ({exportProgress}%)…</span>
+              </>
+            ) : (
+              <>
+                <span>⬇️</span>
+                <span>Export Video</span>
+              </>
+            )}
+          </button>
 
           {/* Zoom Controls */}
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>

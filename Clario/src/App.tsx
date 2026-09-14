@@ -7,6 +7,7 @@ import { AppShell, type ClarioPhase } from './components/layout/AppShell';
 import { AuthGate } from './components/layout/AuthGate';
 import { fetchBrandKitFromDb } from './lib/brandKit';
 import { db } from './lib/dexieDb';
+import { detectCinematicScenes } from './lib/clientSceneDetector';
 import { ReferenceLibraryPanel, type LibraryClip } from './components/workbenches/ReferenceLibraryPanel';
 import { ScriptAnalysisWorkbench } from './components/workbenches/ScriptAnalysisWorkbench';
 import { HomeView } from './components/workbenches/HomeView';
@@ -364,6 +365,43 @@ export default function App() {
               const projId = `proj_${Date.now()}`;
               const previewUrl = URL.createObjectURL(recordedBlob);
               const isSales = recordedCategory === 'sales';
+
+              // Run client-side cinematic scene detection on the recorded studio blob
+              const detected = await detectCinematicScenes(previewUrl);
+              const trackItems = (detected || []).map((s, idx) => ({
+                id: `track_${s.id}_${idx}`,
+                title: `${s.sceneTag} (${s.startTime.toFixed(1)}s)`,
+                startTime: s.startTime,
+                endTime: s.endTime,
+                duration: s.duration,
+                type: 'video' as const,
+                url: previewUrl,
+                videoUrl: previewUrl,
+                isBroll: s.contentType !== 'a_roll',
+                beatType: (idx === 0 ? 'hook' : s.contentType === 'a_roll' ? 'problem' : 'proof') as any,
+                scriptText: s.sceneTag,
+                thumbnailUrl: s.frameUrl,
+                scene_tag: s.sceneTag,
+              }));
+
+              // Persist detected scene shots to local Dexie vault
+              for (const s of (detected || [])) {
+                await db.shots.put({
+                  id: s.id,
+                  harvest_job_id: projId,
+                  shot_id: s.id,
+                  start_seconds: s.startTime,
+                  end_seconds: s.endTime,
+                  duration: s.duration,
+                  visual_description: s.sceneTag,
+                  clean_source_url: previewUrl,
+                  frame_url: s.frameUrl,
+                  content_type: s.contentType,
+                  scene_tag: s.sceneTag,
+                  notes: `Auto-cut studio recording (${s.sceneTag})`,
+                } as any);
+              }
+
               const newProj: ClarioProject = {
                 id: projId,
                 name: `${isSales ? 'Sales Pitch' : 'Content Reel'} (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`,
@@ -372,7 +410,7 @@ export default function App() {
                 targetPurpose: isSales ? 'sales_outreach' : 'content_creator',
                 scriptText: recordedEditScript,
                 slides: [],
-                trackItems: [{
+                trackItems: trackItems.length > 0 ? trackItems : [{
                   id: `track_rec_${Date.now()}`,
                   title: isSales ? 'Prospect Walkthrough' : 'Main Cut',
                   startTime: 0,
@@ -380,6 +418,7 @@ export default function App() {
                   duration: 30,
                   type: 'video',
                   url: previewUrl,
+                  videoUrl: previewUrl,
                   isBroll: false,
                 }],
                 selectedAssets: [],

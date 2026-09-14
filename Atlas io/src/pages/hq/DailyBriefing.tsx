@@ -55,8 +55,8 @@ export default function DailyBriefing() {
         setTopOpportunities(
           top3.map((d: any) => ({
             id: d.id,
-            company: d.organization_name,
-            role: d.title || d.prospect || "Decision Maker",
+            company: d.organization_name || d.company_name || d.company || d.name || "Target Prospect",
+            role: d.title || d.prospect || d.founder_name || "Decision Maker (Needs Verification)",
             score: d.fit_score ?? 70,
             intent:
               Array.isArray(d.pain_signals) && d.pain_signals.length > 0

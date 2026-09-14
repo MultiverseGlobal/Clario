@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
 import { AtlasIcon } from "@/components/atlas/EcosystemIcons";
 import RadarDiscover from "@/components/atlas/RadarDiscover";
+import { NewLeadModal } from "@/components/atlas/NewLeadModal";
 
 interface Opportunity {
   id: string;
@@ -54,6 +55,7 @@ export default function HqRadar() {
   const [activeContact, setActiveContact] = useState<Contact | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isNewLeadModalOpen, setIsNewLeadModalOpen] = useState(false);
 
   // Generator state
   const [generating, setGenerating] = useState(false);
@@ -486,9 +488,9 @@ export default function HqRadar() {
               </Button>
             )}
             <Button
-              onClick={() => setActiveOpportunityId(null)}
+              onClick={() => setIsNewLeadModalOpen(true)}
               size="sm"
-              className="h-8 px-3 rounded-lg bg-foreground text-background text-xs font-medium flex items-center gap-1.5"
+              className="h-8 px-3 rounded-lg bg-foreground text-background text-xs font-medium flex items-center gap-1.5 cursor-pointer shadow-sm hover:opacity-90 transition-opacity"
             >
               <Plus className="w-3.5 h-3.5" /> Add Lead
             </Button>
@@ -845,6 +847,14 @@ export default function HqRadar() {
           </div>
         )}
       </div>
+
+      <NewLeadModal 
+        open={isNewLeadModalOpen} 
+        onClose={() => {
+          setIsNewLeadModalOpen(false);
+          loadData();
+        }} 
+      />
     </div>
   );
 }
