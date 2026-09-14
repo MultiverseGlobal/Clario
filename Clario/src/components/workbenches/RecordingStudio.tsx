@@ -247,22 +247,25 @@ export function RecordingStudio({ onBack, onFinish, initialCategory = 'sales' }:
       {/* Hidden compositor canvas - not displayed, used only for MediaRecorder capture */}
       <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-      {/* Top Bar */}
-      <div className="flex items-center justify-between p-6 w-full z-20">
-        <button onClick={onBack} className="bg-white/5 border border-white/10 text-white hover:bg-white/10 flex items-center gap-2 rounded-full px-5 py-2.5 backdrop-blur-md transition-colors">
+      {/* Top Bar — clears FloatingNav with pt-20 */}
+      <div className="flex items-center justify-between px-8 pt-20 pb-3 w-full z-20">
+        <button 
+          onClick={onBack} 
+          className="bg-white/10 hover:bg-white/15 border border-white/15 text-white flex items-center gap-2 rounded-full px-4 py-2 backdrop-blur-md transition-all shadow-sm cursor-pointer"
+        >
           <ArrowLeft className="w-4 h-4" />
-          <span className="font-medium text-sm">Exit Studio</span>
+          <span className="font-medium text-xs">Exit Studio</span>
         </button>
 
         {isRecording && (
-          <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3 bg-red-500/10 border border-red-500/20 backdrop-blur-md px-4 py-1.5 rounded-full">
+          <div className="flex items-center gap-3 bg-red-500/15 border border-red-500/30 backdrop-blur-md px-4 py-1.5 rounded-full shadow-[0_0_20px_rgba(239,68,68,0.2)]">
             <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.6)]" />
-            <span className="text-red-400 font-mono text-sm tracking-widest">{formatTime(recordingTime)}</span>
+            <span className="text-red-400 font-mono text-xs tracking-widest font-bold">{formatTime(recordingTime)}</span>
           </div>
         )}
 
-        <button className="p-2.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors backdrop-blur-md">
-          <Settings2 className="w-5 h-5 text-white/80" />
+        <button className="p-2.5 rounded-full bg-white/10 border border-white/15 hover:bg-white/15 transition-colors backdrop-blur-md cursor-pointer">
+          <Settings2 className="w-4 h-4 text-white/80" />
         </button>
       </div>
 
