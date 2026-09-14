@@ -3,12 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Camera, Video, Mic, MicOff, VideoOff,
   ArrowLeft, Maximize, Activity,
-  Settings2, MonitorUp, Target, Sparkles
+  MonitorUp, Target, Sparkles, UploadCloud
 } from 'lucide-react';
 
 interface RecordingStudioProps {
   onBack: () => void;
-  onFinish: (videoBlob?: Blob, editScript?: string, category?: 'sales' | 'content') => void;
+  onFinish: (videoBlob?: Blob, editScript?: string, category?: 'sales' | 'content', uploadedFile?: File) => void;
   initialCategory?: 'sales' | 'content';
 }
 
@@ -66,6 +66,15 @@ export function RecordingStudio({ onBack, onFinish, initialCategory = 'sales' }:
     setVideoPurpose(next);
     setEditDirectiveScript(PURPOSE_CONFIG[next].directive);
     setTeleprompterText(PURPOSE_CONFIG[next].teleprompter);
+  };
+
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUploadFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      onFinish(file, editDirectiveScript, videoPurpose, file);
+    }
   };
 
   const isReady = !!screenStream;
@@ -242,35 +251,52 @@ export function RecordingStudio({ onBack, onFinish, initialCategory = 'sales' }:
   };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black text-white flex flex-col font-sans overflow-hidden clario-mesh-gradient">
+    <div className="fixed inset-0 z-[40] bg-black text-white flex flex-col font-sans overflow-hidden clario-mesh-gradient pt-20">
 
       {/* Hidden compositor canvas - not displayed, used only for MediaRecorder capture */}
       <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-      {/* Top Bar — clears FloatingNav with pt-20 */}
-      <div className="flex items-center justify-between px-8 pt-20 pb-3 w-full z-20">
-        <button 
-          onClick={onBack} 
-          className="bg-white/10 hover:bg-white/15 border border-white/15 text-white flex items-center gap-2 rounded-full px-4 py-2 backdrop-blur-md transition-all shadow-sm cursor-pointer"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span className="font-medium text-xs">Exit Studio</span>
-        </button>
+      {/* Hidden file input for uploading video footage */}
+      <input ref={uploadInputRef} type="file" accept="video/*" style={{ display: 'none' }} onChange={handleUploadFile} />
+
+      {/* Top Status Bar (positioned below FloatingNav) */}
+      <div className="flex items-center justify-between px-8 py-2.5 w-full z-20 shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs font-mono text-white/70">
+            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.7)]" />
+            <span className="font-semibold uppercase tracking-wider text-[11px]">AI Director Studio</span>
+          </div>
+          <span className="text-[11px] text-white/40 font-mono hidden sm:inline">1080p · Auto-Cut Pre-Editor Ready</span>
+        </div>
 
         {isRecording && (
-          <div className="flex items-center gap-3 bg-red-500/15 border border-red-500/30 backdrop-blur-md px-4 py-1.5 rounded-full shadow-[0_0_20px_rgba(239,68,68,0.2)]">
-            <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.6)]" />
+          <div className="flex items-center gap-3 bg-red-500/15 border border-red-500/30 backdrop-blur-md px-5 py-1.5 rounded-full shadow-[0_0_20px_rgba(239,68,68,0.3)]">
+            <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.8)]" />
             <span className="text-red-400 font-mono text-xs tracking-widest font-bold">{formatTime(recordingTime)}</span>
           </div>
         )}
 
-        <button className="p-2.5 rounded-full bg-white/10 border border-white/15 hover:bg-white/15 transition-colors backdrop-blur-md cursor-pointer">
-          <Settings2 className="w-4 h-4 text-white/80" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => uploadInputRef.current?.click()}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-xs font-medium text-white transition-all cursor-pointer shadow-sm"
+            title="Upload pre-recorded footage to auto-cut cinematic scenes"
+          >
+            <UploadCloud className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Upload Footage</span>
+          </button>
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-white/60 hover:text-white transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Exit Studio</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Studio Area */}
-      <div className="flex-1 relative flex flex-col lg:flex-row items-center justify-center p-6 lg:p-12 pt-0 lg:pt-0 gap-6 lg:gap-12 z-10 pb-32 overflow-y-auto lg:overflow-hidden">
+      <div className="flex-1 relative flex flex-col lg:flex-row items-center justify-center p-6 lg:p-8 pt-0 lg:pt-0 gap-6 lg:gap-8 z-10 pb-28 overflow-y-auto lg:overflow-hidden">
 
         {/* Screen Canvas */}
         <div ref={(el) => { if (el) (window as any).clarioStudioContainer = el; }} className="relative w-full max-w-5xl aspect-video rounded-[24px] shadow-2xl clario-frame-card overflow-hidden ring-1 ring-white/10 bg-black shrink-0">
@@ -283,25 +309,34 @@ export function RecordingStudio({ onBack, onFinish, initialCategory = 'sales' }:
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0, transition: { duration: 0.2 } }}
-                className="absolute inset-0 flex flex-col items-center justify-center gap-6 bg-black/70 backdrop-blur-sm z-30"
+                className="absolute inset-0 flex flex-col items-center justify-center gap-6 bg-black/70 backdrop-blur-sm z-30 p-6"
               >
-                <div className="w-20 h-20 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
-                  <MonitorUp className="w-10 h-10 text-white/50" />
+                <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
+                  <MonitorUp className="w-8 h-8 text-white/60" />
                 </div>
                 <div className="text-center">
-                  <h3 className="text-xl font-semibold mb-2">Share your screen to begin</h3>
-                  <p className="text-white/50 text-sm max-w-xs leading-relaxed">
-                    Choose the window or tab you want to record.<br />Your webcam appears as a draggable PIP overlay.
+                  <h3 className="text-xl font-semibold mb-2">Record Screen or Ingest Footage</h3>
+                  <p className="text-white/50 text-sm max-w-sm leading-relaxed">
+                    Choose a screen or window to record with AI Director framing, or upload existing footage to auto-cut cinematic scenes and strip captions.
                   </p>
                   {screenError && <p className="text-red-400 text-xs mt-3">{screenError}</p>}
                 </div>
-                <button
-                  onClick={handleShareScreen}
-                  className="px-7 py-3 rounded-full bg-white text-black font-semibold text-sm hover:bg-white/90 active:scale-95 transition-all flex items-center gap-2"
-                >
-                  <MonitorUp className="w-4 h-4" />
-                  Share Screen
-                </button>
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  <button
+                    onClick={handleShareScreen}
+                    className="px-6 py-2.5 rounded-full bg-white text-black font-semibold text-xs hover:bg-white/90 active:scale-95 transition-all flex items-center gap-2 shadow-lg cursor-pointer"
+                  >
+                    <MonitorUp className="w-4 h-4" />
+                    Share Screen to Record
+                  </button>
+                  <button
+                    onClick={() => uploadInputRef.current?.click()}
+                    className="px-6 py-2.5 rounded-full bg-white/10 hover:bg-white/15 border border-white/20 text-white font-semibold text-xs active:scale-95 transition-all flex items-center gap-2 shadow-lg cursor-pointer"
+                  >
+                    <UploadCloud className="w-4 h-4 text-indigo-400" />
+                    Upload Video File
+                  </button>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -471,6 +506,13 @@ export function RecordingStudio({ onBack, onFinish, initialCategory = 'sales' }:
           className={`p-3 rounded-full hover:bg-white/10 transition-colors ${isReady ? 'text-green-400' : 'text-white/70'}`}
         >
           <MonitorUp className="w-5 h-5" />
+        </button>
+        <button
+          onClick={() => uploadInputRef.current?.click()}
+          title="Upload video footage to auto-cut scenes"
+          className="p-3 rounded-full hover:bg-white/10 text-indigo-300 transition-colors"
+        >
+          <UploadCloud className="w-5 h-5" />
         </button>
         <button
           className="p-3 rounded-full hover:bg-white/10 text-white/70 transition-colors"

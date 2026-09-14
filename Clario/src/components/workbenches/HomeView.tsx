@@ -3,7 +3,13 @@ import { listProjects, deleteProject, saveProject, ClarioProject } from '../../l
 import { Play, Plus, Clock, FileVideo, Trash2, Edit2 } from 'lucide-react';
 import { ProjectCreationWizard } from './ProjectCreationWizard';
 
-export function HomeView({ onSelectProject }: { onSelectProject: (p: ClarioProject) => void }) {
+export function HomeView({ 
+  onSelectProject,
+  onNavigatePhase
+}: { 
+  onSelectProject: (p: ClarioProject) => void;
+  onNavigatePhase?: (phase: any) => void;
+}) {
   const [projects, setProjects] = useState<ClarioProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [showWizard, setShowWizard] = useState(false);
@@ -157,7 +163,12 @@ export function HomeView({ onSelectProject }: { onSelectProject: (p: ClarioProje
           onProjectCreated={(p) => {
             setShowWizard(false);
             onSelectProject(p);
-          }} 
+          }}
+          onSaveToLibrary={(p) => {
+            setShowWizard(false);
+            onSelectProject(p);
+            onNavigatePhase?.('reference_library');
+          }}
         />
       )}
 

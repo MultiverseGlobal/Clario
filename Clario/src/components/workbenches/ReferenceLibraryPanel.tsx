@@ -1,8 +1,9 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { db } from '../../lib/dexieDb';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface LibraryClip {
+export interface LibraryClip {
   id: string;
   shot_id: string;
   title?: string;
@@ -14,6 +15,7 @@ interface LibraryClip {
   end_sec?: number;
   duration?: number;
   content_type?: string;
+  scene_tag?: string;
   created_at?: string;
 }
 
@@ -30,6 +32,7 @@ interface ReferenceLibraryPanelProps {
   userId: string;
   serverBase?: string;
   geminiApiKey?: string;
+  onOpenInEditor?: (clip: LibraryClip) => void;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -54,6 +57,7 @@ export function ReferenceLibraryPanel({
   userId,
   serverBase = '/api/v1',
   geminiApiKey,
+  onOpenInEditor,
 }: ReferenceLibraryPanelProps) {
   const [urlInput, setUrlInput] = useState('');
   const [jobs, setJobs] = useState<IngestJob[]>([]);
@@ -61,22 +65,90 @@ export function ReferenceLibraryPanel({
   const [isLoading, setIsLoading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedClip, setSelectedClip] = useState<LibraryClip | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollTimers = useRef<Record<string, ReturnType<typeof setInterval>>>({});
 
-  // ── Fetch library ──────────────────────────────────────────────────────────
+  // ── Fetch library (Dexie Local Vault + Remote API) ──────────────────────────
   const fetchLibrary = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${serverBase}/reference/library?user_id=${userId}&page=1&page_size=48`);
-      const data = await res.json();
-      setLibrary(data.clips || []);
+      // 1. Fetch local shots & vault assets from Dexie
+      const [localShots, localVault] = await Promise.all([
+        db.shots.toArray().catch(() => []),
+        db.vaultAssets.toArray().catch(() => []),
+      ]);
+
+      const localClips: LibraryClip[] = (localShots || []).map((s) => {
+        const tag = (s as any).scene_tag || s.visual_description || (s.content_type === 'a_roll' ? 'A-Roll (Talking Head)' : 'Cinematic B-Roll');
+        return {
+          id: s.id,
+          shot_id: s.shot_id,
+          title: s.visual_description || s.likely_source || s.shot_id,
+          source_url: s.clean_source_url || s.reference_url,
+          source_type: 'upload',
+          frame_url: s.frame_url,
+          description: s.notes || s.visual_description || '',
+          start_sec: s.start_seconds,
+          end_sec: s.end_seconds,
+          duration: s.duration,
+          content_type: s.content_type || 'b_roll',
+          scene_tag: tag,
+          created_at: new Date().toISOString(),
+        };
+      });
+
+      // Incorporate standalone vault assets
+      (localVault || []).forEach((v) => {
+        if (!localClips.some((c) => c.id === v.id || c.shot_id === v.shotId)) {
+          localClips.push({
+            id: v.id,
+            shot_id: v.shotId || v.id,
+            title: v.title,
+            source_url: v.sourceUrl || v.url,
+            source_type: 'upload',
+            frame_url: (v as any).frame_url || (v as any).thumbnail || v.url,
+            description: v.rightsNote || v.title,
+            duration: (v as any).durationSeconds || 4,
+            content_type: v.assetKind === 'attached_master' ? 'a_roll' : 'b_roll',
+            scene_tag: v.title || 'Saved Asset',
+            created_at: new Date().toISOString(),
+          });
+        }
+      });
+
+      // 2. Fetch remote clips if connected
+      let remoteClips: LibraryClip[] = [];
+      try {
+        const res = await fetch(`${serverBase}/reference/library?user_id=${userId}&page=1&page_size=48`);
+        if (res.ok) {
+          const data = await res.json();
+          remoteClips = data.clips || [];
+        }
+      } catch {
+        // remote is optional
+      }
+
+      // Merge unique clips
+      const merged = [...localClips];
+      remoteClips.forEach((rc) => {
+        if (!merged.some((m) => m.id === rc.id || m.shot_id === rc.shot_id)) {
+          merged.push(rc);
+        }
+      });
+
+      setLibrary(merged);
     } catch (e) {
       console.warn('Failed to fetch library:', e);
     } finally {
       setIsLoading(false);
     }
   }, [serverBase, userId]);
+
+  useEffect(() => {
+    fetchLibrary();
+  }, [fetchLibrary]);
 
   // ── Poll job status ────────────────────────────────────────────────────────
   const startPolling = useCallback((jobId: string, localId: string) => {
@@ -180,6 +252,73 @@ export function ReferenceLibraryPanel({
     return 'var(--pds-text-muted)';
   };
 
+  // ── Clip Deletion ─────────────────────────────────────────────────────────
+  const handleDeleteClip = async (e: React.MouseEvent, clip: LibraryClip) => {
+    e.stopPropagation();
+    try {
+      await Promise.all([
+        db.shots.delete(clip.id).catch(() => {}),
+        db.shots.where('shot_id').equals(clip.shot_id).delete().catch(() => {}),
+        db.vaultAssets.delete(clip.id).catch(() => {}),
+        db.vaultAssets.where('shotId').equals(clip.shot_id).delete().catch(() => {}),
+      ]);
+      setLibrary((prev) => prev.filter((c) => c.id !== clip.id && c.shot_id !== clip.shot_id));
+      if (selectedClip?.id === clip.id) setSelectedClip(null);
+    } catch (err) {
+      console.error('Failed to delete clip from vault:', err);
+    }
+  };
+
+  // ── Categories & Filtering ──────────────────────────────────────────────────
+  const CATEGORIES = [
+    { id: 'all', label: 'All Footage', icon: '🎬' },
+    { id: 'cars', label: 'Cars & Transit', icon: '🚗' },
+    { id: 'table', label: 'Table & Desk', icon: '🪑' },
+    { id: 'a_roll', label: 'A-Roll (Speech)', icon: '🎙️' },
+    { id: 'b_roll', label: 'Cinematic B-Roll', icon: '✨' },
+    { id: 'screen', label: 'Screen & UI', icon: '💻' },
+  ];
+
+  const getCategoryCount = (catId: string) => {
+    if (catId === 'all') return library.length;
+    return library.filter((clip) => {
+      const text = `${clip.scene_tag || ''} ${clip.title || ''} ${clip.description || ''}`.toLowerCase();
+      if (catId === 'cars') return text.includes('car') || text.includes('transit') || text.includes('vehicle') || text.includes('road');
+      if (catId === 'table') return text.includes('table') || text.includes('desk') || text.includes('workspace') || text.includes('counter');
+      if (catId === 'a_roll') return clip.content_type === 'a_roll' || text.includes('a-roll') || text.includes('talking') || text.includes('speech');
+      if (catId === 'b_roll') return clip.content_type === 'b_roll' || text.includes('b-roll') || text.includes('cinematic') || text.includes('broll');
+      if (catId === 'screen') return text.includes('screen') || text.includes('demo') || text.includes('ui') || text.includes('interface');
+      return false;
+    }).length;
+  };
+
+  const filteredLibrary = library.filter((clip) => {
+    if (selectedCategory !== 'all') {
+      const text = `${clip.scene_tag || ''} ${clip.title || ''} ${clip.description || ''}`.toLowerCase();
+      if (selectedCategory === 'cars') {
+        if (!text.includes('car') && !text.includes('transit') && !text.includes('vehicle') && !text.includes('road')) return false;
+      } else if (selectedCategory === 'table') {
+        if (!text.includes('table') && !text.includes('desk') && !text.includes('workspace') && !text.includes('counter')) return false;
+      } else if (selectedCategory === 'a_roll') {
+        if (clip.content_type !== 'a_roll' && !text.includes('a-roll') && !text.includes('talking') && !text.includes('speech')) return false;
+      } else if (selectedCategory === 'b_roll') {
+        if (clip.content_type !== 'b_roll' && !text.includes('b-roll') && !text.includes('cinematic') && !text.includes('broll')) return false;
+      } else if (selectedCategory === 'screen') {
+        if (!text.includes('screen') && !text.includes('demo') && !text.includes('ui') && !text.includes('interface')) return false;
+      }
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchTitle = (clip.title || '').toLowerCase().includes(q);
+      const matchDesc = (clip.description || '').toLowerCase().includes(q);
+      const matchTag = (clip.scene_tag || '').toLowerCase().includes(q);
+      if (!matchTitle && !matchDesc && !matchTag) return false;
+    }
+
+    return true;
+  });
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div
@@ -226,7 +365,7 @@ export function ReferenceLibraryPanel({
             Ingest Reference
           </h2>
           <p style={{ margin: '6px 0 0', fontSize: 12, fontFamily: "'Inter', system-ui, sans-serif", color: 'var(--pds-text-secondary)', lineHeight: 1.5 }}>
-            Paste a YouTube, Instagram, or Drive URL — or drop a video file — to add footage to your library.
+            Paste a YouTube, Instagram, or Drive URL — or drop a video file — to auto-cut and categorize scenes into your library.
           </p>
         </div>
 
@@ -306,7 +445,7 @@ export function ReferenceLibraryPanel({
             {isDragging ? 'Drop to ingest' : 'Drop a video file, or click to browse'}
           </span>
           <span style={{ fontSize: 9, fontFamily: "'JetBrains Mono', monospace", color: 'var(--pds-text-muted)', letterSpacing: '0.06em' }}>
-            MP4 · MOV · WEBM
+            MP4 · MOV · WEBM · AUTOMATIC SCENE SLICING
           </span>
           <input ref={fileInputRef} type="file" accept="video/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileIngest(f); }} />
         </div>
@@ -367,42 +506,125 @@ export function ReferenceLibraryPanel({
               transition: 'background 150ms',
             }}
           >
-            ↻ Refresh Library
+            ↻ Refresh Local Vault & Library
           </button>
         </div>
       </div>
 
-      {/* ── Right Column: Library Grid ─────────────────────────────────────── */}
+      {/* ── Right Column: Categorized Library Grid ──────────────────────────── */}
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-        {/* Library header */}
+        {/* Library header & Search */}
         <div
           style={{
             padding: '20px 24px 14px',
             borderBottom: '1px solid var(--pds-border-subtle)',
             display: 'flex',
-            alignItems: 'flex-end',
+            alignItems: 'center',
             justifyContent: 'space-between',
+            gap: 16,
+            flexWrap: 'wrap',
           }}
         >
           <div>
             <p style={{ margin: 0, fontSize: 9, fontFamily: "'JetBrains Mono', monospace", letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--pds-text-muted)' }}>
-              {library.length} clips
+              {filteredLibrary.length} of {library.length} clips indexed
             </p>
             <h2 style={{ margin: '4px 0 0', fontSize: 18, fontWeight: 700, fontFamily: "'Inter', system-ui, sans-serif", letterSpacing: '-0.02em', color: 'var(--pds-text-primary)', lineHeight: 1.1 }}>
-              Your Library
+              Reference & Shot Library
             </h2>
           </div>
-          {library.length === 0 && (
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search Table, Cars, A-Roll..."
+              style={{
+                padding: '6px 12px',
+                borderRadius: 8,
+                border: '1px solid var(--pds-border-mid)',
+                background: 'var(--pds-surface-1)',
+                color: 'var(--pds-text-primary)',
+                fontFamily: "'Inter', system-ui, sans-serif",
+                fontSize: 11,
+                width: 220,
+                outline: 'none',
+              }}
+            />
             <button
               onClick={fetchLibrary}
-              style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--pds-border-mid)', background: 'transparent', color: 'var(--pds-text-secondary)', fontFamily: "'Inter', system-ui, sans-serif", fontSize: 11, cursor: 'pointer' }}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 8,
+                border: '1px solid var(--pds-border-mid)',
+                background: 'transparent',
+                color: 'var(--pds-text-secondary)',
+                fontFamily: "'Inter', system-ui, sans-serif",
+                fontSize: 11,
+                cursor: 'pointer',
+              }}
             >
-              Load Library
+              Sync
             </button>
-          )}
+          </div>
         </div>
 
-        {/* Grid */}
+        {/* Scene Category Pills */}
+        <div
+          style={{
+            padding: '12px 24px',
+            borderBottom: '1px solid var(--pds-border-subtle)',
+            display: 'flex',
+            gap: 8,
+            overflowX: 'auto',
+            background: 'var(--pds-surface-1)',
+          }}
+        >
+          {CATEGORIES.map((cat) => {
+            const isCatActive = selectedCategory === cat.id;
+            const count = getCategoryCount(cat.id);
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '5px 12px',
+                  borderRadius: 20,
+                  fontSize: 11,
+                  fontWeight: isCatActive ? 600 : 500,
+                  fontFamily: "'Inter', system-ui, sans-serif",
+                  border: `1px solid ${isCatActive ? 'var(--pds-accent)' : 'var(--pds-border-subtle)'}`,
+                  background: isCatActive ? 'var(--pds-accent)' : 'var(--pds-surface-2)',
+                  color: isCatActive ? 'var(--pds-accent-inv)' : 'var(--pds-text-secondary)',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 150ms ease',
+                }}
+              >
+                <span>{cat.icon}</span>
+                <span>{cat.label}</span>
+                <span
+                  style={{
+                    fontSize: 9,
+                    fontFamily: "'JetBrains Mono', monospace",
+                    padding: '1px 5px',
+                    borderRadius: 10,
+                    background: isCatActive ? 'rgba(255,255,255,0.2)' : 'var(--pds-surface-3)',
+                    color: isCatActive ? 'inherit' : 'var(--pds-text-muted)',
+                  }}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Clips Grid */}
         <div
           style={{
             flex: 1,
@@ -415,32 +637,30 @@ export function ReferenceLibraryPanel({
               <span style={{ fontSize: 12, color: 'var(--pds-text-muted)', fontFamily: "'Inter', system-ui, sans-serif" }}>Loading library…</span>
             </div>
           )}
-          {!isLoading && library.length === 0 && (
+          {!isLoading && filteredLibrary.length === 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 300, gap: 12 }}>
-              <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-                <rect x="4" y="6" width="10" height="28" rx="1.5" stroke="var(--pds-border-mid)" strokeWidth="1.5"/>
-                <rect x="17" y="6" width="10" height="28" rx="1.5" stroke="var(--pds-border-mid)" strokeWidth="1.5"/>
-                <line x1="30" y1="6" x2="31.5" y2="34" stroke="var(--pds-border-mid)" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              <p style={{ margin: 0, fontSize: 13, color: 'var(--pds-text-muted)', fontFamily: "'Inter', system-ui, sans-serif" }}>
-                Your library is empty
+              <span style={{ fontSize: 32 }}>🎬</span>
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--pds-text-muted)', fontFamily: "'Inter', system-ui, sans-serif", fontWeight: 600 }}>
+                {library.length === 0 ? 'Your library is empty' : `No clips matching category "${selectedCategory}"`}
               </p>
               <p style={{ margin: 0, fontSize: 11, color: 'var(--pds-text-disabled)', fontFamily: "'Inter', system-ui, sans-serif" }}>
-                Ingest a URL or upload a video to get started
+                {library.length === 0 ? 'Upload a video to automatically slice and categorize scenes (Cars, Table, A-Roll, etc.)' : 'Try selecting another category tab or clearing your search.'}
               </p>
             </div>
           )}
-          {!isLoading && library.length > 0 && (
+          {!isLoading && filteredLibrary.length > 0 && (
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                gap: 12,
+                gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                gap: 14,
               }}
             >
-              {library.map((clip) => {
+              {filteredLibrary.map((clip) => {
                 const badge = SOURCE_BADGE[clip.source_type] || SOURCE_BADGE.upload;
                 const isSelected = selectedClip?.id === clip.id;
+                const sceneTag = clip.scene_tag || (clip.content_type === 'a_roll' ? 'A-Roll' : 'Cinematic B-Roll');
+
                 return (
                   <div
                     key={clip.id}
@@ -452,10 +672,13 @@ export function ReferenceLibraryPanel({
                       background: isSelected ? 'var(--pds-accent-dim)' : 'var(--pds-surface-1)',
                       overflow: 'hidden',
                       cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
                       boxShadow: isSelected ? 'var(--pds-shadow-md)' : 'var(--pds-shadow-sm)',
+                      transition: 'transform 150ms ease, box-shadow 150ms ease',
                     }}
                   >
-                    {/* Keyframe */}
+                    {/* Keyframe Thumbnail Container */}
                     <div style={{ position: 'relative', aspectRatio: '16/9', background: 'var(--pds-surface-3)' }}>
                       {clip.frame_url ? (
                         <img
@@ -465,43 +688,102 @@ export function ReferenceLibraryPanel({
                         />
                       ) : (
                         <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--pds-border-mid)" strokeWidth="1.2">
+                          <svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="var(--pds-border-mid)" strokeWidth="1.2">
                             <rect x="2" y="4" width="16" height="12" rx="1.5"/>
                             <polygon points="8,7 14,10 8,13" fill="var(--pds-border-mid)" stroke="none"/>
                           </svg>
                         </div>
                       )}
+
                       {/* Source badge */}
                       <span style={{ position: 'absolute', top: 6, left: 6, fontSize: 8, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", letterSpacing: '0.08em', textTransform: 'uppercase', padding: '2px 5px', borderRadius: 4, background: badge.color, color: '#fff' }}>
                         {badge.label}
                       </span>
+
+                      {/* Scene Category Tag Pill */}
+                      <span
+                        style={{
+                          position: 'absolute',
+                          top: 6,
+                          right: 6,
+                          fontSize: 8,
+                          fontWeight: 700,
+                          fontFamily: "'JetBrains Mono', monospace",
+                          letterSpacing: '0.04em',
+                          padding: '2px 6px',
+                          borderRadius: 4,
+                          background: 'rgba(10, 11, 14, 0.78)',
+                          color: '#38bdf8',
+                          backdropFilter: 'blur(6px)',
+                          border: '1px solid rgba(56, 189, 248, 0.35)',
+                        }}
+                      >
+                        {sceneTag}
+                      </span>
+
                       {/* Duration badge */}
                       {clip.duration != null && (
-                        <span style={{ position: 'absolute', bottom: 6, right: 6, fontSize: 9, fontFamily: "'JetBrains Mono', monospace", padding: '2px 5px', borderRadius: 4, background: 'rgba(0,0,0,0.55)', color: '#fff', backdropFilter: 'blur(4px)' }}>
+                        <span style={{ position: 'absolute', bottom: 6, right: 6, fontSize: 9, fontFamily: "'JetBrains Mono', monospace", padding: '2px 5px', borderRadius: 4, background: 'rgba(0,0,0,0.65)', color: '#fff', backdropFilter: 'blur(4px)' }}>
                           {fmtSec(clip.duration)}
                         </span>
                       )}
                     </div>
 
-                    {/* Meta */}
-                    <div style={{ padding: '8px 10px 10px' }}>
-                      <p style={{ margin: 0, fontSize: 11, fontWeight: 500, fontFamily: "'Inter', system-ui, sans-serif", color: 'var(--pds-text-primary)', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {/* Metadata & Actions */}
+                    <div style={{ padding: '10px 12px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                      <p style={{ margin: 0, fontSize: 12, fontWeight: 600, fontFamily: "'Inter', system-ui, sans-serif", color: 'var(--pds-text-primary)', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {clip.title || clip.shot_id}
                       </p>
                       {clip.description && (
-                        <p style={{ margin: '3px 0 0', fontSize: 10, fontFamily: "'Inter', system-ui, sans-serif", color: 'var(--pds-text-secondary)', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                        <p style={{ margin: '4px 0 0', fontSize: 10, fontFamily: "'Inter', system-ui, sans-serif", color: 'var(--pds-text-secondary)', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                           {clip.description}
                         </p>
                       )}
-                      <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center' }}>
-                        <span style={{ fontSize: 9, fontFamily: "'JetBrains Mono', monospace", color: 'var(--pds-text-muted)', letterSpacing: '0.04em' }}>
+
+                      <div style={{ display: 'flex', gap: 6, marginTop: 'auto', paddingTop: 8, alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: 9, fontFamily: "'JetBrains Mono', monospace", color: 'var(--pds-text-muted)' }}>
                           {fmtSec(clip.start_sec)} → {fmtSec(clip.end_sec)}
                         </span>
-                        {clip.content_type && (
-                          <span style={{ fontSize: 8, fontFamily: "'JetBrains Mono', monospace", color: 'var(--pds-text-muted)', padding: '1px 4px', borderRadius: 3, border: '1px solid var(--pds-border-subtle)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                            {clip.content_type}
-                          </span>
-                        )}
+
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenInEditor?.(clip);
+                            }}
+                            style={{
+                              padding: '4px 8px',
+                              borderRadius: 6,
+                              background: 'var(--pds-accent)',
+                              color: 'var(--pds-accent-inv)',
+                              border: 'none',
+                              fontSize: 10,
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 3,
+                            }}
+                            title="Create new video timeline with this scene"
+                          >
+                            🪄 New Video
+                          </button>
+                          <button
+                            onClick={(e) => handleDeleteClip(e, clip)}
+                            style={{
+                              padding: '4px 6px',
+                              borderRadius: 6,
+                              background: 'transparent',
+                              border: '1px solid var(--pds-border-subtle)',
+                              color: 'var(--pds-text-muted)',
+                              fontSize: 10,
+                              cursor: 'pointer',
+                            }}
+                            title="Delete clip from library"
+                          >
+                            ✕
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>

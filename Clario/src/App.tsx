@@ -6,7 +6,8 @@ import { getApiKey, setApiKey, fetchApiKeyFromDb } from './lib/gemini';
 import { AppShell, type ClarioPhase } from './components/layout/AppShell';
 import { AuthGate } from './components/layout/AuthGate';
 import { fetchBrandKitFromDb } from './lib/brandKit';
-import { ReferenceLibraryPanel } from './components/workbenches/ReferenceLibraryPanel';
+import { db } from './lib/dexieDb';
+import { ReferenceLibraryPanel, type LibraryClip } from './components/workbenches/ReferenceLibraryPanel';
 import { ScriptAnalysisWorkbench } from './components/workbenches/ScriptAnalysisWorkbench';
 import { HomeView } from './components/workbenches/HomeView';
 import { DeliverableView } from './components/workbenches/DeliverableView';
@@ -24,6 +25,7 @@ export default function App() {
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [recordedEditScript, setRecordedEditScript] = useState<string>('');
   const [recordedCategory, setRecordedCategory] = useState<'sales' | 'content'>('sales');
+  const [librarySubView, setLibrarySubView] = useState<'vault' | 'script'>('vault');
 
   // Video Canvas Playback & Track State
   const [canvasTime, setCanvasTime] = useState(0);
@@ -111,6 +113,41 @@ export default function App() {
     }
     setCurrentPhase(p);
     if (p === 'home') setCurrentProject(null);
+  };
+
+  const handleOpenClipInEditor = async (clip: LibraryClip) => {
+    const projId = `proj_${Date.now()}`;
+    const clipUrl = clip.source_url || clip.frame_url || '';
+    const isARoll = clip.content_type === 'a_roll';
+    const newProj: ClarioProject = {
+      id: projId,
+      name: `${clip.title || clip.scene_tag || 'Scene'} Edit (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`,
+      mode: 'video_harvester',
+      category: 'content',
+      targetPurpose: 'content_creator',
+      scriptText: clip.description || '',
+      slides: [],
+      trackItems: [{
+        id: `track_${Date.now()}`,
+        title: clip.title || clip.scene_tag || 'Scene 1',
+        startTime: 0,
+        endTime: clip.duration || 5,
+        duration: clip.duration || 5,
+        type: 'video',
+        url: clipUrl,
+        videoUrl: clipUrl,
+        isBroll: !isARoll,
+        thumbnailUrl: clip.frame_url,
+      } as any],
+      selectedAssets: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    setCurrentProject(newProj);
+    await saveProject(newProj);
+    setCanvasTime(0);
+    setCanvasIsPlaying(false);
+    setCurrentPhase('video_canvas');
   };
 
   if (!settingsLoaded) {
@@ -236,31 +273,60 @@ export default function App() {
 
       {/* ── UNIFIED WORKSPACE ─────────────────────────────────────────────── */}
       {currentPhase === 'reference_library' ? (
-        <>
-          {/* Script Analysis Workbench is shown when a project is active */}
-          {currentProject ? (
-            <ScriptAnalysisWorkbench
-              currentProject={currentProject}
-              onUpdateProject={(p) => {
-                setCurrentProject(p);
-                saveProject(p);
-              }}
-              userId={currentProject.id || 'local'}
-              serverBase="/api/v1"
-              geminiApiKey={getApiKey() || undefined}
-              onGenerateDeliverable={(result) => {
-                setLatestResult(result);
-                setCurrentPhase('deliverable');
-              }}
-            />
-          ) : (
-            <ReferenceLibraryPanel
-              userId="local"
-              serverBase="/api/v1"
-              geminiApiKey={getApiKey() || undefined}
-            />
+        <div className="flex flex-col h-full w-full">
+          {currentProject && (
+            <div className="flex items-center justify-between px-6 py-2 bg-card/70 border-b border-border/40 backdrop-blur-md shrink-0">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setLibrarySubView('vault')}
+                  className={`px-3 py-1 text-xs rounded-xl font-medium transition-all cursor-pointer ${
+                    librarySubView === 'vault'
+                      ? 'bg-foreground text-background font-semibold shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  }`}
+                >
+                  📦 Asset Vault & Scene Categories
+                </button>
+                <button
+                  onClick={() => setLibrarySubView('script')}
+                  className={`px-3 py-1 text-xs rounded-xl font-medium transition-all cursor-pointer ${
+                    librarySubView === 'script'
+                      ? 'bg-foreground text-background font-semibold shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  }`}
+                >
+                  🧠 Script Intelligence ({currentProject.name})
+                </button>
+              </div>
+            </div>
           )}
-        </>
+
+          <div className="flex-1 overflow-hidden">
+            {librarySubView === 'script' && currentProject ? (
+              <ScriptAnalysisWorkbench
+                currentProject={currentProject}
+                onUpdateProject={(p) => {
+                  setCurrentProject(p);
+                  saveProject(p);
+                }}
+                userId={currentProject.id || 'local'}
+                serverBase="/api/v1"
+                geminiApiKey={getApiKey() || undefined}
+                onGenerateDeliverable={(result) => {
+                  setLatestResult(result);
+                  setCurrentPhase('deliverable');
+                }}
+              />
+            ) : (
+              <ReferenceLibraryPanel
+                userId="local"
+                serverBase="/api/v1"
+                geminiApiKey={getApiKey() || undefined}
+                onOpenInEditor={handleOpenClipInEditor}
+              />
+            )}
+          </div>
+        </div>
       ) : currentPhase === 'deliverable' ? (
         <DeliverableView 
           projectName={currentProject?.name || 'Untitled Project'} 
@@ -348,10 +414,43 @@ export default function App() {
           projectName={currentProject?.name}
           onSaveAssetPack={async () => {
             if (!currentProject) return;
+            // Iterate over track items and save each as a shot & vault asset in Dexie
+            for (const item of (currentProject.trackItems || [])) {
+              const shotId = `shot_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+              const isARoll = !item.isBroll;
+              const sceneTag = (item as any).scene_tag || (isARoll ? 'A-Roll (Talking Head)' : 'Cinematic B-Roll');
+              const itemUrl = item.url || (item as any).videoUrl || '';
+              const thumb = (item as any).thumbnailUrl || (item as any).thumbnail || itemUrl;
+              await db.shots.put({
+                id: shotId,
+                harvest_job_id: currentProject.id,
+                shot_id: shotId,
+                start_seconds: item.startTime,
+                end_seconds: item.endTime,
+                duration: item.duration || (item.endTime - item.startTime),
+                visual_description: item.title,
+                clean_source_url: itemUrl,
+                frame_url: thumb,
+                content_type: isARoll ? 'a_roll' : 'b_roll',
+                scene_tag: sceneTag,
+                notes: `Saved from ${currentProject.name}`,
+              } as any);
+              await db.vaultAssets.put({
+                id: `vault_${shotId}`,
+                shotId: shotId,
+                projectId: currentProject.id,
+                title: item.title || sceneTag,
+                assetKind: isARoll ? 'attached_master' : 'vault_broll',
+                sourceUrl: itemUrl,
+                rightsNote: 'Workspace Reference Pack',
+                createdAt: Date.now(),
+              } as any);
+            }
             if (currentProject.harvestProject) {
               await syncProjectToVault(currentProject.harvestProject);
             }
             // Navigate to library so user can see their saved asset pack
+            setLibrarySubView('vault');
             setCurrentPhase('reference_library');
           }}
           onMakeNewVideo={async () => {
