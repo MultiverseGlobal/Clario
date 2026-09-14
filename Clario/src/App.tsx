@@ -23,6 +23,17 @@ export default function App() {
   const [latestResult, setLatestResult] = useState<any>(null);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [recordedEditScript, setRecordedEditScript] = useState<string>('');
+  const [recordedCategory, setRecordedCategory] = useState<'sales' | 'content'>('sales');
+
+  // Video Canvas Playback & Track State
+  const [canvasTime, setCanvasTime] = useState(0);
+  const [canvasIsPlaying, setCanvasIsPlaying] = useState(false);
+  const [canvasSelectedItemId, setCanvasSelectedItemId] = useState<string | null>(null);
+
+  // Slide Canvas State
+  const [slideActiveIdx, setSlideActiveIdx] = useState(0);
+  const [slideSelectedTextId, setSlideSelectedTextId] = useState<string | null>(null);
+  const [slideSelectedElementId, setSlideSelectedElementId] = useState<string | null>(null);
 
   // Shell modals
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
@@ -73,7 +84,31 @@ export default function App() {
     }, 1000);
   };
 
+  // Playback timer for VideoCanvas
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    if (canvasIsPlaying && currentPhase === 'video_canvas') {
+      interval = setInterval(() => {
+        setCanvasTime((t) => {
+          const totalDur = currentProject?.trackItems?.reduce((sum: number, i: any) => sum + (i.duration || 0), 0) || 30;
+          if (t >= totalDur) {
+            setCanvasIsPlaying(false);
+            return 0;
+          }
+          return parseFloat((t + 0.1).toFixed(1));
+        });
+      }, 100);
+    }
+    return () => clearInterval(interval);
+  }, [canvasIsPlaying, currentPhase, currentProject]);
+
   const handleNavigatePhase = (p: ClarioPhase) => {
+    if (p === 'video_canvas') {
+      if (currentProject?.mode === 'slide_harvester' || currentProject?.mode === 'carousel') {
+        setCurrentPhase('slide_canvas');
+        return;
+      }
+    }
     setCurrentPhase(p);
     if (p === 'home') setCurrentProject(null);
   };
@@ -89,6 +124,7 @@ export default function App() {
       onNavigatePhase={handleNavigatePhase}
       onOpenApiKeyModal={() => setShowApiKeyModal(true)}
       hasApiKey={Boolean(getApiKey())}
+      hasActiveProject={Boolean(currentProject)}
     >
       {/* ── Brand Kit Drawer / Modal ───────────────────────────────────────── */}
 
@@ -234,10 +270,12 @@ export default function App() {
       ) : currentPhase === 'studio' ? (
         <RecordingStudio
           onBack={() => setCurrentPhase('home')}
-          onFinish={(blob, editScript) => {
+          initialCategory={recordedCategory}
+          onFinish={(blob, editScript, category) => {
             if (blob) {
               setRecordedBlob(blob);
               setRecordedEditScript(editScript || '');
+              if (category) setRecordedCategory(category);
               setCurrentPhase('preview');
             } else {
               setCurrentPhase('home');
@@ -255,7 +293,36 @@ export default function App() {
             setRecordedEditScript('');
             setCurrentPhase('studio');
           }}
-          onMoveToEditor={() => {
+          onMoveToEditor={async () => {
+            if (recordedBlob) {
+              const projId = `proj_${Date.now()}`;
+              const previewUrl = URL.createObjectURL(recordedBlob);
+              const isSales = recordedCategory === 'sales';
+              const newProj: ClarioProject = {
+                id: projId,
+                name: `${isSales ? 'Sales Pitch' : 'Content Reel'} (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`,
+                mode: 'video_harvester',
+                category: recordedCategory,
+                targetPurpose: isSales ? 'sales_outreach' : 'content_creator',
+                scriptText: recordedEditScript,
+                slides: [],
+                trackItems: [{
+                  id: `track_rec_${Date.now()}`,
+                  title: isSales ? 'Prospect Walkthrough' : 'Main Cut',
+                  startTime: 0,
+                  endTime: 30,
+                  duration: 30,
+                  type: 'video',
+                  url: previewUrl,
+                  isBroll: false,
+                }],
+                selectedAssets: [],
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+              };
+              setCurrentProject(newProj);
+              await saveProject(newProj);
+            }
             setCurrentPhase('video_canvas');
           }}
           onSave={async (blob) => {
@@ -269,28 +336,47 @@ export default function App() {
         />
       ) : currentPhase === 'video_canvas' ? (
         <VideoCanvas 
-          trackItems={[]}
-          assets={[]}
-          duration={30}
-          currentTime={0}
-          isPlaying={false}
-          selectedItemId={null}
-          onChange={() => {}}
-          onSeek={() => {}}
-          onTogglePlay={() => {}}
-          onSelectItem={() => {}}
+          trackItems={currentProject?.trackItems || []}
+          assets={currentProject?.selectedAssets || []}
+          videoUrl={currentProject?.trackItems?.[0]?.url || (currentProject?.trackItems?.[0] as any)?.videoUrl || ''}
+          duration={
+            currentProject?.trackItems?.reduce((sum: number, item: any) => sum + (item.duration || 0), 0) || 30
+          }
+          currentTime={canvasTime}
+          isPlaying={canvasIsPlaying}
+          selectedItemId={canvasSelectedItemId}
+          onChange={(newTrackItems) => {
+            if (currentProject) {
+              const updated = {
+                ...currentProject,
+                trackItems: newTrackItems,
+                updatedAt: Date.now()
+              };
+              setCurrentProject(updated);
+              saveProject(updated);
+            }
+          }}
+          onSeek={(time) => setCanvasTime(time)}
+          onTogglePlay={() => setCanvasIsPlaying((prev) => !prev)}
+          onSelectItem={(id) => setCanvasSelectedItemId(id)}
         />
       ) : currentPhase === 'slide_canvas' ? (
         <SlideCanvas
-          slides={[]}
-          assets={[]}
-          activeIdx={0}
-          selectedTextId={null}
-          selectedElementId={null}
-          onChange={() => {}}
-          onActiveChange={() => {}}
-          onSelectText={() => {}}
-          onSelectElement={() => {}}
+          slides={currentProject?.slides || []}
+          assets={currentProject?.selectedAssets || []}
+          activeIdx={slideActiveIdx}
+          selectedTextId={slideSelectedTextId}
+          selectedElementId={slideSelectedElementId}
+          onChange={(newSlides) => {
+            if (currentProject) {
+              const updated = { ...currentProject, slides: newSlides, updatedAt: Date.now() };
+              setCurrentProject(updated);
+              saveProject(updated);
+            }
+          }}
+          onActiveChange={(idx) => setSlideActiveIdx(idx)}
+          onSelectText={(id) => setSlideSelectedTextId(id)}
+          onSelectElement={(id) => setSlideSelectedElementId(id)}
         />
       ) : currentPhase === 'resolve_shot' ? (
         <ResolveShotWorkbench
@@ -319,7 +405,11 @@ export default function App() {
         <HomeView
           onSelectProject={(p) => {
             setCurrentProject(p);
-            setCurrentPhase('reference_library');
+            if (p.mode === 'slide_harvester' || p.mode === 'carousel') {
+              setCurrentPhase('slide_canvas');
+            } else {
+              setCurrentPhase('video_canvas');
+            }
           }}
         />
       )}

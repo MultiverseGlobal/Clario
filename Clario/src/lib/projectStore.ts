@@ -30,6 +30,8 @@ export interface ClarioProject {
   trackItems: VideoTrackItem[];
   selectedAssets: Asset[];
   harvestProject?: HarvestProject;
+  category?: 'sales' | 'content' | 'slides';
+  targetPurpose?: string;
   thumbnail?: string; // base64 or data URL
   createdAt: number;
   updatedAt: number;

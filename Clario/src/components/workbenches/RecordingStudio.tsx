@@ -3,15 +3,41 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Camera, Video, Mic, MicOff, VideoOff,
   ArrowLeft, Maximize, Activity,
-  Settings2, MonitorUp,
+  Settings2, MonitorUp, Target, Sparkles
 } from 'lucide-react';
 
 interface RecordingStudioProps {
   onBack: () => void;
-  onFinish: (videoBlob?: Blob, editScript?: string) => void;
+  onFinish: (videoBlob?: Blob, editScript?: string, category?: 'sales' | 'content') => void;
+  initialCategory?: 'sales' | 'content';
 }
 
-export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
+const PURPOSE_CONFIG = {
+  sales: {
+    label: "Sales & Outreach Pitch",
+    badge: "Outbound / Loom",
+    directive: "Auto-zoom smoothly on clicks & active fields, 24px padded studio canvas with rounded 16px corners, dark mesh backdrop, cut silences >1.2s, 1.25x punch-in on value demo. High conversion B2B outbound framing.",
+    teleprompter: 
+      "• Hey [First Name]! Saw what you're building and wanted to share a quick insight.\n\n" +
+      "• Most teams I talk to are frustrated with manual pipeline stagnation.\n\n" +
+      "• We engineered an autonomous engine to solve exactly that in 3 clicks.\n\n" +
+      "• Here's a live look at how it extracts and verifies target founders...\n\n" +
+      "• Would you be open to a 10-minute walkthrough this Thursday?",
+  },
+  content: {
+    label: "Social & Viral Content",
+    badge: "Shorts / Reels / YouTube",
+    directive: "Fast snappy zoom cuts on key beats, eliminate pauses >0.8s, 9:16 vertical punch-ins, high-contrast framing with caption safe zones. Dynamic dopamine pacing.",
+    teleprompter:
+      "• STOP SCROLLING. Here is the 1 growth secret nobody is telling you.\n\n" +
+      "• 90% of creators do this completely backwards and wonder why their reach died.\n\n" +
+      "• Here's the 3-step breakdown you can execute right now.\n\n" +
+      "• Step 1: Hook them in 2 seconds. Step 2: Strip all filler. Step 3: Fast b-roll cuts.\n\n" +
+      "• Save this video and comment 'ACCESS' for the complete template.",
+  }
+};
+
+export function RecordingStudio({ onBack, onFinish, initialCategory = 'sales' }: RecordingStudioProps) {
   const screenVideoRef   = useRef<HTMLVideoElement>(null);
   const pipVideoRef      = useRef<HTMLVideoElement>(null);
   const canvasRef        = useRef<HTMLCanvasElement>(null);
@@ -27,17 +53,20 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
   const [camOn, setCamOn] = useState(false);
   const [screenError, setScreenError] = useState<string | null>(null);
   
-  const [scriptMode, setScriptMode] = useState<'edit_script' | 'teleprompter'>('edit_script');
+  const [videoPurpose, setVideoPurpose] = useState<'sales' | 'content'>(initialCategory);
+  const [scriptMode, setScriptMode] = useState<'edit_script' | 'teleprompter'>('teleprompter');
   const [editDirectiveScript, setEditDirectiveScript] = useState(
-    "Auto-zoom smoothly on clicks & active fields, 24px padded canvas with rounded 16px corners, dark studio backdrop, trim silences >1.2s, 1.25x punch-in on value demo."
+    PURPOSE_CONFIG[initialCategory].directive
   );
   const [teleprompterText, setTeleprompterText] = useState(
-    "• Hey! Thanks for taking the time to review this.\n\n" +
-    "• I know you've been struggling with pipeline stagnation recently.\n\n" +
-    "• What we've built here is specifically designed to eliminate that friction.\n\n" +
-    "• It's fully automated and integrates directly with your existing stack.\n\n" +
-    "• Let's walk through how this completely changes your outreach."
+    PURPOSE_CONFIG[initialCategory].teleprompter
   );
+
+  const handleSelectPurpose = (next: 'sales' | 'content') => {
+    setVideoPurpose(next);
+    setEditDirectiveScript(PURPOSE_CONFIG[next].directive);
+    setTeleprompterText(PURPOSE_CONFIG[next].teleprompter);
+  };
 
   const isReady = !!screenStream;
 
@@ -187,7 +216,7 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
           clearTimeout(compositorRef.current);
           compositorRef.current = null;
         }
-        onFinish(new Blob(chunksRef.current, { type: 'video/webm' }), editDirectiveScript);
+        onFinish(new Blob(chunksRef.current, { type: 'video/webm' }), editDirectiveScript, videoPurpose);
       };
       mr.start(500);
       mediaRecorderRef.current = mr;
@@ -307,6 +336,34 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-accent/20 text-accent border border-accent/30 font-semibold">
                 Cap.so AI
               </span>
+            </div>
+
+            {/* Target Purpose Switcher: Sales vs Content */}
+            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white/10 border border-white/10 text-xs mb-3">
+              <button
+                type="button"
+                onClick={() => handleSelectPurpose('sales')}
+                className={`flex-1 py-1.5 px-2 rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  videoPurpose === 'sales'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'text-white/60 hover:text-white'
+                }`}
+              >
+                <Target className="w-3.5 h-3.5 text-amber-300" />
+                <span>Sales Pitch</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectPurpose('content')}
+                className={`flex-1 py-1.5 px-2 rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  videoPurpose === 'content'
+                    ? 'bg-purple-600 text-white shadow-md'
+                    : 'text-white/60 hover:text-white'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-pink-300" />
+                <span>Social Content</span>
+              </button>
             </div>
 
             {/* Mode Switcher */}

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Video, Presentation, UploadCloud, Link as LinkIcon, Camera, 
   CheckCircle2, ArrowRight, X, Copy, Archive, Check, Scissors, 
-  Film, Loader2, Sparkles, FileVideo
+  Film, Loader2, Sparkles, FileVideo, Target
 } from 'lucide-react';
 import { RecordingStudio } from './RecordingStudio';
 import { ClarioProject, saveProject } from '../../lib/projectStore';
@@ -21,6 +21,7 @@ type WizardView = 'dropzone' | 'processing' | 'success' | 'recording_studio';
 
 export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCreationWizardProps) {
   const [mode, setMode] = useState<WizardMode>('video');
+  const [videoPurpose, setVideoPurpose] = useState<'sales' | 'content'>('sales');
   const [view, setView] = useState<WizardView>('dropzone');
   const [isDragging, setIsDragging] = useState(false);
   
@@ -125,8 +126,9 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
   }, [serverBase]);
 
   // Main file processing pipeline: optimistic + non-blocking
-  const processUploadedFile = async (file: File) => {
+  const processUploadedFile = async (file: File, overridePurpose?: 'sales' | 'content') => {
     const isVideo = mode === 'video' || file.type.startsWith('video/');
+    const effectivePurpose = overridePurpose || videoPurpose;
     const previewUrl = URL.createObjectURL(file);
     const projectId = `proj_${Date.now()}`;
     const cleanName = file.name.replace(/\.[^/.]+$/, "");
@@ -142,6 +144,8 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
       id: projectId,
       name: cleanName,
       mode: isVideo ? 'video_harvester' : 'slide_harvester',
+      category: isVideo ? effectivePurpose : 'slides',
+      targetPurpose: isVideo ? (effectivePurpose === 'sales' ? 'sales_outreach' : 'content_creator') : 'slide_presentation',
       scriptText: '',
       slides: [],
       trackItems: isVideo ? [{
@@ -149,6 +153,7 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
         title: file.name,
         startTime: 0,
         endTime: 30,
+        duration: 30,
         type: 'video',
         url: previewUrl,
       }] : [],
@@ -310,9 +315,14 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
     }
   };
 
-  const handleRecordingFinished = async (blob: Blob) => {
+  const handleRecordingFinished = async (blob?: Blob, _script?: string, category?: 'sales' | 'content') => {
+    if (!blob) {
+      setView('dropzone');
+      return;
+    }
+    if (category) setVideoPurpose(category);
     const file = new File([blob], `recording_${Date.now()}.webm`, { type: 'video/webm' });
-    await processUploadedFile(file);
+    await processUploadedFile(file, category);
   };
 
   const handleDownloadZip = async () => {
@@ -356,7 +366,13 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
   };
 
   if (view === 'recording_studio') {
-    return <RecordingStudio onBack={() => setView('dropzone')} onFinish={handleRecordingFinished} />;
+    return (
+      <RecordingStudio 
+        onBack={() => setView('dropzone')} 
+        initialCategory={videoPurpose}
+        onFinish={handleRecordingFinished} 
+      />
+    );
   }
 
   return (
@@ -424,8 +440,38 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="space-y-6"
+                className="space-y-4"
               >
+                {/* Target Purpose: Sales vs Content */}
+                {mode === 'video' && (
+                  <div className="flex items-center gap-2 p-1 bg-white/[0.04] border border-white/10 rounded-2xl">
+                    <button
+                      type="button"
+                      onClick={() => setVideoPurpose('sales')}
+                      className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        videoPurpose === 'sales'
+                          ? 'bg-indigo-600 text-white shadow-md'
+                          : 'text-white/50 hover:text-white'
+                      }`}
+                    >
+                      <Target className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Sales & Outreach (Loom Pitch)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setVideoPurpose('content')}
+                      className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        videoPurpose === 'content'
+                          ? 'bg-purple-600 text-white shadow-md'
+                          : 'text-white/50 hover:text-white'
+                      }`}
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-pink-300" />
+                      <span>Social & Creator (Reels / Shorts)</span>
+                    </button>
+                  </div>
+                )}
+
                 {/* Drag and Drop Zone */}
                 <div
                   onDragOver={handleDragOver}

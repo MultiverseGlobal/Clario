@@ -22,9 +22,8 @@ interface AppShellProps {
   onNavigatePhase: (phase: ClarioPhase) => void;
   onOpenApiKeyModal: () => void;
   hasApiKey: boolean;
+  hasActiveProject?: boolean;
 }
-
-
 
 export function AppShell({
   children,
@@ -32,6 +31,7 @@ export function AppShell({
   onNavigatePhase,
   onOpenApiKeyModal,
   hasApiKey,
+  hasActiveProject,
 }: AppShellProps) {
   const [theme, setTheme] = useState<'light' | 'dark'>(() =>
     document.documentElement.classList.contains('dark') ? 'dark' : 'light'
@@ -42,7 +42,6 @@ export function AppShell({
     document.documentElement.classList.toggle('dark', next === 'dark');
     setTheme(next);
   };
-
 
   const { publish } = useCrossAppBus(supabase, null);
   useEffect(() => {
@@ -64,6 +63,7 @@ export function AppShell({
           toggleTheme={toggleTheme}
           onNavigatePhase={onNavigatePhase}
           onOpenApiKeyModal={onOpenApiKeyModal}
+          hasActiveProject={hasActiveProject}
         />
       )}
 
