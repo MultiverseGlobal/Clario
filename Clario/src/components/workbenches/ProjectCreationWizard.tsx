@@ -401,33 +401,35 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6">
+    <div className="fixed inset-0 z-50 bg-neutral-900/40 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6">
       <motion.div 
+        layoutId="project-wizard-container"
+        transition={{ type: "spring", stiffness: 350, damping: 30 }}
         initial={{ opacity: 0, scale: 0.96, y: 16 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 16 }}
-        className="w-full max-w-2xl bg-[#0c0e14] border border-white/10 shadow-[0_32px_64px_rgba(0,0,0,0.8)] rounded-3xl overflow-hidden relative flex flex-col"
+        className="w-full max-w-2xl bg-white border border-neutral-200 shadow-2xl shadow-neutral-900/10 rounded-3xl overflow-hidden relative flex flex-col"
       >
         {/* Header Bar */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08] bg-white/[0.02]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-200 bg-neutral-50">
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
-              <Sparkles className="h-4 w-4 text-indigo-400" />
+            <div className="h-8 w-8 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center">
+              <Sparkles className="h-4 w-4 text-indigo-600" />
             </div>
             <div>
-              <h2 className="font-display text-base font-bold text-white tracking-tight">New Clario Project</h2>
-              <p className="text-[11px] text-white/40 font-mono">Instant Media Ingest & AI Studio</p>
+              <h2 className="font-display text-base font-bold text-neutral-900 tracking-tight">New Clario Project</h2>
+              <p className="text-[11px] text-neutral-500 font-mono">Instant Media Ingest & AI Studio</p>
             </div>
           </div>
 
           {/* Mode Switcher */}
-          <div className="flex items-center gap-1 bg-white/[0.06] p-1 rounded-xl border border-white/[0.08]">
+          <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl border border-neutral-200">
             <button
               onClick={() => setMode('video')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                 mode === 'video'
-                  ? 'bg-white text-black font-semibold shadow-sm'
-                  : 'text-white/60 hover:text-white'
+                  ? 'bg-neutral-900 text-white font-semibold shadow-sm'
+                  : 'text-neutral-600 hover:text-neutral-900'
               }`}
             >
               <Video className="h-3.5 w-3.5" />
@@ -437,8 +439,8 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
               onClick={() => setMode('slides')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                 mode === 'slides'
-                  ? 'bg-white text-black font-semibold shadow-sm'
-                  : 'text-white/60 hover:text-white'
+                  ? 'bg-neutral-900 text-white font-semibold shadow-sm'
+                  : 'text-neutral-600 hover:text-neutral-900'
               }`}
             >
               <Presentation className="h-3.5 w-3.5" />
@@ -448,7 +450,7 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
 
           <button 
             onClick={onClose} 
-            className="p-1.5 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors ml-2 cursor-pointer"
+            className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-500 hover:text-neutral-900 transition-colors ml-2 cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -469,17 +471,17 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
               >
                 {/* Target Purpose: Sales vs Content */}
                 {mode === 'video' && (
-                  <div className="flex items-center gap-2 p-1 bg-white/[0.04] border border-white/10 rounded-2xl">
+                  <div className="flex items-center gap-2 p-1 bg-white border border-neutral-200 rounded-2xl">
                     <button
                       type="button"
                       onClick={() => setVideoPurpose('sales')}
                       className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                         videoPurpose === 'sales'
-                          ? 'bg-indigo-600 text-white shadow-md'
-                          : 'text-white/50 hover:text-white'
+                          ? 'bg-indigo-600 text-neutral-900 shadow-md'
+                          : 'text-neutral-500 hover:text-neutral-900'
                       }`}
                     >
-                      <Target className="w-3.5 h-3.5 text-amber-300" />
+                      <Target className="w-3.5 h-3.5 text-amber-600" />
                       <span>Sales & Outreach (Loom Pitch)</span>
                     </button>
                     <button
@@ -487,11 +489,11 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
                       onClick={() => setVideoPurpose('content')}
                       className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                         videoPurpose === 'content'
-                          ? 'bg-purple-600 text-white shadow-md'
-                          : 'text-white/50 hover:text-white'
+                          ? 'bg-purple-600 text-neutral-900 shadow-md'
+                          : 'text-neutral-500 hover:text-neutral-900'
                       }`}
                     >
-                      <Sparkles className="w-3.5 h-3.5 text-pink-300" />
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
                       <span>Social & Creator (Reels / Shorts)</span>
                     </button>
                   </div>
@@ -499,28 +501,28 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
 
                 {/* Sales Editor Directive Prompt */}
                 {mode === 'video' && videoPurpose === 'sales' && (
-                  <div className="p-3 bg-white/[0.03] border border-white/10 rounded-2xl space-y-1.5">
+                  <div className="p-3 bg-neutral-50 border border-neutral-200 rounded-2xl space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-mono font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <label className="text-[11px] font-mono font-bold text-amber-600 uppercase tracking-wider flex items-center gap-1.5">
                         <Target className="w-3 h-3" />
                         <span>Sales Editor Directive Prompt</span>
                       </label>
-                      <span className="text-[10px] text-white/40 font-mono">Custom instructions</span>
+                      <span className="text-[10px] text-neutral-500 font-mono">Custom instructions</span>
                     </div>
                     <input
                       type="text"
                       value={editorPrompt}
                       onChange={e => setEditorPrompt(e.target.value)}
                       placeholder="e.g. Cap.so sleek studio padding, 16:9 widescreen, punch-in zooms, silence trimmed"
-                      className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-indigo-500 font-mono"
+                      className="w-full bg-white border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:border-indigo-500 font-mono"
                     />
                   </div>
                 )}
 
                 {/* Social Content Mode Info */}
                 {mode === 'video' && videoPurpose === 'content' && (
-                  <div className="p-3 bg-purple-500/[0.05] border border-purple-500/20 rounded-2xl flex items-center gap-2 text-xs text-purple-200">
-                    <Sparkles className="w-4 h-4 text-pink-300 shrink-0" />
+                  <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-center gap-2 text-xs text-indigo-700">
+                    <Sparkles className="w-4 h-4 text-indigo-500 shrink-0" />
                     <span>Auto scene breakdown, caption stripping, and speech vs. music isolation enabled.</span>
                   </div>
                 )}
@@ -533,8 +535,8 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
                   onClick={() => fileInputRef.current?.click()}
                   className={`relative group cursor-pointer rounded-2xl border-2 border-dashed p-8 sm:p-12 text-center transition-all duration-300 flex flex-col items-center justify-center ${
                     isDragging
-                      ? 'border-indigo-500 bg-indigo-500/10 shadow-[0_0_40px_rgba(99,102,241,0.2)]'
-                      : 'border-white/15 bg-white/[0.02] hover:border-white/30 hover:bg-white/[0.04]'
+                      ? 'border-indigo-500 bg-indigo-50 shadow-[0_0_40px_rgba(99,102,241,0.2)]'
+                      : 'border-neutral-300 bg-neutral-50 hover:border-neutral-400 hover:bg-white'
                   }`}
                 >
                   <input
@@ -545,14 +547,14 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
                     className="hidden"
                   />
 
-                  <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:border-indigo-500/40 transition-all duration-300">
-                    <UploadCloud className="w-8 h-8 text-indigo-400" />
+                  <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:border-indigo-300 transition-all duration-300">
+                    <UploadCloud className="w-8 h-8 text-indigo-600" />
                   </div>
 
-                  <h3 className="text-base sm:text-lg font-bold text-white mb-1.5">
-                    Drop your {mode === 'video' ? 'video' : 'presentation or PDF'} here, or <span className="text-indigo-400 underline underline-offset-4">browse</span>
+                  <h3 className="text-base sm:text-lg font-bold text-neutral-900 mb-1.5">
+                    Drop your {mode === 'video' ? 'video' : 'presentation or PDF'} here, or <span className="text-indigo-600 underline underline-offset-4">browse</span>
                   </h3>
-                  <p className="text-xs text-white/50 max-w-sm">
+                  <p className="text-xs text-neutral-500 max-w-sm">
                     {mode === 'video' 
                       ? 'MP4, MOV, or WebM up to 500MB. Auto-extracts clean master cuts and cinematic B-roll.' 
                       : 'PDF, Keynote, or PPT slides. Extracts key topics and structure.'}
@@ -564,18 +566,18 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
                   <button
                     type="button"
                     onClick={() => setShowUrlInput(!showUrlInput)}
-                    className="flex items-center justify-center gap-2.5 p-3.5 rounded-xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.06] hover:border-white/20 text-white text-xs font-medium transition-all cursor-pointer"
+                    className="flex items-center justify-center gap-2.5 p-3.5 rounded-xl border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 hover:border-neutral-300 text-neutral-900 text-xs font-medium transition-all cursor-pointer"
                   >
-                    <LinkIcon className="w-4 h-4 text-emerald-400" />
+                    <LinkIcon className="w-4 h-4 text-emerald-600" />
                     <span>Paste Link (YouTube, Drive, Web)</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setView('recording_studio')}
-                    className="flex items-center justify-center gap-2.5 p-3.5 rounded-xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.06] hover:border-white/20 text-white text-xs font-medium transition-all cursor-pointer"
+                    className="flex items-center justify-center gap-2.5 p-3.5 rounded-xl border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 hover:border-neutral-300 text-neutral-900 text-xs font-medium transition-all cursor-pointer"
                   >
-                    <Camera className="w-4 h-4 text-purple-400" />
+                    <Camera className="w-4 h-4 text-indigo-600" />
                     <span>Record Screen & Camera</span>
                   </button>
                 </div>
@@ -592,12 +594,12 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
                       value={urlInput}
                       onChange={(e) => setUrlInput(e.target.value)}
                       placeholder="https://youtube.com/watch?v=... or Google Drive URL"
-                      className="flex-1 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/15 focus:border-indigo-500 focus:outline-none text-xs text-white font-mono placeholder:text-white/30"
+                      className="flex-1 px-4 py-2.5 rounded-xl bg-white border border-neutral-300 focus:border-indigo-500 focus:outline-none text-xs text-neutral-900 font-mono placeholder:text-neutral-400"
                     />
                     <button
                       onClick={() => handleUrlIngest(urlInput)}
                       disabled={!urlInput.trim()}
-                      className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold shrink-0 transition-colors cursor-pointer"
+                      className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-neutral-900 text-xs font-semibold shrink-0 transition-colors cursor-pointer"
                     >
                       Import
                     </button>
@@ -617,20 +619,20 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
               >
                 {/* File Card with Instant Local Preview */}
                 {activeFile && (
-                  <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.03] border border-white/10">
-                    <div className="h-16 w-24 rounded-xl bg-black overflow-hidden border border-white/10 shrink-0 relative flex items-center justify-center">
+                  <div className="flex items-center gap-4 p-4 rounded-2xl bg-neutral-50 border border-neutral-200">
+                    <div className="h-16 w-24 rounded-xl bg-black overflow-hidden border border-neutral-200 shrink-0 relative flex items-center justify-center">
                       {mode === 'video' ? (
                         <video src={activeFile.previewUrl} className="w-full h-full object-cover" muted />
                       ) : (
-                        <FileVideo className="h-6 w-6 text-white/40" />
+                        <FileVideo className="h-6 w-6 text-neutral-500" />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-semibold text-white truncate">{activeFile.name}</div>
-                      <div className="text-xs text-white/40 font-mono mt-0.5">{activeFile.size}</div>
-                      <div className="text-xs text-indigo-400 font-mono mt-1 flex items-center gap-1.5">
+                      <div className="text-sm font-semibold text-neutral-900 truncate">{activeFile.name}</div>
+                      <div className="text-xs text-neutral-500 font-mono mt-0.5">{activeFile.size}</div>
+                      <div className="text-xs text-indigo-600 font-mono mt-1 flex items-center gap-1.5">
                         {backendStatus === 'running' && <Loader2 className="w-3 h-3 animate-spin" />}
-                        {backendStatus === 'offline' && <CheckCircle2 className="w-3 h-3 text-emerald-400" />}
+                        {backendStatus === 'offline' && <CheckCircle2 className="w-3 h-3 text-emerald-600" />}
                         <span>{statusText}</span>
                       </div>
                     </div>
@@ -639,13 +641,13 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
 
                 {/* Animated Progress Bar */}
                 <div className="space-y-2">
-                  <div className="flex justify-between text-xs font-mono text-white/60">
+                  <div className="flex justify-between text-xs font-mono text-neutral-600">
                     <span>{statusText}</span>
                     <span>{progress}%</span>
                   </div>
-                  <div className="w-full h-2 bg-white/[0.08] rounded-full overflow-hidden">
+                  <div className="w-full h-2 bg-neutral-200 rounded-full overflow-hidden">
                     <motion.div 
-                      className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 rounded-full"
+                      className="h-full bg-gradient-to-r from-indigo-500 to-emerald-400 rounded-full"
                       initial={{ width: 0 }}
                       animate={{ width: `${progress}%` }}
                       transition={{ duration: 0.3 }}
@@ -653,51 +655,50 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
                   </div>
                 </div>
 
-                {/* 4-Stage Intelligence Pipeline Milestones */}
                 <div className="grid grid-cols-2 gap-2 pt-1">
-                  <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.07] flex items-center gap-2">
+                  <div className="p-2.5 rounded-xl bg-neutral-50 border border-neutral-200 flex items-center gap-2">
                     <span className="text-sm">🎬</span>
                     <div>
-                      <div className="text-[11px] font-bold text-white">Cinematic Scenes</div>
-                      <div className="text-[9px] text-white/40">Scene boundaries & cuts</div>
+                      <div className="text-[11px] font-bold text-neutral-900">Scene-Based Cutting</div>
+                      <div className="text-[9px] text-neutral-500">Shot Boundary Detection - Splitting scenes by camera angle</div>
                     </div>
                   </div>
 
-                  <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.07] flex items-center gap-2">
+                  <div className="p-2.5 rounded-xl bg-neutral-50 border border-neutral-200 flex items-center gap-2">
                     <span className="text-sm">💬</span>
                     <div>
-                      <div className="text-[11px] font-bold text-white">Captions Separated</div>
-                      <div className="text-[9px] text-white/40">Subtitles isolated to track</div>
+                      <div className="text-[11px] font-bold text-neutral-900">Clearing Captions</div>
+                      <div className="text-[9px] text-neutral-500">Asset Resolution & AI Inpainting - Removing dopamine text</div>
                     </div>
                   </div>
 
-                  <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.07] flex items-center gap-2">
+                  <div className="p-2.5 rounded-xl bg-neutral-50 border border-neutral-200 flex items-center gap-2">
                     <span className="text-sm">🎙️</span>
                     <div>
-                      <div className="text-[11px] font-bold text-white">Voice & Music Split</div>
-                      <div className="text-[9px] text-white/40">Speech stripped from BGM</div>
+                      <div className="text-[11px] font-bold text-neutral-900">Voice & Music Split</div>
+                      <div className="text-[9px] text-neutral-500">Isolating speech track from background music</div>
                     </div>
                   </div>
 
-                  <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.07] flex items-center gap-2">
+                  <div className="p-2.5 rounded-xl bg-neutral-50 border border-neutral-200 flex items-center gap-2">
                     <span className="text-sm">✨</span>
                     <div>
-                      <div className="text-[11px] font-bold text-white">Studio Directives</div>
-                      <div className="text-[9px] text-white/40">Framing & kinetic styling</div>
+                      <div className="text-[11px] font-bold text-neutral-900">Studio Compilation</div>
+                      <div className="text-[9px] text-neutral-500">Generating clean cinematic cuts</div>
                     </div>
                   </div>
                 </div>
 
                 {/* Instant Actions (No blocking) */}
-                <div className="pt-2 flex items-center justify-between gap-3 border-t border-white/[0.08]">
-                  <p className="text-xs text-white/40">
+                <div className="pt-2 flex items-center justify-between gap-3 border-t border-neutral-200">
+                  <p className="text-xs text-neutral-500">
                     {backendStatus === 'offline' 
                       ? 'Local editor ready immediately.' 
                       : 'Assets ready to arrange in timeline editor.'}
                   </p>
                   <button
                     onClick={openEditorImmediately}
-                    className="px-5 py-2.5 rounded-xl bg-white text-black hover:bg-white/90 text-xs font-bold flex items-center gap-2 transition-all shadow-lg cursor-pointer"
+                    className="px-5 py-2.5 rounded-xl bg-neutral-900 text-white hover:bg-neutral-800 text-xs font-bold flex items-center gap-2 transition-all shadow-lg cursor-pointer"
                   >
                     <span>Open in Editor</span>
                     <ArrowRight className="w-3.5 h-3.5" />
@@ -716,43 +717,43 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
-                      <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                    <div className="h-10 w-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center">
+                      <CheckCircle2 className="h-5 w-5 text-emerald-600" />
                     </div>
                     <div>
-                      <h3 className="text-base font-bold text-white">
+                      <h3 className="text-base font-bold text-neutral-900">
                         🎬 {detectedScenes.length || activeProject?.trackItems.length || 4} Cinematic Scenes Cut & Ready
                       </h3>
-                      <p className="text-xs text-white/50">
+                      <p className="text-xs text-neutral-500">
                         Frame-level cuts detected · Speech aligned · Captions ready to strip
                       </p>
                     </div>
                   </div>
-                  <span className="text-[11px] font-mono px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-semibold">
+                  <span className="text-[11px] font-mono px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200 font-semibold">
                     Auto-Cut Active
                   </span>
                 </div>
 
                 {/* Pre-Editor Caption Stripping & Cleanup Controls */}
-                <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="p-3.5 rounded-2xl bg-neutral-50 border border-neutral-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                   <div>
-                    <div className="text-xs font-semibold text-white flex items-center gap-1.5">
-                      <Scissors className="w-3.5 h-3.5 text-rose-400" />
+                    <div className="text-xs font-semibold text-neutral-900 flex items-center gap-1.5">
+                      <Scissors className="w-3.5 h-3.5 text-rose-600" />
                       <span>Pre-Editor Caption Stripping</span>
                     </div>
-                    <div className="text-[11px] text-white/40 mt-0.5">
+                    <div className="text-[11px] text-neutral-500 mt-0.5">
                       Strip burnt-in pixel captions before timeline entry
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white/5 border border-white/10 text-xs">
+                  <div className="flex items-center gap-1.5 p-1 rounded-xl bg-neutral-50 border border-neutral-200 text-xs">
                     <button
                       type="button"
                       onClick={() => setCaptionStripMode('punch_in')}
                       className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                         captionStripMode === 'punch_in'
                           ? 'bg-rose-600 text-white shadow-md'
-                          : 'text-white/60 hover:text-white'
+                          : 'text-neutral-600 hover:text-neutral-900'
                       }`}
                     >
                       ✂️ Punch-In
@@ -763,7 +764,7 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
                       className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                         captionStripMode === 'blur_mask'
                           ? 'bg-indigo-600 text-white shadow-md'
-                          : 'text-white/60 hover:text-white'
+                          : 'text-neutral-600 hover:text-neutral-900'
                       }`}
                     >
                       🌫️ Blur Matte
@@ -773,8 +774,8 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
                       onClick={() => setCaptionStripMode('none')}
                       className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                         captionStripMode === 'none'
-                          ? 'bg-white/20 text-white'
-                          : 'text-white/40 hover:text-white'
+                          ? 'bg-neutral-200 text-neutral-900'
+                          : 'text-neutral-500 hover:text-neutral-900'
                       }`}
                     >
                       Off
@@ -784,7 +785,7 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
 
                 {/* Scene Cards Grid (Auto-cut scenes with scene tags: Cars, Table, A-Roll, B-Roll) */}
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs font-mono text-white/60">
+                  <div className="flex items-center justify-between text-xs font-mono text-neutral-600">
                     <span className="uppercase tracking-wider">
                       Auto-Cut Scenes ({detectedScenes.length || activeProject?.trackItems.length || 0})
                     </span>
@@ -807,31 +808,31 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
                     }))).map((scene, idx) => (
                       <div 
                         key={scene.id || idx} 
-                        className="rounded-xl bg-white/[0.02] border border-white/10 overflow-hidden group hover:border-indigo-500/40 transition-all flex flex-col"
+                        className="rounded-xl bg-neutral-50 border border-neutral-200 overflow-hidden group hover:border-indigo-300 transition-all flex flex-col"
                       >
-                        <div className="aspect-video bg-black/60 relative overflow-hidden flex items-center justify-center">
+                        <div className="aspect-video bg-neutral-100 relative overflow-hidden flex items-center justify-center">
                           {scene.frameUrl ? (
                             <img src={scene.frameUrl} alt={scene.sceneTag} className="w-full h-full object-cover" />
                           ) : (
-                            <Film className="w-6 h-6 text-white/20" />
+                            <Film className="w-6 h-6 text-neutral-900/20" />
                           )}
-                          <span className="absolute bottom-1 right-1 text-[9px] font-mono px-1.5 py-0.5 rounded bg-black/70 text-white font-bold backdrop-blur-sm">
+                          <span className="absolute bottom-1 right-1 text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/90 text-neutral-900 shadow-sm text-neutral-900 font-bold backdrop-blur-sm">
                             {scene.duration}s
                           </span>
                           <span className={`absolute top-1 left-1 text-[8px] font-mono uppercase px-1.5 py-0.5 rounded font-bold ${
-                            scene.contentType === 'a_roll' ? 'bg-indigo-600 text-white' : 'bg-emerald-600 text-white'
+                            scene.contentType === 'a_roll' ? 'bg-indigo-600 text-neutral-900' : 'bg-emerald-600 text-neutral-900'
                           }`}>
                             {scene.contentType === 'a_roll' ? 'A-Roll' : 'B-Roll'}
                           </span>
                         </div>
                         <div className="p-2 flex-1 flex flex-col justify-between">
-                          <div className="text-[11px] font-semibold text-white truncate" title={scene.sceneTag}>
+                          <div className="text-[11px] font-semibold text-neutral-900 truncate" title={scene.sceneTag}>
                             {scene.sceneTag}
                           </div>
-                          <div className="text-[9px] font-mono text-white/40 mt-0.5 flex items-center justify-between">
+                          <div className="text-[9px] font-mono text-neutral-500 mt-0.5 flex items-center justify-between">
                             <span>{scene.startTime.toFixed(1)}s → {scene.endTime.toFixed(1)}s</span>
                             {captionStripMode !== 'none' && (
-                              <span className="text-rose-400 font-bold text-[8px]">STRIP</span>
+                              <span className="text-rose-600 font-bold text-[8px]">STRIP</span>
                             )}
                           </div>
                         </div>
@@ -845,17 +846,17 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
                   <button
                     type="button"
                     onClick={handleSavePackToLibrary}
-                    className="flex-1 py-3 px-4 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer shadow-sm"
+                    className="flex-1 py-3 px-4 rounded-xl border border-neutral-300 bg-neutral-50 hover:bg-neutral-100 text-neutral-900 text-xs font-semibold flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer shadow-sm"
                     title="Save all cut scenes categorized into your Reference Library (Cars, Table, A-roll, B-roll)"
                   >
-                    <Archive className="w-4 h-4 text-emerald-400" />
+                    <Archive className="w-4 h-4 text-emerald-600" />
                     <span>📦 Save Pack to Library</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={openEditorImmediately}
-                    className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-indigo-600/25 cursor-pointer"
+                    className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-indigo-600/25 cursor-pointer"
                   >
                     <Film className="w-4 h-4" />
                     <span>🪄 New Video (Enter Editor)</span>
