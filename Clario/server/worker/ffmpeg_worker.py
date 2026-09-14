@@ -319,16 +319,20 @@ def cut_segment_ffmpeg(video_path: str, start_sec: float, end_sec: float, output
 
 # ── Caption & Subtitle Removal ───────────────────────────────────────────────
 
-def remove_captions_ffmpeg(video_path: str, output_path: str) -> bool:
+def remove_captions_ffmpeg(video_path: str, output_path: str, punch_in: bool = True) -> bool:
     """
     Remove subtitle tracks (-sn) and clean caption overlays from the video.
+    If punch_in is True, crops the bottom 18% where mobile hardcoded captions reside
+    and smoothly scales back to the original resolution, eliminating burnt-in text.
     Re-encodes cleanly with libx264/aac and +faststart.
     """
     try:
+        vf_filter = "crop=iw:ih*0.82:0:0,scale=iw:ih:flags=bicubic" if punch_in else "null"
         cmd = [
             FFMPEG_BIN,
             "-i", video_path,
             "-sn",  # strip all embedded subtitle streams
+            "-vf", vf_filter,
             "-c:v", "libx264",
             "-preset", "fast",
             "-crf", "18",
