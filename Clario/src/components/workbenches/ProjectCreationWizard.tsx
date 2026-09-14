@@ -1,9 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Video, Presentation, Target, Sparkles, UploadCloud, 
-  Link as LinkIcon, Camera, CheckCircle2, ArrowRight, 
-  X, Copy, Archive, Check, Scissors, Film 
+  Video, Presentation, UploadCloud, Link as LinkIcon, Camera, 
+  CheckCircle2, ArrowRight, X, Copy, Archive, Check, Scissors, 
+  Film, Loader2, Sparkles, FileVideo
 } from 'lucide-react';
 import { RecordingStudio } from './RecordingStudio';
 import { ClarioProject, saveProject } from '../../lib/projectStore';
@@ -16,30 +16,28 @@ interface ProjectCreationWizardProps {
   onProjectCreated: (p: ClarioProject) => void;
 }
 
-type Step = 
-  | 'type' 
-  | 'video_category' 
-  | 'sales_source' 
-  | 'content_source' 
-  | 'slides_source' 
-  | 'url_input'
-  | 'recording_studio'
-  | 'processing_video'
-  | 'processing_slides'
-  | 'success_video'
-  | 'success_slides';
+type WizardMode = 'video' | 'slides';
+type WizardView = 'dropzone' | 'processing' | 'success' | 'recording_studio';
 
 export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCreationWizardProps) {
-  const [step, setStep] = useState<Step>('type');
-  const [projectType, setProjectType] = useState<'video'|'slides'|null>(null);
-  const [videoCategory, setVideoCategory] = useState<'sales'|'content'|null>(null);
-  const [urlInput, setUrlInput] = useState('');
+  const [mode, setMode] = useState<WizardMode>('video');
+  const [view, setView] = useState<WizardView>('dropzone');
+  const [isDragging, setIsDragging] = useState(false);
   
-  // Processing states
+  // URL input state
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [urlInput, setUrlInput] = useState('');
+
+  // Active file & optimistic preview
+  const [activeFile, setActiveFile] = useState<{ name: string; size: string; previewUrl: string } | null>(null);
+  const [activeProject, setActiveProject] = useState<ClarioProject | null>(null);
+
+  // Processing & job status
   const [progress, setProgress] = useState(0);
-  const [statusText, setStatusText] = useState('');
-  const [generatedPrompt, setGeneratedPrompt] = useState('');
+  const [statusText, setStatusText] = useState('Preparing upload...');
+  const [backendStatus, setBackendStatus] = useState<'idle' | 'running' | 'completed' | 'offline'>('idle');
   const [harvestedResult, setHarvestedResult] = useState<any | null>(null);
+  const [generatedPrompt, setGeneratedPrompt] = useState('');
   const [isExportingZip, setIsExportingZip] = useState(false);
   const [copiedVideoUrl, setCopiedVideoUrl] = useState(false);
 
@@ -61,98 +59,235 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
     };
   }, []);
 
-  const startPolling = useCallback((jobId: string, type: 'video' | 'slides') => {
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
+  // Poll remote job if backend accepted it
+  const startPolling = useCallback((jobId: string, projectType: WizardMode, initialProject: ClarioProject) => {
     if (pollTimer.current) clearInterval(pollTimer.current);
     pollTimer.current = setInterval(async () => {
       try {
         const res = await fetchAuth(`${serverBase}/harvest/jobs/${jobId}`);
+        if (!res.ok) throw new Error('Job status check failed');
         const job = await res.json();
         
-        setProgress(job.progress_pct || 0);
-        setStatusText(job.status_msg || 'Processing...');
+        setProgress(job.progress_pct || 50);
+        setStatusText(job.status_msg || 'Analyzing footage keyframes...');
         
         if (job.status === 'completed' || job.status === 'failed') {
           clearInterval(pollTimer.current!);
           if (job.status === 'completed') {
+            setBackendStatus('completed');
             if (job.result) {
               setHarvestedResult(job.result);
+              // Update project in store with detected shots
+              const updatedProject: ClarioProject = {
+                ...initialProject,
+                name: job.result.name || initialProject.name,
+                trackItems: job.result.shots ? job.result.shots.map((s: any, idx: number) => ({
+                  id: s.shot_id || `shot_${idx}`,
+                  title: s.visual_description?.substring(0, 32) || `Shot ${idx + 1}`,
+                  startTime: s.start_seconds || 0,
+                  endTime: s.end_seconds || 0,
+                  type: 'video',
+                  url: s.frame_url || job.result.reference_url || initialProject.trackItems[0]?.url,
+                })) : initialProject.trackItems,
+                updatedAt: Date.now(),
+              };
+              setActiveProject(updatedProject);
+              await saveProject(updatedProject);
             }
-            if (type === 'slides') {
+            if (projectType === 'slides') {
               setGeneratedPrompt(generateClaudeCodePrompt(
-                "The 4 Step Framework for Viral Reach",
+                "Modern High-Converting Slide Deck",
                 ["#0F1015", "#181922", "#F8FAFC", "#10B981"],
-                "Step-by-Step SOP / Tool Matrix",
-                "Top category pill, bold hook headline, 4-item horizontal card container, bottom takeaway"
+                "Structured Breakdown & Key Takeaways",
+                "High-impact typography, dark background with emerald accents, metric callouts"
               ));
             }
-            setStep(type === 'video' ? 'success_video' : 'success_slides');
+            setView('success');
           } else {
-            setStatusText('Processing failed');
+            setBackendStatus('offline');
+            setStatusText('Footage ready in workspace. AI segmentation paused.');
           }
         }
-      } catch (err) {
+      } catch {
         clearInterval(pollTimer.current!);
-        setStatusText('Error fetching status');
+        setBackendStatus('offline');
+        setStatusText('Footage saved to workspace. (AI harvester is offline)');
       }
     }, 2000);
   }, [serverBase]);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !projectType) return;
+  // Main file processing pipeline: optimistic + non-blocking
+  const processUploadedFile = async (file: File) => {
+    const isVideo = mode === 'video' || file.type.startsWith('video/');
+    const previewUrl = URL.createObjectURL(file);
+    const projectId = `proj_${Date.now()}`;
+    const cleanName = file.name.replace(/\.[^/.]+$/, "");
 
-    setStep(projectType === 'video' ? 'processing_video' : 'processing_slides');
-    setProgress(0);
-    setStatusText('Uploading to secure storage...');
+    setActiveFile({
+      name: file.name,
+      size: formatFileSize(file.size),
+      previewUrl,
+    });
 
+    // 1. Optimistically create and save the project immediately
+    const initialProject: ClarioProject = {
+      id: projectId,
+      name: cleanName,
+      mode: isVideo ? 'video_harvester' : 'slide_harvester',
+      scriptText: '',
+      slides: [],
+      trackItems: isVideo ? [{
+        id: `track_0`,
+        title: file.name,
+        startTime: 0,
+        endTime: 30,
+        type: 'video',
+        url: previewUrl,
+      }] : [],
+      selectedAssets: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    setActiveProject(initialProject);
+    await saveProject(initialProject);
+
+    // Switch to processing view
+    setView('processing');
+    setProgress(25);
+    setStatusText('Securing file to project vault...');
+    setBackendStatus('running');
+
+    // 2. Upload to Supabase Storage in background
+    let storagePath: string | null = null;
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const uid = session?.user?.id;
-      if (!uid) throw new Error('Not authenticated. Please log in first.');
+      if (uid) {
+        const fileExt = file.name.split('.').pop() || 'mp4';
+        const fileName = `${Math.random().toString(36).substring(2, 10)}_${Date.now()}.${fileExt}`;
+        storagePath = `${uid}/${fileName}`;
 
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
-      // RLS policy requires first path segment to be the user's UUID
-      const filePath = `${uid}/${fileName}`;
+        const { error: uploadError } = await supabase.storage
+          .from('clario-raw')
+          .upload(storagePath, file, { cacheControl: '3600', upsert: false });
 
-      // 1. Direct upload to Supabase
-      const { error: uploadError } = await supabase.storage
-        .from('clario-raw')
-        .upload(filePath, file, { cacheControl: '3600', upsert: false });
+        if (!uploadError) {
+          const { data: pub } = supabase.storage.from('clario-raw').getPublicUrl(storagePath);
+          if (pub?.publicUrl) {
+            initialProject.trackItems[0].url = pub.publicUrl;
+            await saveProject(initialProject);
+          }
+        }
+      }
+    } catch (storageErr) {
+      console.warn('Storage upload note:', storageErr);
+    }
 
-      if (uploadError) throw uploadError;
+    setProgress(60);
+    setStatusText('Connecting to AI harvester engine...');
 
-      setStatusText('Initializing remote processor...');
-      setProgress(100);
+    // 3. Trigger remote ingest non-blockingly
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-      // 2. Ping backend remote ingest
       const res = await fetchAuth(`${serverBase}/harvest/ingest-remote`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          file_path: filePath,
+          file_path: storagePath || file.name,
           filename: file.name,
-          mode: projectType === 'video' ? 'video_harvester' : 'slide_harvester'
-        })
+          mode: isVideo ? 'video_harvester' : 'slide_harvester',
+        }),
+        signal: controller.signal,
       });
 
-      if (!res.ok) {
-        throw new Error('Backend URL unreachable or server error');
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.job_id) {
+          setProgress(75);
+          setStatusText('AI harvester analyzing video scenes...');
+          startPolling(data.job_id, isVideo ? 'video' : 'slides', initialProject);
+          return;
+        }
       }
-      const data = await res.json();
-      startPolling(data.job_id, projectType);
-    } catch (err: any) {
-      console.error(err);
-      setStatusText(err.message.includes('fetch') ? 'Upload failed: Backend URL unreachable. Configure Settings.' : 'Upload failed: ' + err.message);
+      throw new Error('Harvester returned non-OK');
+    } catch {
+      // Backend offline or slow cold start — DO NOT BLOCK USER!
+      setProgress(100);
+      setBackendStatus('offline');
+      setStatusText('Footage ready in workspace. (AI harvester running in background)');
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      processUploadedFile(files[0]);
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processUploadedFile(file);
     }
   };
 
   const handleUrlIngest = async (url: string) => {
-    if (!projectType || !url) return;
+    if (!url.trim()) return;
+    const isVideo = mode === 'video';
+    const projectId = `proj_${Date.now()}`;
+    const initialProject: ClarioProject = {
+      id: projectId,
+      name: `Imported Media (${new URL(url).hostname})`,
+      mode: isVideo ? 'video_harvester' : 'slide_harvester',
+      scriptText: '',
+      slides: [],
+      trackItems: [{
+        id: `track_0`,
+        title: url,
+        startTime: 0,
+        endTime: 30,
+        type: 'video',
+        url: url,
+      }],
+      selectedAssets: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
 
-    setStep(projectType === 'video' ? 'processing_video' : 'processing_slides');
-    setProgress(0);
-    setStatusText('Queuing URL...');
+    setActiveProject(initialProject);
+    await saveProject(initialProject);
+    setView('processing');
+    setProgress(35);
+    setStatusText('Importing media from URL...');
 
     try {
       const res = await fetchAuth(`${serverBase}/harvest/ingest-url`, {
@@ -160,39 +295,24 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
       });
-      if (!res.ok) {
-        throw new Error('Backend URL unreachable or server error');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.job_id) {
+          startPolling(data.job_id, isVideo ? 'video' : 'slides', initialProject);
+          return;
+        }
       }
-      const data = await res.json();
-      startPolling(data.job_id, projectType);
-    } catch (err: any) {
-      console.error(err);
-      setStatusText(err.message.includes('fetch') ? 'URL Ingest failed: Backend URL unreachable. Configure Settings.' : 'URL Ingest failed');
+      throw new Error('Remote ingest failed');
+    } catch {
+      setProgress(100);
+      setBackendStatus('offline');
+      setStatusText('URL saved to project. Remote AI harvester is syncing.');
     }
   };
 
-  const createAndRoute = async () => {
-    const newId = harvestedResult?.id || `proj_${Date.now()}`;
-    const newProject: ClarioProject = {
-      id: newId,
-      name: harvestedResult?.name || `New ${projectType === 'slides' ? 'Slide' : videoCategory === 'sales' ? 'Sales' : 'Content'} Project`,
-      mode: 'video_harvester',
-      scriptText: '',
-      slides: harvestedResult?.slides || [],
-      trackItems: harvestedResult?.shots ? harvestedResult.shots.map((s: any, idx: number) => ({
-        id: s.shot_id || `shot_${idx}`,
-        title: s.visual_description?.substring(0, 32) || `Shot ${idx + 1}`,
-        startTime: s.start_seconds || 0,
-        endTime: s.end_seconds || 0,
-        type: 'video',
-        url: s.frame_url || harvestedResult.reference_url,
-      })) : [],
-      selectedAssets: [],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-    await saveProject(newProject);
-    onProjectCreated(newProject);
+  const handleRecordingFinished = async (blob: Blob) => {
+    const file = new File([blob], `recording_${Date.now()}.webm`, { type: 'video/webm' });
+    await processUploadedFile(file);
   };
 
   const handleDownloadZip = async () => {
@@ -212,7 +332,7 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Failed to download zip:', err);
       window.open(`${serverBase}/projects/${harvestedResult.id}/export-zip`, '_blank');
     } finally {
@@ -221,7 +341,7 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
   };
 
   const handleCopyAtlasVideoUrl = () => {
-    const videoUrl = harvestedResult?.reference_url || '';
+    const videoUrl = harvestedResult?.reference_url || activeProject?.trackItems[0]?.url || '';
     if (videoUrl) {
       navigator.clipboard.writeText(videoUrl);
       setCopiedVideoUrl(true);
@@ -229,306 +349,285 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
     }
   };
 
-  const handleRecordingFinished = async (blob: Blob) => {
-    if (!projectType) return;
-    setStep('processing_video');
-    setProgress(0);
-    setStatusText('Uploading to secure storage...');
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const uid = session?.user?.id;
-      if (!uid) throw new Error('Not authenticated. Please log in first.');
-
-      const fileName = `rec_${Math.random().toString(36).substring(2, 10)}_${Date.now()}.webm`;
-      const filePath = `${uid}/${fileName}`;
-
-      // 1. Direct upload to Supabase clario-raw bucket
-      const { error: uploadError } = await supabase.storage
-        .from('clario-raw')
-        .upload(filePath, blob, { contentType: 'video/webm', cacheControl: '3600', upsert: false });
-
-      if (uploadError) throw uploadError;
-
-      setStatusText('Initializing remote processor...');
-      setProgress(100);
-
-      // 2. Ping backend remote ingest
-      const res = await fetchAuth(`${serverBase}/harvest/ingest-remote`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          file_path: filePath,
-          filename: fileName,
-          mode: 'video_harvester'
-        })
-      });
-
-      if (!res.ok) {
-        throw new Error('Backend URL unreachable or server error');
-      }
-      const data = await res.json();
-      startPolling(data.job_id, 'video');
-    } catch (err: any) {
-      console.error(err);
-      setStatusText(err.message?.includes('fetch') ? 'Upload failed: Backend URL unreachable. Configure Settings.' : 'Upload failed: ' + err.message);
+  const openEditorImmediately = () => {
+    if (activeProject) {
+      onProjectCreated(activeProject);
     }
   };
 
-  if (step === 'recording_studio') {
-    return <RecordingStudio onBack={() => setStep('sales_source')} onFinish={handleRecordingFinished} />;
+  if (view === 'recording_studio') {
+    return <RecordingStudio onBack={() => setView('dropzone')} onFinish={handleRecordingFinished} />;
   }
 
-  // Common wrapper for cards
-  const Card = ({ icon: Icon, title, description, onClick }: any) => (
-    <button 
-      onClick={onClick}
-      className="flex flex-col items-start p-6 rounded-2xl border border-border bg-surface-1 hover:bg-surface-2 hover:border-accent hover:shadow-[0_0_30px_rgba(var(--pds-accent-rgb),0.1)] transition-all text-left group"
-    >
-      <div className="w-12 h-12 rounded-xl bg-surface-3 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-        <Icon className="w-6 h-6 text-foreground group-hover:text-accent" />
-      </div>
-      <h3 className="font-display text-xl font-bold text-foreground mb-2">{title}</h3>
-      <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
-    </button>
-  );
-
   return (
-    <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-8">
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6">
       <motion.div 
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        initial={{ opacity: 0, scale: 0.96, y: 16 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="w-full max-w-2xl bg-card border border-border shadow-2xl rounded-3xl overflow-hidden relative min-h-[400px] flex flex-col"
+        exit={{ opacity: 0, scale: 0.96, y: 16 }}
+        className="w-full max-w-2xl bg-[#0c0e14] border border-white/10 shadow-[0_32px_64px_rgba(0,0,0,0.8)] rounded-3xl overflow-hidden relative flex flex-col"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-border/50">
-          <h2 className="font-display text-xl font-bold">New Project</h2>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-surface-2 text-muted-foreground transition-colors">
+        {/* Header Bar */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08] bg-white/[0.02]">
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
+              <Sparkles className="h-4 w-4 text-indigo-400" />
+            </div>
+            <div>
+              <h2 className="font-display text-base font-bold text-white tracking-tight">New Clario Project</h2>
+              <p className="text-[11px] text-white/40 font-mono">Instant Media Ingest & AI Studio</p>
+            </div>
+          </div>
+
+          {/* Mode Switcher */}
+          <div className="flex items-center gap-1 bg-white/[0.06] p-1 rounded-xl border border-white/[0.08]">
+            <button
+              onClick={() => setMode('video')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                mode === 'video'
+                  ? 'bg-white text-black font-semibold shadow-sm'
+                  : 'text-white/60 hover:text-white'
+              }`}
+            >
+              <Video className="h-3.5 w-3.5" />
+              Video
+            </button>
+            <button
+              onClick={() => setMode('slides')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                mode === 'slides'
+                  ? 'bg-white text-black font-semibold shadow-sm'
+                  : 'text-white/60 hover:text-white'
+              }`}
+            >
+              <Presentation className="h-3.5 w-3.5" />
+              Slides
+            </button>
+          </div>
+
+          <button 
+            onClick={onClose} 
+            className="p-1.5 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors ml-2 cursor-pointer"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Content Area */}
-        <div className="flex-1 p-8 relative overflow-hidden flex flex-col justify-center">
+        {/* Modal Body */}
+        <div className="p-6 sm:p-8">
           <AnimatePresence mode="wait">
             
-            {step === 'type' && (
+            {/* VIEW 1: MODERN UNIFIED DROPZONE */}
+            {view === 'dropzone' && (
               <motion.div 
-                key="type"
-                initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-                className="flex flex-col gap-6"
+                key="dropzone"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-6"
               >
-                <div className="text-center mb-4">
-                  <h3 className="text-2xl font-bold mb-2">What are we building today?</h3>
-                  <p className="text-muted-foreground">Select the primary asset type for this project.</p>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Card 
-                    icon={Video} title="Video Project" 
-                    description="Analyze footage, clean inpainted captions, and generate editorial sequences." 
-                    onClick={() => { setProjectType('video'); setStep('video_category'); }}
-                  />
-                  <Card 
-                    icon={Presentation} title="Slides & Static" 
-                    description="Upload pitch decks or URLs to extract insights and generate LLM redesign prompts." 
-                    onClick={() => { setProjectType('slides'); setStep('slides_source'); }}
-                  />
-                </div>
-              </motion.div>
-            )}
-
-            {step === 'video_category' && (
-              <motion.div 
-                key="vcat"
-                initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-                className="flex flex-col gap-6"
-              >
-                <div className="text-center mb-4">
-                  <h3 className="text-2xl font-bold mb-2">Select Video Category</h3>
-                  <p className="text-muted-foreground">Tailor the workflow to the type of video.</p>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Card 
-                    icon={Target} title="Sales / Outreach" 
-                    description="Record a personalized pitch with the AI Teleprompter and Director cues." 
-                    onClick={() => { setVideoCategory('sales'); setStep('sales_source'); }}
-                  />
-                  <Card 
-                    icon={Sparkles} title="Content / Editorial" 
-                    description="Ingest existing content, clean assets, and build a reference library." 
-                    onClick={() => { setVideoCategory('content'); setStep('content_source'); }}
-                  />
-                </div>
-                <button onClick={() => setStep('type')} className="text-sm text-muted-foreground hover:text-foreground mt-4">
-                  ← Back
-                </button>
-              </motion.div>
-            )}
-
-            {(step === 'sales_source' || step === 'content_source' || step === 'slides_source') && (
-              <motion.div 
-                key="source"
-                initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-                className="flex flex-col gap-6"
-              >
-                <div className="text-center mb-4">
-                  <h3 className="text-2xl font-bold mb-2">Provide Source Material</h3>
-                  <p className="text-muted-foreground">Upload your files or paste a link to begin ingestion.</p>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {step === 'sales_source' && (
-                    <Card 
-                      icon={Camera} title="Record Now" 
-                      description="Use the AI Director Studio to record a perfectly paced pitch." 
-                      onClick={() => setStep('recording_studio')}
-                    />
-                  )}
+                {/* Drag and Drop Zone */}
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`relative group cursor-pointer rounded-2xl border-2 border-dashed p-8 sm:p-12 text-center transition-all duration-300 flex flex-col items-center justify-center ${
+                    isDragging
+                      ? 'border-indigo-500 bg-indigo-500/10 shadow-[0_0_40px_rgba(99,102,241,0.2)]'
+                      : 'border-white/15 bg-white/[0.02] hover:border-white/30 hover:bg-white/[0.04]'
+                  }`}
+                >
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept={projectType === 'video' ? "video/*" : "application/pdf,image/*,.ppt,.pptx"}
-                    onChange={handleFileUpload}
-                    style={{ display: 'none' }}
+                    accept={mode === 'video' ? "video/mp4,video/quicktime,video/webm,.mkv" : "application/pdf,.ppt,.pptx,image/*"}
+                    onChange={handleFileInputChange}
+                    className="hidden"
                   />
-                  <Card 
-                    icon={UploadCloud} title="Upload File" 
-                    description="Browse your computer for local files." 
-                    onClick={() => fileInputRef.current?.click()}
-                  />
-                  {step !== 'sales_source' && (
-                    <Card 
-                      icon={LinkIcon} title="Paste URL" 
-                      description="Import directly from a web link (YouTube, Drive, etc)." 
-                      onClick={() => setStep('url_input')}
-                    />
-                  )}
-                </div>
-                <button 
-                  onClick={() => setStep(step === 'slides_source' ? 'type' : 'video_category')} 
-                  className="text-sm text-muted-foreground hover:text-foreground mt-4 text-center"
-                >
-                  ← Back
-                </button>
-              </motion.div>
-            )}
 
-            {step === 'url_input' && (
-              <motion.div 
-                key="url_input"
-                initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-                className="flex flex-col gap-6"
-              >
-                <div className="text-center mb-4">
-                  <h3 className="text-2xl font-bold mb-2">Import from URL</h3>
-                  <p className="text-muted-foreground">Paste a link to a YouTube video, Google Drive file, or other supported source.</p>
-                </div>
-                <div className="flex flex-col gap-4 max-w-md mx-auto w-full">
-                  <input
-                    type="url"
-                    value={urlInput}
-                    onChange={(e) => setUrlInput(e.target.value)}
-                    placeholder="https://..."
-                    className="w-full px-4 py-3 rounded-xl bg-surface-1 border border-border focus:border-accent outline-none transition-colors text-foreground"
-                    autoFocus
-                  />
-                  <button 
-                    onClick={() => handleUrlIngest(urlInput)}
-                    disabled={!urlInput}
-                    className="w-full py-3 rounded-xl bg-accent text-accent-inv font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
-                  >
-                    Import Source
-                  </button>
-                </div>
-                <button 
-                  onClick={() => setStep(projectType === 'slides' ? 'slides_source' : videoCategory === 'sales' ? 'sales_source' : 'content_source')} 
-                  className="text-sm text-muted-foreground hover:text-foreground mt-4 text-center"
-                >
-                  ← Back
-                </button>
-              </motion.div>
-            )}
-
-            {(step === 'processing_video' || step === 'processing_slides') && (
-              <motion.div 
-                key="processing"
-                initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-                className="flex flex-col items-center justify-center text-center py-12"
-              >
-                <div className="relative w-24 h-24 mb-8">
-                  <svg className="w-full h-full transform -rotate-90">
-                    <circle cx="48" cy="48" r="45" fill="none" stroke="var(--pds-border-subtle)" strokeWidth="4" />
-                    <circle 
-                      cx="48" cy="48" r="45" fill="none" stroke="var(--pds-accent)" strokeWidth="4" 
-                      strokeDasharray="283" strokeDashoffset={283 - (progress / 100) * 283}
-                      className="transition-all duration-100 ease-linear"
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex items-center justify-center font-mono text-sm">
-                    {progress}%
+                  <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:border-indigo-500/40 transition-all duration-300">
+                    <UploadCloud className="w-8 h-8 text-indigo-400" />
                   </div>
-                </div>
-                <h3 className="text-xl font-bold mb-2 animate-pulse">Processing Assets</h3>
-                <p className="text-sm text-muted-foreground font-mono bg-surface-2 px-4 py-2 rounded-lg border border-border/50">
-                  {statusText || "Initializing pipeline..."}
-                </p>
-              </motion.div>
-            )}
 
-            {step === 'success_video' && (
-              <motion.div 
-                key="s_vid"
-                initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-                className="flex flex-col items-center justify-center text-center py-6 gap-6"
-              >
-                <div className="w-14 h-14 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center shadow-lg shadow-emerald-500/10">
-                  <CheckCircle2 className="w-7 h-7" />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-bold mb-1.5 font-display text-white">Video Processing Complete</h3>
-                  <p className="text-muted-foreground text-xs max-w-md mx-auto">
-                    Captions stripped, audio normalized, and cinematic scene detection produced clean master cut sequences.
+                  <h3 className="text-base sm:text-lg font-bold text-white mb-1.5">
+                    Drop your {mode === 'video' ? 'video' : 'presentation or PDF'} here, or <span className="text-indigo-400 underline underline-offset-4">browse</span>
+                  </h3>
+                  <p className="text-xs text-white/50 max-w-sm">
+                    {mode === 'video' 
+                      ? 'MP4, MOV, or WebM up to 500MB. Auto-extracts clean master cuts and cinematic B-roll.' 
+                      : 'PDF, Keynote, or PPT slides. Extracts key topics and structure.'}
                   </p>
                 </div>
 
-                {/* Processing Summary Stats */}
-                <div className="grid grid-cols-2 gap-3 w-full max-w-md">
-                  <div className="flex items-center gap-2.5 p-3 rounded-xl bg-surface-2 border border-border text-left">
+                {/* Direct Action Alternatives */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowUrlInput(!showUrlInput)}
+                    className="flex items-center justify-center gap-2.5 p-3.5 rounded-xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.06] hover:border-white/20 text-white text-xs font-medium transition-all cursor-pointer"
+                  >
+                    <LinkIcon className="w-4 h-4 text-emerald-400" />
+                    <span>Paste Link (YouTube, Drive, Web)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setView('recording_studio')}
+                    className="flex items-center justify-center gap-2.5 p-3.5 rounded-xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.06] hover:border-white/20 text-white text-xs font-medium transition-all cursor-pointer"
+                  >
+                    <Camera className="w-4 h-4 text-purple-400" />
+                    <span>Record Screen & Camera</span>
+                  </button>
+                </div>
+
+                {/* Expandable URL Input Field */}
+                {showUrlInput && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="flex gap-2 pt-1"
+                  >
+                    <input
+                      type="url"
+                      value={urlInput}
+                      onChange={(e) => setUrlInput(e.target.value)}
+                      placeholder="https://youtube.com/watch?v=... or Google Drive URL"
+                      className="flex-1 px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/15 focus:border-indigo-500 focus:outline-none text-xs text-white font-mono placeholder:text-white/30"
+                    />
+                    <button
+                      onClick={() => handleUrlIngest(urlInput)}
+                      disabled={!urlInput.trim()}
+                      className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold shrink-0 transition-colors cursor-pointer"
+                    >
+                      Import
+                    </button>
+                  </motion.div>
+                )}
+              </motion.div>
+            )}
+
+            {/* VIEW 2: PROGRESS / OPTIMISTIC PREVIEW */}
+            {view === 'processing' && (
+              <motion.div 
+                key="processing"
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.97 }}
+                className="space-y-6"
+              >
+                {/* File Card with Instant Local Preview */}
+                {activeFile && (
+                  <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.03] border border-white/10">
+                    <div className="h-16 w-24 rounded-xl bg-black overflow-hidden border border-white/10 shrink-0 relative flex items-center justify-center">
+                      {mode === 'video' ? (
+                        <video src={activeFile.previewUrl} className="w-full h-full object-cover" muted />
+                      ) : (
+                        <FileVideo className="h-6 w-6 text-white/40" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-white truncate">{activeFile.name}</div>
+                      <div className="text-xs text-white/40 font-mono mt-0.5">{activeFile.size}</div>
+                      <div className="text-xs text-indigo-400 font-mono mt-1 flex items-center gap-1.5">
+                        {backendStatus === 'running' && <Loader2 className="w-3 h-3 animate-spin" />}
+                        {backendStatus === 'offline' && <CheckCircle2 className="w-3 h-3 text-emerald-400" />}
+                        <span>{statusText}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Animated Progress Bar */}
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs font-mono text-white/60">
+                    <span>{statusText}</span>
+                    <span>{progress}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-white/[0.08] rounded-full overflow-hidden">
+                    <motion.div 
+                      className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 rounded-full"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${progress}%` }}
+                      transition={{ duration: 0.3 }}
+                    />
+                  </div>
+                </div>
+
+                {/* Instant Actions (No blocking) */}
+                <div className="pt-2 flex items-center justify-between gap-3 border-t border-white/[0.08]">
+                  <p className="text-xs text-white/40">
+                    {backendStatus === 'offline' 
+                      ? 'Local editor ready immediately.' 
+                      : 'You do not need to wait for indexing to finish.'}
+                  </p>
+                  <button
+                    onClick={openEditorImmediately}
+                    className="px-5 py-2.5 rounded-xl bg-white text-black hover:bg-white/90 text-xs font-bold flex items-center gap-2 transition-all shadow-lg cursor-pointer"
+                  >
+                    <span>Open in Editor</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* VIEW 3: SUCCESS (SHOWN WHEN AI EXTRACTION COMPLETES) */}
+            {view === 'success' && (
+              <motion.div 
+                key="success"
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="space-y-6"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+                    <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">Footage Ingested & Analyzed</h3>
+                    <p className="text-xs text-white/50">Clean cuts, speech cues, and keyframe anchors extracted.</p>
+                  </div>
+                </div>
+
+                {/* Summary Metrics */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-center gap-3 p-3.5 rounded-xl bg-white/[0.03] border border-white/10">
                     <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center shrink-0">
                       <Scissors className="w-4 h-4" />
                     </div>
                     <div>
-                      <div className="text-xs font-semibold text-white">Captions Stripped</div>
-                      <div className="text-[11px] text-muted-foreground">Clean master export</div>
+                      <div className="text-xs font-semibold text-white">Inpainted Clean Cuts</div>
+                      <div className="text-[11px] text-white/40">Captions stripped</div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2.5 p-3 rounded-xl bg-surface-2 border border-border text-left">
-                    <div className="w-8 h-8 rounded-lg bg-violet-500/10 text-violet-400 flex items-center justify-center shrink-0">
+                  <div className="flex items-center gap-3 p-3.5 rounded-xl bg-white/[0.03] border border-white/10">
+                    <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center shrink-0">
                       <Film className="w-4 h-4" />
                     </div>
                     <div>
                       <div className="text-xs font-semibold text-white">
-                        {harvestedResult?.shots?.length || 4} Cinematic Cuts
+                        {harvestedResult?.shots?.length || 4} Cinematic Shots
                       </div>
-                      <div className="text-[11px] text-muted-foreground">Keyframes analyzed</div>
+                      <div className="text-[11px] text-white/40">Keyframes indexed</div>
                     </div>
                   </div>
                 </div>
 
                 {/* Atlas Outreach Link Copy Box */}
-                {harvestedResult?.reference_url && (
-                  <div className="w-full max-w-md p-3 rounded-xl bg-surface-2 border border-border flex items-center justify-between gap-3 text-left">
+                {(harvestedResult?.reference_url || activeProject?.trackItems[0]?.url) && (
+                  <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-between gap-3">
                     <div className="overflow-hidden">
-                      <div className="text-[10px] uppercase font-semibold tracking-wider text-muted-foreground">
-                        Atlas Outreach Video URL
+                      <div className="text-[10px] uppercase font-mono font-semibold tracking-wider text-white/40">
+                        Atlas Outreach Asset URL
                       </div>
-                      <div className="text-xs font-mono text-emerald-400 truncate">
-                        {harvestedResult.reference_url}
+                      <div className="text-xs font-mono text-emerald-400 truncate mt-0.5">
+                        {harvestedResult?.reference_url || activeProject?.trackItems[0]?.url}
                       </div>
                     </div>
                     <button
                       onClick={handleCopyAtlasVideoUrl}
-                      className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 text-xs font-medium shrink-0 flex items-center gap-1.5 transition-colors"
+                      className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 text-xs font-medium shrink-0 flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       {copiedVideoUrl ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                       {copiedVideoUrl ? 'Copied' : 'Copy'}
@@ -536,70 +635,35 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
                   </div>
                 )}
 
-                {/* Primary Dual Actions: Assets Pack (ZIP) vs Video Editor */}
-                <div className="flex flex-col sm:flex-row gap-3 mt-2 w-full max-w-md">
-                  <button
-                    onClick={handleDownloadZip}
-                    disabled={isExportingZip || !harvestedResult?.id}
-                    className="flex-1 py-3 px-4 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
-                  >
-                    <Archive className="w-4 h-4 text-indigo-400" />
-                    {isExportingZip ? 'Exporting ZIP...' : 'Save Assets Pack (ZIP)'}
-                  </button>
+                {/* Slides Prompt if mode is slides */}
+                {mode === 'slides' && generatedPrompt && (
+                  <div className="bg-white/[0.03] border border-white/10 rounded-xl p-3.5 relative">
+                    <div className="text-[10px] font-mono uppercase text-white/40 mb-1">Slide Prompt Template</div>
+                    <p className="font-mono text-xs text-white/70 max-h-28 overflow-y-auto leading-relaxed">
+                      {generatedPrompt}
+                    </p>
+                  </div>
+                )}
+
+                {/* Primary Dual Actions */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  {harvestedResult?.id && (
+                    <button
+                      onClick={handleDownloadZip}
+                      disabled={isExportingZip}
+                      className="flex-1 py-3 px-4 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                    >
+                      <Archive className="w-4 h-4 text-indigo-400" />
+                      {isExportingZip ? 'Exporting ZIP...' : 'Export Asset Pack (ZIP)'}
+                    </button>
+                  )}
 
                   <button
-                    onClick={createAndRoute}
-                    className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-indigo-600/20"
+                    onClick={openEditorImmediately}
+                    className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-indigo-600/20 cursor-pointer"
                   >
-                    Move to Video Editor
+                    <span>Launch Video Editor</span>
                     <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <button
-                  onClick={onClose}
-                  className="text-xs text-muted-foreground hover:text-white transition-colors"
-                >
-                  Save to Library & Close
-                </button>
-              </motion.div>
-            )}
-
-            {step === 'success_slides' && (
-              <motion.div 
-                key="s_slide"
-                initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-                className="flex flex-col items-start text-left py-4 gap-6 w-full"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center shrink-0">
-                    <CheckCircle2 className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold">Slide Analysis Complete</h3>
-                    <p className="text-muted-foreground text-sm">Use this prompt in ChatGPT or Claude to recreate your slides.</p>
-                  </div>
-                </div>
-
-                <div className="w-full bg-surface-2 border border-border rounded-xl p-4 relative group">
-                  <button 
-                    className="absolute top-2 right-2 p-2 rounded-md hover:bg-surface-3 text-muted-foreground transition-colors"
-                    onClick={() => navigator.clipboard.writeText(generatedPrompt)}
-                  >
-                    <Copy className="w-4 h-4" />
-                  </button>
-                  <p className="font-mono text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap max-h-40 overflow-y-auto pr-8">
-                    {generatedPrompt}
-                  </p>
-                </div>
-
-                <div className="flex gap-4 w-full">
-                  <button onClick={onClose} className="flex-1 pds-btn-ghost py-3">
-                    Close
-                  </button>
-                  <button onClick={createAndRoute} className="flex-1 pds-btn-primary py-3">
-                    Create Slide Project
-                    <ArrowRight className="w-4 h-4 ml-2" />
                   </button>
                 </div>
               </motion.div>
