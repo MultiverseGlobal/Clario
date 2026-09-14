@@ -1,4 +1,4 @@
-import { db, type DexieProjectRecord, type DexieVaultAssetRecord } from './dexieDb';
+import { db, type DexieVaultAssetRecord } from './dexieDb';
 import { supabase } from './supabase';
 import {
   type HarvestProject,
@@ -331,15 +331,16 @@ export async function saveProject(project: ClarioProject | HarvestProject): Prom
 
   const harvestData = normalizeHarvestProject(rawHarvest);
 
-  const dexieRecord: DexieProjectRecord = {
+  const dexieRecord: any = {
     id: harvestData.id,
     name: harvestData.name || 'Untitled Harvest',
     mode: (harvestData.mode as any) || 'video_harvester',
-    reference_url: harvestData.reference_url,
+    reference_url: harvestData.reference_url || (project as ClarioProject).trackItems?.[0]?.url,
     source_file_name: harvestData.source_file_name,
     created_at: harvestData.created_at || Date.now(),
     updated_at: Date.now(),
     project_data: harvestData,
+    clario_data: project,
   };
 
   // Upsert project
@@ -443,6 +444,16 @@ export async function getProject(id: string): Promise<ClarioProject | null> {
     await syncProjectToVault(normalizedHarvest);
   }
 
+  const rawClario = (record as any).clario_data;
+  if (rawClario) {
+    return {
+      ...rawClario,
+      name: record.name,
+      updatedAt: record.updated_at,
+      harvestProject: normalizedHarvest || rawClario.harvestProject,
+    };
+  }
+
   return {
     id: record.id,
     name: record.name,
@@ -506,7 +517,16 @@ export async function listProjects(): Promise<ClarioProject[]> {
   const records = await db.projects.orderBy('updated_at').reverse().toArray();
 
   return records.map(record => {
+    const rawClario = (record as any).clario_data;
     const normalizedHarvest = record.project_data ? normalizeHarvestProject(record.project_data) : undefined;
+    if (rawClario) {
+      return {
+        ...rawClario,
+        name: record.name,
+        updatedAt: record.updated_at,
+        harvestProject: normalizedHarvest || rawClario.harvestProject,
+      };
+    }
     return {
       id: record.id,
       name: record.name,

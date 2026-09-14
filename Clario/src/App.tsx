@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
-import { listProjects, saveProject, uploadBlobToVault, ClarioProject } from './lib/projectStore';
+import { listProjects, saveProject, uploadBlobToVault, duplicateProject, syncProjectToVault, ClarioProject } from './lib/projectStore';
 import { fetchApiBaseFromDb } from './lib/apiClient';
 import { getApiKey, setApiKey, fetchApiKeyFromDb } from './lib/gemini';
 import { AppShell, type ClarioPhase } from './components/layout/AppShell';
@@ -345,6 +345,24 @@ export default function App() {
           currentTime={canvasTime}
           isPlaying={canvasIsPlaying}
           selectedItemId={canvasSelectedItemId}
+          projectName={currentProject?.name}
+          onSaveAssetPack={async () => {
+            if (!currentProject) return;
+            if (currentProject.harvestProject) {
+              await syncProjectToVault(currentProject.harvestProject);
+            }
+            // Navigate to library so user can see their saved asset pack
+            setCurrentPhase('reference_library');
+          }}
+          onMakeNewVideo={async () => {
+            if (!currentProject) return;
+            const cloned = await duplicateProject(currentProject.id);
+            if (cloned) {
+              setCurrentProject(cloned);
+              setCanvasTime(0);
+              setCanvasIsPlaying(false);
+            }
+          }}
           onChange={(newTrackItems) => {
             if (currentProject) {
               const updated = {

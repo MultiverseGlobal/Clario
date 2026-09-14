@@ -2,10 +2,15 @@ import { supabase } from './supabase';
 import type { HarvestProject } from '../types/assets';
 
 let memoryApiBase: string | null = null;
+const RENDER_PROD_URL = 'https://clario-l5d0.onrender.com';
 
 export function getApiBase(): string {
-  const base = memoryApiBase || (import.meta.env.DEV ? 'http://localhost:8000' : 'https://clario-l5d0.onrender.com');
-  return base.replace(/\/+$/, '') + (base.endsWith('/api/v1') ? '' : '/api/v1');
+  if (memoryApiBase) {
+    const clean = memoryApiBase.replace(/\/+$/, '');
+    return clean.endsWith('/api/v1') ? clean : `${clean}/api/v1`;
+  }
+  const base = RENDER_PROD_URL;
+  return `${base}/api/v1`;
 }
 
 export async function fetchApiBaseFromDb(): Promise<void> {
@@ -46,15 +51,38 @@ export interface ServerJobStatus {
 }
 
 /**
- * Check if the Clario FastAPI heavy media worker is running.
+ * Check if the Clario FastAPI backend is online.
+ * Tests local port 8000 first if configured, then falls back to deployed Render worker.
  */
 export async function checkServerHealth(): Promise<boolean> {
-  try {
-    const res = await fetch(`${getApiBase()}/health`, { signal: AbortSignal.timeout(3000) });
-    return res.ok;
-  } catch {
-    return false;
+  // 1. If user is in dev mode and local server might be up, try localhost:8000
+  if (import.meta.env.DEV && !memoryApiBase) {
+    try {
+      const localRes = await fetch('http://localhost:8000/api/v1/health', { signal: AbortSignal.timeout(1000) });
+      if (localRes.ok) {
+        memoryApiBase = 'http://localhost:8000';
+        return true;
+      }
+    } catch {}
   }
+
+  // 2. Try current configured API base (Render cloud by default)
+  try {
+    const currentBase = getApiBase();
+    const res = await fetch(`${currentBase}/health`, { signal: AbortSignal.timeout(4000) });
+    if (res.ok) return true;
+  } catch {}
+
+  // 3. Fallback check to production Render backend
+  try {
+    const prodRes = await fetch(`${RENDER_PROD_URL}/api/v1/health`, { signal: AbortSignal.timeout(4000) });
+    if (prodRes.ok) {
+      memoryApiBase = RENDER_PROD_URL;
+      return true;
+    }
+  } catch {}
+
+  return false;
 }
 
 /**

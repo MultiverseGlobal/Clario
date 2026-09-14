@@ -42,6 +42,7 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
   const [isExportingZip, setIsExportingZip] = useState(false);
   const [copiedVideoUrl, setCopiedVideoUrl] = useState(false);
 
+  const [editorPrompt, setEditorPrompt] = useState('Cap.so studio padding, 16:9 widescreen, punch-in zooms on demo moments, silence trimmed');
   const serverBase = getApiBase();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -146,17 +147,36 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
       mode: isVideo ? 'video_harvester' : 'slide_harvester',
       category: isVideo ? effectivePurpose : 'slides',
       targetPurpose: isVideo ? (effectivePurpose === 'sales' ? 'sales_outreach' : 'content_creator') : 'slide_presentation',
-      scriptText: '',
+      scriptText: isVideo && effectivePurpose === 'sales' ? editorPrompt : 'Auto scene detection, caption stripping, and speech vs music isolation',
       slides: [],
-      trackItems: isVideo ? [{
-        id: `track_0`,
-        title: file.name,
-        startTime: 0,
-        endTime: 30,
-        duration: 30,
-        type: 'video',
-        url: previewUrl,
-      }] : [],
+      trackItems: isVideo ? [
+        {
+          id: `track_vid_0`,
+          title: file.name,
+          startTime: 0,
+          endTime: 30,
+          duration: 30,
+          type: 'video',
+          url: previewUrl,
+          videoUrl: previewUrl,
+          isBroll: false,
+          beatType: 'hook',
+          scriptText: effectivePurpose === 'sales' ? 'Pattern Interrupt Hook' : 'Viral 3-Second Hook',
+        },
+        {
+          id: `track_vid_1`,
+          title: 'Core Demonstration',
+          startTime: 0,
+          endTime: 30,
+          duration: 30,
+          type: 'video',
+          url: previewUrl,
+          videoUrl: previewUrl,
+          isBroll: false,
+          beatType: 'problem',
+          scriptText: effectivePurpose === 'sales' ? 'Bottleneck Discovery' : 'Core High-Value Insight',
+        }
+      ] : [],
       selectedAssets: [],
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -472,6 +492,34 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
                   </div>
                 )}
 
+                {/* Sales Editor Directive Prompt */}
+                {mode === 'video' && videoPurpose === 'sales' && (
+                  <div className="p-3 bg-white/[0.03] border border-white/10 rounded-2xl space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-mono font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <Target className="w-3 h-3" />
+                        <span>Sales Editor Directive Prompt</span>
+                      </label>
+                      <span className="text-[10px] text-white/40 font-mono">Custom instructions</span>
+                    </div>
+                    <input
+                      type="text"
+                      value={editorPrompt}
+                      onChange={e => setEditorPrompt(e.target.value)}
+                      placeholder="e.g. Cap.so sleek studio padding, 16:9 widescreen, punch-in zooms, silence trimmed"
+                      className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-indigo-500 font-mono"
+                    />
+                  </div>
+                )}
+
+                {/* Social Content Mode Info */}
+                {mode === 'video' && videoPurpose === 'content' && (
+                  <div className="p-3 bg-purple-500/[0.05] border border-purple-500/20 rounded-2xl flex items-center gap-2 text-xs text-purple-200">
+                    <Sparkles className="w-4 h-4 text-pink-300 shrink-0" />
+                    <span>Auto scene breakdown, caption stripping, and speech vs. music isolation enabled.</span>
+                  </div>
+                )}
+
                 {/* Drag and Drop Zone */}
                 <div
                   onDragOver={handleDragOver}
@@ -600,12 +648,47 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
                   </div>
                 </div>
 
+                {/* 4-Stage Intelligence Pipeline Milestones */}
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.07] flex items-center gap-2">
+                    <span className="text-sm">🎬</span>
+                    <div>
+                      <div className="text-[11px] font-bold text-white">Cinematic Scenes</div>
+                      <div className="text-[9px] text-white/40">Scene boundaries & cuts</div>
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.07] flex items-center gap-2">
+                    <span className="text-sm">💬</span>
+                    <div>
+                      <div className="text-[11px] font-bold text-white">Captions Separated</div>
+                      <div className="text-[9px] text-white/40">Subtitles isolated to track</div>
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.07] flex items-center gap-2">
+                    <span className="text-sm">🎙️</span>
+                    <div>
+                      <div className="text-[11px] font-bold text-white">Voice & Music Split</div>
+                      <div className="text-[9px] text-white/40">Speech stripped from BGM</div>
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.07] flex items-center gap-2">
+                    <span className="text-sm">✨</span>
+                    <div>
+                      <div className="text-[11px] font-bold text-white">Studio Directives</div>
+                      <div className="text-[9px] text-white/40">Framing & kinetic styling</div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Instant Actions (No blocking) */}
                 <div className="pt-2 flex items-center justify-between gap-3 border-t border-white/[0.08]">
                   <p className="text-xs text-white/40">
                     {backendStatus === 'offline' 
                       ? 'Local editor ready immediately.' 
-                      : 'You do not need to wait for indexing to finish.'}
+                      : 'Assets ready to arrange in timeline editor.'}
                   </p>
                   <button
                     onClick={openEditorImmediately}

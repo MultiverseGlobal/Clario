@@ -13,6 +13,9 @@ interface VideoCanvasProps {
   onSeek: (time: number) => void;
   onTogglePlay: () => void;
   onSelectItem: (id: string | null) => void;
+  onSaveAssetPack?: () => void;
+  onMakeNewVideo?: () => void;
+  projectName?: string;
 }
 
 function pad(n: number) { return String(Math.floor(n)).padStart(2, "0"); }
@@ -36,14 +39,17 @@ const BEAT_COLORS: Record<string, { bg: string; border: string; badge: string; t
 export function VideoCanvas({
   trackItems, assets, videoUrl, duration, currentTime,
   isPlaying, selectedItemId, onChange, onSeek, onTogglePlay, onSelectItem,
+  onSaveAssetPack, onMakeNewVideo, projectName,
 }: VideoCanvasProps) {
   const [zoom, setZoom] = useState(1);
   const [showSwapDrawer, setShowSwapDrawer] = useState(false);
   const [showCaptionsOverlay, setShowCaptionsOverlay] = useState(true);
   const [isReassembling, setIsReassembling] = useState(false);
+  const [videoError, setVideoError] = useState(false);
 
   const rulerRef = useRef<HTMLDivElement>(null);
   const videoElemRef = useRef<HTMLVideoElement | null>(null);
+  const canvasFileInputRef = useRef<HTMLInputElement>(null);
 
   // Drag-to-reorder state
   const [dragSrcIdx, setDragSrcIdx] = useState<number | null>(null);
@@ -76,7 +82,7 @@ export function VideoCanvas({
   }
 
   // Active video source URL and seek target
-  const currentVideoSrc = activeItem?.videoUrl || videoUrl || "";
+  const currentVideoSrc = activeItem?.videoUrl || (activeItem as any)?.url || videoUrl || "";
   const currentVideoTargetTime = activeItem ? (activeItem.inPoint || 0) + timeInItem : currentTime;
 
   // Sync internal playback seek and src
@@ -84,11 +90,66 @@ export function VideoCanvas({
     if (!videoElemRef.current || !currentVideoSrc) return;
     if (videoElemRef.current.src !== currentVideoSrc) {
       videoElemRef.current.src = currentVideoSrc;
+      setVideoError(false);
     }
     if (Math.abs(videoElemRef.current.currentTime - currentVideoTargetTime) > 0.3) {
       videoElemRef.current.currentTime = currentVideoTargetTime;
     }
   }, [currentVideoSrc, currentVideoTargetTime]);
+
+  // Real Play / Pause controller
+  useEffect(() => {
+    if (!videoElemRef.current) return;
+    if (isPlaying) {
+      videoElemRef.current.play().catch(() => {});
+    } else {
+      videoElemRef.current.pause();
+    }
+  }, [isPlaying]);
+
+  const handleLoadFile = (file: File) => {
+    const url = URL.createObjectURL(file);
+    setVideoError(false);
+    if (trackItems.length > 0) {
+      const updated = trackItems.map((item, idx) => idx === 0 ? { ...item, videoUrl: url, url } : item);
+      onChange(updated);
+    } else {
+      onChange([{
+        id: `track_${Date.now()}`,
+        title: file.name,
+        startTime: 0,
+        endTime: 30,
+        duration: 30,
+        type: 'video',
+        url,
+        videoUrl: url,
+        isBroll: false,
+        beatType: 'beat'
+      }]);
+    }
+  };
+
+  const handleLoadSample = () => {
+    const sampleUrl = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4";
+    setVideoError(false);
+    if (trackItems.length > 0) {
+      const updated = trackItems.map((item, idx) => idx === 0 ? { ...item, videoUrl: sampleUrl, url: sampleUrl } : item);
+      onChange(updated);
+    } else {
+      onChange([{
+        id: `track_${Date.now()}`,
+        title: "Demo Sample Footage",
+        startTime: 0,
+        endTime: 15,
+        duration: 15,
+        type: 'video',
+        url: sampleUrl,
+        videoUrl: sampleUrl,
+        isBroll: false,
+        beatType: 'beat'
+      }]);
+    }
+  };
 
   const handleRulerClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!rulerRef.current || !effectiveDuration) return;
@@ -298,18 +359,35 @@ export function VideoCanvas({
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", background: "var(--base)" }}>
 
       {/* ── Center Stage: Clean Canvas Viewport ────────────────────────────── */}
-      <div style={{
-        flex: 1,
-        minHeight: 0,
-        background: "var(--base)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        position: "relative",
-        overflow: "hidden",
-        padding: 24,
-      }}>
-        {currentVideoSrc ? (
+      <div 
+        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const f = e.dataTransfer.files?.[0];
+          if (f && f.type.startsWith("video/")) handleLoadFile(f);
+        }}
+        style={{
+          flex: 1,
+          minHeight: 0,
+          background: "var(--base)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          position: "relative",
+          overflow: "hidden",
+          padding: 24,
+        }}
+      >
+        <input 
+          type="file" 
+          ref={canvasFileInputRef} 
+          accept="video/*" 
+          style={{ display: "none" }} 
+          onChange={(e) => e.target.files?.[0] && handleLoadFile(e.target.files[0])} 
+        />
+
+        {currentVideoSrc && !videoError ? (
           <div style={{
             position: "relative",
             maxHeight: "100%",
@@ -325,6 +403,14 @@ export function VideoCanvas({
               src={currentVideoSrc}
               style={{ maxHeight: "calc(100vh - 350px)", maxWidth: "100%", display: "block" }}
               onClick={onTogglePlay}
+              onError={() => setVideoError(true)}
+              onTimeUpdate={(e) => {
+                if (isPlaying) {
+                  const targetTime = (e.target as HTMLVideoElement).currentTime;
+                  onSeek(parseFloat(targetTime.toFixed(1)));
+                }
+              }}
+              onEnded={() => onTogglePlay()}
             />
 
             {/* Kinetic Caption Overlay */}
@@ -393,6 +479,7 @@ export function VideoCanvas({
               display: "flex", alignItems: "center", gap: 8,
             }}>
               <div style={{ width: 6, height: 6, borderRadius: "50%", background: isPlaying ? "var(--emerald)" : "var(--accent)" }} />
+              {projectName && <span style={{ fontWeight: 700, color: "rgba(255,255,255,0.8)" }}>{projectName} ·</span>}
               <span>{formatTime(currentTime)} / {formatTime(effectiveDuration)}</span>
               {activeItem && (
                 <span style={{ color: BEAT_COLORS[activeItem.beatType || "beat"]?.badge || "#4E6CF2", fontWeight: 700 }}>
@@ -402,20 +489,52 @@ export function VideoCanvas({
             </div>
           </div>
         ) : (
-          <div style={{ textAlign: "center", color: "var(--text-muted)" }}>
+          <div style={{ 
+            textAlign: "center", 
+            color: "var(--text-muted)", 
+            maxWidth: 440,
+            padding: 32,
+            borderRadius: 20,
+            background: "var(--surface)",
+            border: "1px dashed var(--border)",
+            boxShadow: "var(--shadow-md)"
+          }}>
             <div style={{
-              width: 52, height: 52, borderRadius: 12,
-              background: "var(--surface)", border: "1px solid var(--border)",
+              width: 56, height: 56, borderRadius: 16,
+              background: "var(--surface-2)", border: "1px solid var(--border)",
               display: "flex", alignItems: "center", justifyContent: "center",
-              margin: "0 auto 12px",
+              margin: "0 auto 16px",
+              color: "var(--accent)"
             }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
-                <rect x="2" y="4" width="20" height="16" rx="2.18"/>
-                <path d="M7 2v4M17 2v4M2 12h20M2 7h20M2 17h20"/>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M23 7l-7 5 7 5V7z" />
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
               </svg>
             </div>
-            <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>No Footage Active</p>
-            <p style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 4 }}>Add or select video clips from the left pool</p>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)", marginBottom: 6 }}>
+              {videoError ? "Footage Expired or Inaccessible" : "No Active Video Stream"}
+            </h3>
+            <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 20, lineHeight: 1.5 }}>
+              {videoError 
+                ? "The previous session's temporary preview stream has expired. Attach a video file to resume timeline editing."
+                : "Attach footage to activate multi-track playback, kinetic captions, and auto re-cut features."}
+            </p>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+              <button 
+                onClick={() => canvasFileInputRef.current?.click()}
+                className="pds-btn-primary"
+                style={{ padding: "8px 16px", fontSize: 12, cursor: "pointer" }}
+              >
+                Select Video File
+              </button>
+              <button 
+                onClick={handleLoadSample}
+                className="pds-btn-ghost"
+                style={{ padding: "8px 14px", fontSize: 12, cursor: "pointer" }}
+              >
+                Load Demo Video
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -505,6 +624,44 @@ export function VideoCanvas({
             💬 Captions {showCaptionsOverlay ? "ON" : "OFF"}
           </button>
 
+          <div style={{ width: 1, height: 16, background: "var(--border)" }} />
+
+          {/* Save Asset Pack to Reference Library */}
+          {onSaveAssetPack && (
+            <button
+              onClick={() => {
+                onSaveAssetPack();
+              }}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "4px 12px", borderRadius: 7,
+                background: "var(--surface-2)", border: "1px solid var(--border-strong)",
+                color: "var(--text-primary)", fontSize: 11, fontWeight: 600,
+                cursor: "pointer",
+              }}
+              title="Saves video cuts, isolated audio, music, and keyframes into the Reference Library"
+            >
+              📦 Save Asset Pack to Library
+            </button>
+          )}
+
+          {/* Make New Video Action */}
+          {onMakeNewVideo && (
+            <button
+              onClick={onMakeNewVideo}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "4px 12px", borderRadius: 7,
+                background: "rgba(99,102,241,0.12)", border: "1px solid rgba(99,102,241,0.3)",
+                color: "var(--accent)", fontSize: 11, fontWeight: 600,
+                cursor: "pointer",
+              }}
+              title="Use these harvested assets to create a brand new video"
+            >
+              🪄 Make New Video
+            </button>
+          )}
+
           {/* Zoom Controls */}
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600 }}>ZOOM</span>
@@ -555,11 +712,24 @@ export function VideoCanvas({
 
         {/* Timeline Tracks */}
         <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-          {/* Track Header Label */}
-          <div style={{ width: 60, flexShrink: 0, borderRight: "1px solid var(--border)", background: "var(--surface)" }}>
+          {/* Track Header Labels Column */}
+          <div style={{ width: 84, flexShrink: 0, borderRight: "1px solid var(--border)", background: "var(--surface)", display: "flex", flexDirection: "column" }}>
             <div style={{ height: 24, borderBottom: "1px solid var(--border)" }} />
-            <div style={{ height: 72, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <span style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 700, fontFamily: "Space Mono, monospace" }}>BEATS</span>
+            {/* Track 1: Video Scenes */}
+            <div style={{ height: 72, borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", padding: "0 8px", gap: 4 }}>
+              <span style={{ fontSize: 9, color: "var(--text-secondary)", fontWeight: 700, fontFamily: "Space Mono, monospace" }}>🎬 SCENES</span>
+            </div>
+            {/* Track 2: Voice Track */}
+            <div style={{ height: 38, borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", padding: "0 8px", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 9, color: "var(--emerald)", fontWeight: 700, fontFamily: "Space Mono, monospace" }}>🎙️ VOICE</span>
+            </div>
+            {/* Track 3: Music Bed */}
+            <div style={{ height: 38, borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", padding: "0 8px", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 9, color: "var(--accent)", fontWeight: 700, fontFamily: "Space Mono, monospace" }}>🎵 MUSIC</span>
+            </div>
+            {/* Track 4: Captions */}
+            <div style={{ height: 36, display: "flex", alignItems: "center", padding: "0 8px" }}>
+              <span style={{ fontSize: 9, color: "var(--amber)", fontWeight: 700, fontFamily: "Space Mono, monospace" }}>💬 CAPTION</span>
             </div>
           </div>
 
@@ -600,11 +770,11 @@ export function VideoCanvas({
                 }} />
               </div>
 
-              {/* Beat Blocks on Timeline */}
-              <div style={{ height: 78, display: "flex", alignItems: "center", padding: "0 6px", gap: 4 }}>
+              {/* 1. SCENES TRACK */}
+              <div style={{ height: 72, borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", padding: "0 6px", gap: 4 }}>
                 {trackItems.length === 0 ? (
-                  <div style={{ flex: 1, height: 60, borderRadius: 8, border: "1.5px dashed var(--border)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <span style={{ fontSize: 11, color: "var(--text-muted)" }}>No beats on timeline</span>
+                  <div style={{ flex: 1, height: 56, borderRadius: 8, border: "1.5px dashed var(--border)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <span style={{ fontSize: 11, color: "var(--text-muted)" }}>No scene cuts detected</span>
                   </div>
                 ) : (
                   trackItems.map((item, idx) => {
@@ -623,7 +793,7 @@ export function VideoCanvas({
                         onClick={() => onSelectItem(item.id)}
                         style={{
                           width: `${widthPct}%`,
-                          height: 64,
+                          height: 58,
                           borderRadius: 8,
                           overflow: "hidden",
                           border: `1.5px solid ${isSelected ? "var(--accent)" : isDragOver ? "var(--accent-border)" : beatStyle.border}`,
@@ -634,13 +804,12 @@ export function VideoCanvas({
                           display: "flex",
                           flexDirection: "column",
                           justifyContent: "space-between",
-                          padding: "6px 8px",
+                          padding: "4px 8px",
                           boxShadow: isSelected ? "var(--shadow-md)" : "none",
                           transition: "border-color 0.15s, box-shadow 0.15s",
                           userSelect: "none",
                         }}
                       >
-                        {/* Background Thumbnail */}
                         {item.thumbnail && (
                           <img
                             src={item.thumbnail}
@@ -650,83 +819,125 @@ export function VideoCanvas({
                           />
                         )}
 
-                        {/* Top: Beat Role Tag + Duration */}
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", zIndex: 2 }}>
-                          <span style={{
-                            fontSize: 8, fontWeight: 800, textTransform: "uppercase",
-                            color: beatStyle.badge, letterSpacing: "0.04em",
-                          }}>
-                            {item.beatType?.toUpperCase() || "BEAT"}
+                          <span style={{ fontSize: 8, fontWeight: 800, textTransform: "uppercase", color: beatStyle.badge }}>
+                            {item.beatType?.toUpperCase() || "SCENE"}
                           </span>
                           <span style={{ fontSize: 8, color: "var(--text-secondary)", fontFamily: "Space Mono, monospace" }}>
                             {item.duration.toFixed(1)}s
                           </span>
                         </div>
 
-                        {/* Middle: Script Snippet */}
-                        <div style={{
-                          fontSize: 9, fontWeight: 600, color: "var(--text-primary)",
-                          lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis",
-                          whiteSpace: "nowrap", zIndex: 2,
-                        }}>
-                          {item.scriptText || item.label}
+                        <div style={{ fontSize: 9, fontWeight: 600, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", zIndex: 2 }}>
+                          {item.title || item.scriptText || item.label}
                         </div>
 
-                        {/* Bottom: Type Tag & Action shortcuts */}
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", zIndex: 2 }}>
-                          <span style={{
-                            fontSize: 7.5, color: "var(--text-muted)",
-                            background: "var(--surface)", padding: "1px 4px", borderRadius: 3,
-                          }}>
+                          <span style={{ fontSize: 7.5, color: "var(--text-muted)", background: "var(--surface)", padding: "1px 4px", borderRadius: 3 }}>
                             {item.isBroll ? "⚡ B-Roll" : "📹 A-Roll"}
                           </span>
-
                           {isSelected && (
                             <div style={{ display: "flex", gap: 2 }}>
-                              <button
-                                onClick={e => { e.stopPropagation(); duplicateItem(item.id); }}
-                                title="Duplicate"
-                                style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text-secondary)", borderRadius: 3, padding: "1px 4px", cursor: "pointer", fontSize: 8 }}
-                              >
-                                ⧉
-                              </button>
-                              <button
-                                onClick={e => { e.stopPropagation(); removeItem(item.id); }}
-                                title="Delete"
-                                style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "var(--rose)", borderRadius: 3, padding: "1px 4px", cursor: "pointer", fontSize: 8 }}
-                              >
-                                ×
-                              </button>
+                              <button onClick={e => { e.stopPropagation(); duplicateItem(item.id); }} style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text-secondary)", borderRadius: 3, padding: "1px 4px", cursor: "pointer", fontSize: 8 }}>⧉</button>
+                              <button onClick={e => { e.stopPropagation(); removeItem(item.id); }} style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "var(--rose)", borderRadius: 3, padding: "1px 4px", cursor: "pointer", fontSize: 8 }}>×</button>
                             </div>
                           )}
                         </div>
 
-                        {/* Left Trim Handle */}
                         {isSelected && (
-                          <div
-                            onMouseDown={e => startTrim(e, item.id, "left", item.duration, item.inPoint || 0)}
-                            style={{
-                              position: "absolute", left: 0, top: 0, bottom: 0, width: 6,
-                              background: "var(--accent)", cursor: "ew-resize", zIndex: 10,
-                            }}
-                          />
-                        )}
-
-                        {/* Right Trim Handle */}
-                        {isSelected && (
-                          <div
-                            onMouseDown={e => startTrim(e, item.id, "right", item.duration, item.inPoint || 0)}
-                            style={{
-                              position: "absolute", right: 0, top: 0, bottom: 0, width: 6,
-                              background: "var(--accent)", cursor: "ew-resize", zIndex: 10,
-                            }}
-                          />
+                          <>
+                            <div onMouseDown={e => startTrim(e, item.id, "left", item.duration, item.inPoint || 0)} style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 5, background: "var(--accent)", cursor: "ew-resize", zIndex: 10 }} />
+                            <div onMouseDown={e => startTrim(e, item.id, "right", item.duration, item.inPoint || 0)} style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 5, background: "var(--accent)", cursor: "ew-resize", zIndex: 10 }} />
+                          </>
                         )}
                       </div>
                     );
                   })
                 )}
               </div>
+
+              {/* 2. VOICE TRACK (Speech Audio Waveform) */}
+              <div style={{ height: 38, borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", padding: "0 6px", gap: 4, background: "rgba(16,185,129,0.03)" }}>
+                {trackItems.map((item) => {
+                  const widthPct = Math.max(4, (item.duration / effectiveDuration) * 100);
+                  return (
+                    <div
+                      key={`voice_${item.id}`}
+                      style={{
+                        width: `${widthPct}%`,
+                        height: 28,
+                        borderRadius: 6,
+                        background: "rgba(16,185,129,0.12)",
+                        border: "1px solid rgba(16,185,129,0.3)",
+                        display: "flex",
+                        alignItems: "center",
+                        padding: "0 6px",
+                        gap: 3,
+                        overflow: "hidden",
+                      }}
+                      title="Clean Speech Audio (Isolated Vocals)"
+                    >
+                      <span style={{ fontSize: 8, color: "var(--emerald)", fontWeight: 700 }}>🎙️ Speech</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 1.5, flex: 1, opacity: 0.6 }}>
+                        {[8, 14, 20, 12, 16, 22, 10, 18, 14, 6, 12, 18, 22, 8].map((h, i) => (
+                          <div key={i} style={{ width: 2, height: h, background: "var(--emerald)", borderRadius: 1 }} />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* 3. MUSIC TRACK (Background Music Bed) */}
+              <div style={{ height: 38, borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", padding: "0 6px", background: "rgba(99,102,241,0.03)" }}>
+                <div style={{
+                  width: "100%",
+                  height: 28,
+                  borderRadius: 6,
+                  background: "rgba(99,102,241,0.12)",
+                  border: "1px solid rgba(99,102,241,0.3)",
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "0 10px",
+                  gap: 6,
+                }}>
+                  <span style={{ fontSize: 8, color: "var(--accent)", fontWeight: 700 }}>🎵 Soundtrack (Ambient Bed)</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 2, flex: 1, opacity: 0.5 }}>
+                    {Array.from({ length: 30 }).map((_, i) => (
+                      <div key={i} style={{ width: 3, height: (i % 3 === 0 ? 16 : 8), background: "var(--accent)", borderRadius: 1 }} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. CAPTIONS TRACK */}
+              <div style={{ height: 36, display: "flex", alignItems: "center", padding: "0 6px", gap: 4, background: "rgba(245,158,11,0.02)" }}>
+                {trackItems.map((item) => {
+                  const widthPct = Math.max(4, (item.duration / effectiveDuration) * 100);
+                  return (
+                    <div
+                      key={`caption_${item.id}`}
+                      style={{
+                        width: `${widthPct}%`,
+                        height: 24,
+                        borderRadius: 5,
+                        background: "rgba(245,158,11,0.12)",
+                        border: "1px solid rgba(245,158,11,0.3)",
+                        display: "flex",
+                        alignItems: "center",
+                        padding: "0 6px",
+                        overflow: "hidden",
+                      }}
+                      title={item.scriptText || "Kinetic Caption Segment"}
+                    >
+                      <span style={{ fontSize: 8, color: "var(--amber)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        💬 {item.scriptText || "Caption phrase"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
             </div>
           </div>
         </div>
