@@ -108,20 +108,7 @@ function classifyFrameContent(
   }
 }
 
-/**
- * Calculates color distance between two downscaled frames.
- */
-function computeFrameDifference(prev: Uint8ClampedArray, curr: Uint8ClampedArray): number {
-  let diff = 0;
-  const len = prev.length;
-  for (let i = 0; i < len; i += 4) {
-    const dr = Math.abs(prev[i] - curr[i]);
-    const dg = Math.abs(prev[i + 1] - curr[i + 1]);
-    const db = Math.abs(prev[i + 2] - curr[i + 2]);
-    diff += (dr + dg + db) / (3 * 255);
-  }
-  return diff / (len / 4);
-}
+
 
 /**
  * Auto-cuts video into cinematic scenes by stepping through video frames,

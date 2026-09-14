@@ -14,6 +14,7 @@ import { separateVoiceAndMusic } from '../../lib/audioSeparator';
 import { stripCaptions } from '../../lib/videoInpainter';
 import { db } from '../../lib/dexieDb';
 import type { VideoTrackItem, ShotRecord } from '../../types/assets';
+import { analyzeShotIntelligence } from '../../lib/gemini';
 
 interface ProjectCreationWizardProps {
   onClose: () => void;
@@ -28,6 +29,7 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
   const [mode, setMode] = useState<WizardMode>('video');
   const [videoPurpose, setVideoPurpose] = useState<'sales' | 'content'>('sales');
   const [view, setView] = useState<WizardView>('dropzone');
+  const [wizardStep, setWizardStep] = useState(1);
   const [isDragging, setIsDragging] = useState(false);
   
   // URL input state
@@ -193,7 +195,7 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
               setStatusText(msg);
             });
             inpaintedVideoUrl = inpaintResult;
-            setCaptionStripMode('inpaint');
+            setCaptionStripMode('blur_mask');
           } catch (inpaintErr) {
             console.warn('Video inpainting failed:', inpaintErr);
           }
@@ -246,29 +248,41 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
           });
         }
 
-        const shotsData: ShotRecord[] = scenes.map((s) => ({
-          project_id: projectId,
-          shot_id: s.id,
-          start_seconds: s.startTime,
-          end_seconds: s.endTime,
-          duration: s.duration,
-          frame_url: s.frameUrl,
-          visual_description: s.sceneTag,
-          editor_text: s.hasCaptions ? 'Captions Stripped' : '',
-          source_text: s.sceneTag,
-          content_type: s.contentType,
-          source_type: 'uploaded',
-          likely_source: cleanName,
-          confidence: 'confirmed',
-          exact_source_found: true,
-          clean_source_url: previewUrl,
-          license_status: 'licensed_clean_available',
-          rights_status: 'user_owned',
-          production_eligible: true,
-          replacement_needed: false,
-          replacement_prompt: '',
-          search_queries: [s.sceneTag],
-          notes: `Scene tag: ${s.sceneTag}`,
+        setStatusText('Running Gemini Vision AI analysis on extracted scenes...');
+        const shotsData: ShotRecord[] = await Promise.all(scenes.map(async (s, index) => {
+          // Call Gemini API to get detailed multimodal analysis
+          const intelligence = await analyzeShotIntelligence(s.frameUrl, index, s.startTime, s.endTime, previewUrl);
+          
+          return {
+            project_id: projectId,
+            shot_id: s.id,
+            start_seconds: s.startTime,
+            end_seconds: s.endTime,
+            duration: s.duration,
+            frame_url: s.frameUrl,
+            visual_description: intelligence.visual_description || s.sceneTag,
+            editor_text: intelligence.editor_text || (s.hasCaptions ? 'Captions Stripped' : ''),
+            source_text: intelligence.source_text || s.sceneTag,
+            content_type: intelligence.content_type || s.contentType,
+            source_type: intelligence.source_type || 'uploaded',
+            likely_source: intelligence.likely_source || cleanName,
+            confidence: intelligence.confidence || 'confirmed',
+            exact_source_found: true,
+            clean_source_url: previewUrl,
+            license_status: intelligence.license_status || 'licensed_clean_available',
+            rights_status: 'user_owned',
+            production_eligible: true,
+            replacement_needed: intelligence.replacement_needed || false,
+            replacement_prompt: intelligence.replacement_prompt || '',
+            search_queries: intelligence.search_queries || [s.sceneTag],
+            notes: intelligence.notes || `Scene tag: ${s.sceneTag}`,
+            analysis_confidence: intelligence.analysis_confidence || 'low',
+            detected_text_presence: intelligence.detected_text_presence || false,
+            editor_overlay_detected: intelligence.editor_overlay_detected || false,
+            scene_text_detected: intelligence.scene_text_detected || false,
+            faces_detected_count: intelligence.faces_detected_count || 0,
+            motion_level: intelligence.motion_level || 'moderate'
+          } as ShotRecord;
         }));
 
         const updatedProject: ClarioProject = {
@@ -476,41 +490,23 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
         {/* Header Bar */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/30">
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center">
-              <Sparkles className="h-4 w-4 text-indigo-600" />
-            </div>
+            {view === 'dropzone' && wizardStep > 1 ? (
+              <button onClick={() => setWizardStep(s => s - 1)} className="p-1.5 rounded-lg hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors mr-1">
+                <ArrowRight className="w-5 h-5 rotate-180" />
+              </button>
+            ) : (
+              <div className="h-8 w-8 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center">
+                <Sparkles className="h-4 w-4 text-indigo-600" />
+              </div>
+            )}
             <div>
               <h2 className="font-display text-base font-bold text-foreground tracking-tight">New Clario Project</h2>
-              <p className="text-[11px] text-muted-foreground font-mono">Instant Media Ingest & AI Studio</p>
+              <p className="text-[11px] text-muted-foreground font-mono">
+                {view === 'dropzone' ? `Step ${wizardStep} of 3` : 'Instant Media Ingest & AI Studio'}
+              </p>
             </div>
           </div>
-
-          {/* Mode Switcher */}
-          <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-xl border border-border">
-            <button
-              onClick={() => setMode('video')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                mode === 'video'
-                  ? 'bg-foreground text-background font-semibold shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <Video className="h-3.5 w-3.5" />
-              Video
-            </button>
-            <button
-              onClick={() => setMode('slides')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                mode === 'slides'
-                  ? 'bg-foreground text-background font-semibold shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <Presentation className="h-3.5 w-3.5" />
-              Slides
-            </button>
-          </div>
-
+          
           <button 
             onClick={onClose} 
             className="p-1.5 rounded-lg hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors ml-2 cursor-pointer"
@@ -526,126 +522,143 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
             {/* VIEW 1: MODERN UNIFIED DROPZONE */}
             {view === 'dropzone' && (
               <motion.div 
-                key="dropzone"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="space-y-4"
+                key={`dropzone-step-${wizardStep}`}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-6"
               >
-                {/* Target Purpose: Sales vs Content */}
-                {mode === 'video' && (
-                  <div className="flex items-center gap-2 p-1 bg-card border border-border rounded-2xl">
-                    <button
-                      type="button"
-                      onClick={() => setVideoPurpose('sales')}
-                      className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                        videoPurpose === 'sales'
-                          ? 'bg-indigo-600 text-foreground shadow-md'
-                          : 'text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      <Target className="w-3.5 h-3.5 text-amber-600" />
-                      <span>Sales & Outreach (Loom Pitch)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setVideoPurpose('content')}
-                      className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                        videoPurpose === 'content'
-                          ? 'bg-purple-600 text-foreground shadow-md'
-                          : 'text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-                      <span>Social & Creator (Reels / Shorts)</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* Sales Editor Directive Prompt */}
-                {mode === 'video' && videoPurpose === 'sales' && (
-                  <div className="p-3 bg-muted/30 border border-border rounded-2xl space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-mono font-bold text-amber-600 uppercase tracking-wider flex items-center gap-1.5">
-                        <Target className="w-3 h-3" />
-                        <span>Sales Editor Directive Prompt</span>
-                      </label>
-                      <span className="text-[10px] text-muted-foreground font-mono">Custom instructions</span>
+                {wizardStep === 1 && (
+                  <div className="flex flex-col gap-4">
+                    <h3 className="text-lg font-bold text-foreground">What kind of project are you creating?</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <button
+                        onClick={() => { setMode('video'); setWizardStep(2); }}
+                        className={`p-6 rounded-2xl border-2 text-left transition-all ${mode === 'video' ? 'border-indigo-500 bg-indigo-50/50' : 'border-border bg-card hover:border-indigo-300'}`}
+                      >
+                        <Video className="w-8 h-8 text-indigo-600 mb-3" />
+                        <h4 className="font-bold text-foreground mb-1">Video Edit</h4>
+                        <p className="text-xs text-muted-foreground">Process MP4s, extract cuts, strip captions, and split audio.</p>
+                      </button>
+                      <button
+                        onClick={() => { setMode('slides'); setWizardStep(3); }}
+                        className={`p-6 rounded-2xl border-2 text-left transition-all ${mode === 'slides' ? 'border-purple-500 bg-purple-50/50' : 'border-border bg-card hover:border-purple-300'}`}
+                      >
+                        <Presentation className="w-8 h-8 text-purple-600 mb-3" />
+                        <h4 className="font-bold text-foreground mb-1">Slide Deck</h4>
+                        <p className="text-xs text-muted-foreground">Import PDFs or images to extract structure and OCR.</p>
+                      </button>
                     </div>
-                    <input
-                      type="text"
-                      value={editorPrompt}
-                      onChange={e => setEditorPrompt(e.target.value)}
-                      placeholder="e.g. Cap.so sleek studio padding, 16:9 widescreen, punch-in zooms, silence trimmed"
-                      className="w-full bg-card border border-border rounded-xl px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-indigo-500 font-mono"
-                    />
                   </div>
                 )}
 
-                {/* Social Content Mode Info */}
-                {mode === 'video' && videoPurpose === 'content' && (
-                  <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-center gap-2 text-xs text-indigo-700">
-                    <Sparkles className="w-4 h-4 text-indigo-500 shrink-0" />
-                    <span>Auto scene breakdown, caption stripping, and speech vs. music isolation enabled.</span>
+                {wizardStep === 2 && mode === 'video' && (
+                  <div className="flex flex-col gap-4">
+                    <h3 className="text-lg font-bold text-foreground">Select Video Purpose</h3>
+                    <div className="flex flex-col gap-3">
+                      <button
+                        onClick={() => setVideoPurpose('sales')}
+                        className={`p-4 rounded-xl border-2 flex items-center gap-4 transition-all ${videoPurpose === 'sales' ? 'border-amber-500 bg-amber-50/50' : 'border-border bg-card hover:border-amber-300'}`}
+                      >
+                        <Target className={`w-6 h-6 ${videoPurpose === 'sales' ? 'text-amber-600' : 'text-muted-foreground'}`} />
+                        <div className="text-left">
+                          <h4 className="font-bold text-foreground text-sm">Sales & Outreach (Loom Pitch)</h4>
+                          <p className="text-xs text-muted-foreground">Optimized for talking heads, demos, and punch-in cuts.</p>
+                        </div>
+                      </button>
+                      
+                      {videoPurpose === 'sales' && (
+                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="ml-10">
+                          <label className="text-[11px] font-mono font-bold text-amber-600 uppercase tracking-wider block mb-1">Editor Directive Prompt</label>
+                          <input
+                            type="text"
+                            value={editorPrompt}
+                            onChange={e => setEditorPrompt(e.target.value)}
+                            placeholder="e.g. Cap.so sleek studio padding..."
+                            className="w-full bg-card border border-border rounded-xl px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-amber-500 font-mono"
+                          />
+                        </motion.div>
+                      )}
+
+                      <button
+                        onClick={() => setVideoPurpose('content')}
+                        className={`p-4 rounded-xl border-2 flex items-center gap-4 transition-all ${videoPurpose === 'content' ? 'border-purple-500 bg-purple-50/50' : 'border-border bg-card hover:border-purple-300'}`}
+                      >
+                        <Sparkles className={`w-6 h-6 ${videoPurpose === 'content' ? 'text-purple-600' : 'text-muted-foreground'}`} />
+                        <div className="text-left">
+                          <h4 className="font-bold text-foreground text-sm">Social & Creator (Reels / Shorts)</h4>
+                          <p className="text-xs text-muted-foreground">Auto scene breakdown, caption stripping, and music isolation.</p>
+                        </div>
+                      </button>
+                    </div>
+                    
+                    <div className="flex justify-end mt-2">
+                      <button onClick={() => setWizardStep(3)} className="px-6 py-2 bg-foreground text-background text-sm font-bold rounded-xl hover:opacity-90 transition-opacity">
+                        Continue
+                      </button>
+                    </div>
                   </div>
                 )}
 
-                {/* Drag and Drop Zone */}
-                <div
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`relative group cursor-pointer rounded-2xl border-2 border-dashed p-8 sm:p-12 text-center transition-all duration-300 flex flex-col items-center justify-center ${
-                    isDragging
-                      ? 'border-indigo-500 bg-indigo-50 shadow-[0_0_40px_rgba(99,102,241,0.2)]'
-                      : 'border-border bg-muted/30 hover:border-neutral-400 hover:bg-card'
-                  }`}
-                >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept={mode === 'video' ? "video/mp4,video/quicktime,video/webm,.mkv" : "application/pdf,.ppt,.pptx,image/*"}
-                    onChange={handleFileInputChange}
-                    className="hidden"
-                  />
+                {wizardStep === 3 && (
+                  <div className="flex flex-col gap-4">
+                    <h3 className="text-lg font-bold text-foreground">Provide Media</h3>
+                    {/* Drag and Drop Zone */}
+                    <div
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      onClick={() => fileInputRef.current?.click()}
+                      className={`relative group cursor-pointer rounded-2xl border-2 border-dashed p-8 sm:p-12 text-center transition-all duration-300 flex flex-col items-center justify-center ${
+                        isDragging
+                          ? 'border-indigo-500 bg-indigo-50 shadow-[0_0_40px_rgba(99,102,241,0.2)]'
+                          : 'border-border bg-muted/30 hover:border-neutral-400 hover:bg-card'
+                      }`}
+                    >
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept={mode === 'video' ? "video/mp4,video/quicktime,video/webm,.mkv" : "application/pdf,.ppt,.pptx,image/*"}
+                        onChange={handleFileInputChange}
+                        className="hidden"
+                      />
 
-                  <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:border-indigo-300 transition-all duration-300">
-                    <UploadCloud className="w-8 h-8 text-indigo-600" />
-                  </div>
+                      <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:border-indigo-300 transition-all duration-300">
+                        <UploadCloud className="w-8 h-8 text-indigo-600" />
+                      </div>
 
-                  <h3 className="text-base sm:text-lg font-bold text-foreground mb-1.5">
-                    Drop your {mode === 'video' ? 'video' : 'presentation or PDF'} here, or <span className="text-indigo-600 underline underline-offset-4">browse</span>
-                  </h3>
-                  <p className="text-xs text-muted-foreground max-w-sm">
-                    {mode === 'video' 
-                      ? 'MP4, MOV, or WebM up to 500MB. Auto-extracts clean master cuts and cinematic B-roll.' 
-                      : 'PDF, Keynote, or PPT slides. Extracts key topics and structure.'}
-                  </p>
-                </div>
+                      <h3 className="text-base sm:text-lg font-bold text-foreground mb-1.5">
+                        Drop your {mode === 'video' ? 'video' : 'presentation or PDF'} here, or <span className="text-indigo-600 underline underline-offset-4">browse</span>
+                      </h3>
+                      <p className="text-xs text-muted-foreground max-w-sm">
+                        {mode === 'video' 
+                          ? 'MP4, MOV, or WebM up to 500MB.' 
+                          : 'PDF, Keynote, or PPT slides.'}
+                      </p>
+                    </div>
 
-                {/* Direct Action Alternatives */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowUrlInput(!showUrlInput)}
-                    className="flex items-center justify-center gap-2.5 p-3.5 rounded-xl border border-border bg-muted/30 hover:bg-muted/50 hover:border-border text-foreground text-xs font-medium transition-all cursor-pointer"
-                  >
-                    <LinkIcon className="w-4 h-4 text-emerald-600" />
-                    <span>Paste Link (YouTube, Drive, Web)</span>
-                  </button>
+                    {/* Direct Action Alternatives */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowUrlInput(!showUrlInput)}
+                        className="flex items-center justify-center gap-2.5 p-3.5 rounded-xl border border-border bg-muted/30 hover:bg-muted/50 hover:border-border text-foreground text-xs font-medium transition-all cursor-pointer"
+                      >
+                        <LinkIcon className="w-4 h-4 text-emerald-600" />
+                        <span>Paste Link (YouTube, Drive, Web)</span>
+                      </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setView('recording_studio')}
-                    className="flex items-center justify-center gap-2.5 p-3.5 rounded-xl border border-border bg-muted/30 hover:bg-muted/50 hover:border-border text-foreground text-xs font-medium transition-all cursor-pointer"
-                  >
-                    <Camera className="w-4 h-4 text-indigo-600" />
-                    <span>Record Screen & Camera</span>
-                  </button>
-                </div>
+                      <button
+                        type="button"
+                        onClick={() => setView('recording_studio')}
+                        className="flex items-center justify-center gap-2.5 p-3.5 rounded-xl border border-border bg-muted/30 hover:bg-muted/50 hover:border-border text-foreground text-xs font-medium transition-all cursor-pointer"
+                      >
+                        <Camera className="w-4 h-4 text-indigo-600" />
+                        <span>Record Screen & Camera</span>
+                      </button>
+                    </div>
 
-                {/* Expandable URL Input Field */}
+                    {/* Expandable URL Input Field */}
                 {showUrlInput && (
                   <motion.div 
                     initial={{ opacity: 0, height: 0 }}
@@ -667,6 +680,8 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
                       Import
                     </button>
                   </motion.div>
+                )}
+                  </div>
                 )}
               </motion.div>
             )}
