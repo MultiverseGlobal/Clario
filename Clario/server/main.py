@@ -5,7 +5,7 @@ import asyncio
 import zipfile
 import re
 import tempfile
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -44,7 +44,8 @@ from worker.ffmpeg_worker import (
     extract_frame_at_timestamp,
     generate_contact_sheet_pillow,
     cut_segment_ffmpeg,
-    remove_captions_ffmpeg
+    remove_captions_ffmpeg,
+    apply_capso_styling
 )
 from worker.vision_worker import analyze_shot_frame
 
@@ -57,6 +58,7 @@ ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://loc
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -515,6 +517,128 @@ async def ingest_remote(
     background_tasks.add_task(process_video_harvest_job, job_id, project_id, req.file_path, user_id, is_remote=True)
 
     return {"job_id": job_id, "project_id": project_id, "status": "queued"}
+
+
+class ScriptEditRequest(BaseModel):
+    video_url: Optional[str] = None
+    file_path: Optional[str] = None  # file path in clario-raw
+    prompt: Optional[str] = "Make this look like a Cap.so recording with sleek studio padding and dark aesthetic"
+    aspect_ratio: Optional[str] = "16:9"  # 16:9, 9:16, 1:1, 4:5
+    padding_pct: Optional[float] = 0.08
+    background_type: Optional[str] = "blur"  # blur, solid
+    background_color: Optional[str] = "#0A0B0E"
+    remove_captions: Optional[bool] = True
+    crop_silence: Optional[bool] = False
+    project_id: Optional[str] = None
+
+
+@app.post("/api/v1/harvest/script-edit")
+async def script_edit_video(
+    req: ScriptEditRequest,
+    user_id: Optional[str] = Depends(get_current_user_id)
+):
+    """
+    Script-Driven / Cap.so Video Production:
+    - User gives natural language instructions (prompt) e.g. "Vertical reel with dark purple background and no captions"
+    - Gemini / Heuristic decomposes instructions into rendering flags (aspect ratio, padding, background, captions)
+    - FFmpeg renders padded video with background and normalized audio
+    - Result uploaded to clario-exports and public URL returned
+    """
+    if not req.video_url and not req.file_path:
+        raise HTTPException(status_code=400, detail="video_url or file_path in clario-raw is required")
+
+    effective_user_id = user_id or "service-user"
+    export_id = f"capso_{uuid.uuid4().hex[:10]}"
+    work_dir = os.path.join(MEDIA_ROOT, export_id)
+    os.makedirs(work_dir, exist_ok=True)
+    local_input = os.path.join(work_dir, "input.mp4")
+    local_output = os.path.join(work_dir, f"{export_id}.mp4")
+
+    # 1. Acquire source file
+    if req.file_path:
+        success = download_from_supabase("clario-raw", req.file_path, local_input)
+        if not success:
+            shutil.rmtree(work_dir, ignore_errors=True)
+            raise HTTPException(status_code=404, detail=f"File {req.file_path} not found in clario-raw bucket")
+    elif req.video_url:
+        import urllib.request
+        try:
+            urllib.request.urlretrieve(req.video_url, local_input)
+        except Exception as e:
+            shutil.rmtree(work_dir, ignore_errors=True)
+            raise HTTPException(status_code=400, detail=f"Failed to download video from URL: {e}")
+
+    # 2. Decompose prompt parameters
+    aspect_ratio = req.aspect_ratio or "16:9"
+    padding_pct = req.padding_pct if req.padding_pct is not None else 0.08
+    background_type = req.background_type or "blur"
+    background_color = req.background_color or "#0A0B0E"
+    remove_captions = True if req.remove_captions is None else req.remove_captions
+    crop_silence = bool(req.crop_silence)
+
+    if req.prompt:
+        p_lower = req.prompt.lower()
+        if any(w in p_lower for w in ["vertical", "reel", "shorts", "tiktok", "9:16", "phone", "story"]):
+            aspect_ratio = "9:16"
+        elif any(w in p_lower for w in ["square", "1:1", "feed"]):
+            aspect_ratio = "1:1"
+        elif any(w in p_lower for w in ["16:9", "horizontal", "landscape", "youtube", "widescreen"]):
+            aspect_ratio = "16:9"
+
+        if "solid" in p_lower or "clean color" in p_lower:
+            background_type = "solid"
+        elif "blur" in p_lower or "ambient" in p_lower or "cap.so" in p_lower:
+            background_type = "blur"
+
+        if "purple" in p_lower:
+            background_color = "#1E1035"
+        elif "blue" in p_lower:
+            background_color = "#0B1528"
+        elif "black" in p_lower or "dark" in p_lower:
+            background_color = "#0A0B0E"
+
+        if "silence" in p_lower or "pause" in p_lower or "breath" in p_lower:
+            crop_silence = True
+        if "keep caption" in p_lower or "with caption" in p_lower:
+            remove_captions = False
+
+    # 3. Apply Cap.so / Studio styling
+    success = apply_capso_styling(
+        video_path=local_input,
+        output_path=local_output,
+        aspect_ratio=aspect_ratio,
+        padding_pct=padding_pct,
+        background_type=background_type,
+        background_color=background_color,
+        remove_captions=remove_captions,
+        crop_silence=crop_silence
+    )
+
+    if not success or not os.path.exists(local_output):
+        shutil.rmtree(work_dir, ignore_errors=True)
+        raise HTTPException(status_code=500, detail="FFmpeg video styling failed")
+
+    # 4. Upload to Supabase clario-exports
+    dest_path = f"exports/{export_id}.mp4"
+    public_url = upload_to_supabase(local_output, "clario-exports", dest_path)
+
+    # Cleanup local temp
+    shutil.rmtree(work_dir, ignore_errors=True)
+
+    return {
+        "success": True,
+        "export_id": export_id,
+        "export_url": public_url,
+        "parameters": {
+            "aspect_ratio": aspect_ratio,
+            "padding_pct": padding_pct,
+            "background_type": background_type,
+            "background_color": background_color,
+            "remove_captions": remove_captions,
+            "crop_silence": crop_silence,
+            "prompt_applied": req.prompt
+        }
+    }
 
 
 @app.post("/api/v1/harvest/ingest-url")

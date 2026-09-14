@@ -233,22 +233,45 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
     if (!projectType) return;
     setStep('processing_video');
     setProgress(0);
-    setStatusText('Uploading Recording...');
-
-    const file = new File([blob], 'recording.webm', { type: 'video/webm' });
-    const form = new FormData();
-    form.append('file', file);
-    form.append('mode', 'video_harvester');
+    setStatusText('Uploading to secure storage...');
 
     try {
-      const res = await fetchAuth(`${serverBase}/harvest/ingest-file`, {
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user?.id;
+      if (!uid) throw new Error('Not authenticated. Please log in first.');
+
+      const fileName = `rec_${Math.random().toString(36).substring(2, 10)}_${Date.now()}.webm`;
+      const filePath = `${uid}/${fileName}`;
+
+      // 1. Direct upload to Supabase clario-raw bucket
+      const { error: uploadError } = await supabase.storage
+        .from('clario-raw')
+        .upload(filePath, blob, { contentType: 'video/webm', cacheControl: '3600', upsert: false });
+
+      if (uploadError) throw uploadError;
+
+      setStatusText('Initializing remote processor...');
+      setProgress(100);
+
+      // 2. Ping backend remote ingest
+      const res = await fetchAuth(`${serverBase}/harvest/ingest-remote`, {
         method: 'POST',
-        body: form,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          file_path: filePath,
+          filename: fileName,
+          mode: 'video_harvester'
+        })
       });
+
+      if (!res.ok) {
+        throw new Error('Backend URL unreachable or server error');
+      }
       const data = await res.json();
       startPolling(data.job_id, 'video');
-    } catch (err) {
-      setStatusText('Upload failed');
+    } catch (err: any) {
+      console.error(err);
+      setStatusText(err.message?.includes('fetch') ? 'Upload failed: Backend URL unreachable. Configure Settings.' : 'Upload failed: ' + err.message);
     }
   };
 

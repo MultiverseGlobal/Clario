@@ -345,3 +345,99 @@ def remove_captions_ffmpeg(video_path: str, output_path: str) -> bool:
         print(f"Caption removal error: {e}")
     return False
 
+
+# ── Cap.so / Studio Script-Driven Video Styling ─────────────────────────────
+
+def apply_capso_styling(
+    video_path: str,
+    output_path: str,
+    aspect_ratio: str = "16:9",
+    padding_pct: float = 0.08,
+    background_type: str = "blur",  # "blur", "solid"
+    background_color: str = "#0A0B0E",
+    remove_captions: bool = True,
+    crop_silence: bool = False
+) -> bool:
+    """
+    Apply Cap.so / Recordly style production to recorded video:
+    - Canvas aspect ratio formatting (16:9, 9:16, 1:1, 4:5)
+    - Padded presentation with blurred background or solid studio backdrop
+    - Subtitle strip (-sn) and caption cleaning
+    - Broadcast-standard audio loudness normalization and optional silence removal
+    """
+    try:
+        dimensions = {
+            "16:9": (1920, 1080),
+            "9:16": (1080, 1920),
+            "1:1": (1080, 1080),
+            "4:5": (1080, 1350),
+        }
+        canvas_w, canvas_h = dimensions.get(aspect_ratio, (1920, 1080))
+
+        pad = max(0.02, min(0.30, padding_pct))
+        max_inner_w = int(canvas_w * (1.0 - 2 * pad))
+        max_inner_h = int(canvas_h * (1.0 - 2 * pad))
+        max_inner_w -= max_inner_w % 2
+        max_inner_h -= max_inner_h % 2
+
+        clean_hex = background_color.lstrip("#")
+        bg_col = f"0x{clean_hex}" if len(clean_hex) == 6 else "0x0A0B0E"
+
+        if background_type == "blur":
+            filter_complex = (
+                f"[0:v]scale={canvas_w}:{canvas_h}:force_original_aspect_ratio=increase,"
+                f"crop={canvas_w}:{canvas_h},boxblur=25:5[bg];"
+                f"[0:v]scale={max_inner_w}:{max_inner_h}:force_original_aspect_ratio=decrease[fg];"
+                f"[bg][fg]overlay=(W-w)/2:(H-h)/2[outv]"
+            )
+        else:
+            filter_complex = (
+                f"[0:v]scale={max_inner_w}:{max_inner_h}:force_original_aspect_ratio=decrease,"
+                f"pad={canvas_w}:{canvas_h}:(ow-iw)/2:(oh-ih)/2:color={bg_col}[outv]"
+            )
+
+        cmd = [
+            FFMPEG_BIN,
+            "-i", video_path,
+        ]
+
+        af_filters = []
+        if crop_silence:
+            af_filters.append("silenceremove=stop_periods=-1:stop_duration=0.3:stop_threshold=-32dB")
+        af_filters.append("loudnorm=I=-16:TP=-1.5:LRA=11")
+
+        cmd.extend([
+            "-filter_complex", filter_complex,
+            "-map", "[outv]",
+            "-map", "0:a?",
+            "-af", ",".join(af_filters),
+        ])
+
+        if remove_captions:
+            cmd.append("-sn")
+
+        cmd.extend([
+            "-c:v", "libx264",
+            "-preset", "fast",
+            "-crf", "20",
+            "-pix_fmt", "yuv420p",
+            "-c:a", "aac",
+            "-b:a", "160k",
+            "-movflags", "+faststart",
+            "-y",
+            output_path
+        ])
+
+        print(f"Executing Cap.so styling: {' '.join(cmd[:10])}...")
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if proc.returncode == 0 and os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
+            print(f"Cap.so styling completed successfully: {output_path}")
+            return True
+        else:
+            print(f"Cap.so styling error: {proc.stderr[-1000:]}")
+            return False
+    except Exception as e:
+        print(f"apply_capso_styling exception: {e}")
+        return False
+
+
