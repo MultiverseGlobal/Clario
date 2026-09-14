@@ -309,9 +309,29 @@ export default function RadarDiscover({ onLeadSaved }: { onLeadSaved?: () => voi
             </div>
           </div>
           {loading && (
-            <p className="text-xs text-muted-foreground font-mono animate-pulse">
-              Scanning {SOURCES.find((s2) => s2.id === source)?.label}...
-            </p>
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-6 flex flex-col items-center justify-center relative overflow-hidden mt-3">
+              <div className="relative w-28 h-28 flex items-center justify-center mb-3">
+                {/* Concentric Sonar Rings */}
+                <div className="absolute inset-0 rounded-full border border-primary/20 animate-ping opacity-30" />
+                <div className="absolute inset-3 rounded-full border border-primary/30" />
+                <div className="absolute inset-7 rounded-full border border-primary/40" />
+                <div className="absolute w-3 h-3 rounded-full bg-primary shadow-lg shadow-primary/50" />
+                {/* Rotating Conic Radar Sweep */}
+                <div 
+                  className="absolute inset-0 rounded-full animate-spin"
+                  style={{
+                    background: "conic-gradient(from 0deg, transparent 0deg, transparent 270deg, rgba(78, 108, 242, 0.3) 360deg)",
+                    animationDuration: "2.4s"
+                  }}
+                />
+              </div>
+              <p className="text-xs font-mono font-semibold text-foreground animate-pulse text-center">
+                RADAR SWEEP ACTIVE · SCANNING {SOURCES.find((s2) => s2.id === source)?.label.toUpperCase()}
+              </p>
+              <p className="text-[11px] text-muted-foreground font-mono text-center max-w-sm mt-1">
+                Enforcing strict headcount bounds (5–30 staff), isolating verified decision makers, and aggregating company intelligence...
+              </p>
+            </div>
           )}
         </div>
 
@@ -381,6 +401,19 @@ export default function RadarDiscover({ onLeadSaved }: { onLeadSaved?: () => voi
                             Research
                           </Button>
                         )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const pitchText = `Personalized video pitch scenario for ${lead.company} (${lead.founder_name || 'Founder'}): Addressing operational bottlenecks and scaling distribution.`;
+                            navigator.clipboard.writeText(pitchText);
+                            toast.success(`Copied Clario Video Pitch prompt for ${lead.company}!`);
+                          }}
+                          className="h-7 text-[11px] text-primary hover:text-primary-foreground border border-primary/20 bg-primary/5 px-2 gap-1"
+                          title="Generate a personalized video pitch scenario for Clario"
+                        >
+                          🎬 Pitch
+                        </Button>
                         <Button
                           size="sm"
                           onClick={() => handleSaveLead(lead)}

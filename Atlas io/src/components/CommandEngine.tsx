@@ -721,14 +721,26 @@ export function CommandEngine({
                 )}
               </div>
 
-              <button
-                onClick={() => setSelectedLeadModal(null)}
-                className={`mt-6 w-full py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
-                  isDark ? "bg-white text-black hover:bg-white/90" : "bg-neutral-900 text-white hover:bg-neutral-800"
-                }`}
-              >
-                Close Inspection
-              </button>
+              <div className="mt-5 flex flex-col gap-2">
+                <button
+                  onClick={() => {
+                    const prompt = `Personalized video outreach demo for ${selectedLeadModal.company}. Focus on solving: ${selectedLeadModal.bottleneck || selectedLeadModal.founder_thesis}. Recipient: ${selectedLeadModal.founder?.name || 'Founder'}.`;
+                    navigator.clipboard.writeText(prompt);
+                    toast.success(`Copied Clario Video Pitch brief for ${selectedLeadModal.company}!`);
+                  }}
+                  className="w-full py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-all border border-indigo-500/30 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  🎬 Generate Video Pitch in Clario
+                </button>
+                <button
+                  onClick={() => setSelectedLeadModal(null)}
+                  className={`w-full py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
+                    isDark ? "bg-white text-black hover:bg-white/90" : "bg-neutral-900 text-white hover:bg-neutral-800"
+                  }`}
+                >
+                  Close Inspection
+                </button>
+              </div>
             </div>
           </motion.div>
         )}
