@@ -10,6 +10,7 @@ import { ClarioProject, saveProject } from '../../lib/projectStore';
 import { getApiBase } from '../../lib/apiClient';
 import { supabase } from '../../lib/supabase';
 import { detectCinematicScenes, type DetectedScene } from '../../lib/clientSceneDetector';
+import { separateVoiceAndMusic } from '../../lib/audioSeparator';
 import { db } from '../../lib/dexieDb';
 import type { VideoTrackItem, ShotRecord } from '../../types/assets';
 
@@ -168,6 +169,20 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
         const autoStrip = hasAnyCaptions ? 'punch_in' : 'none';
         setCaptionStripMode(autoStrip);
 
+        // Audio Separation Step
+        let vocalsTrackUrl = '';
+        let accompanimentTrackUrl = '';
+        try {
+          const audioResult = await separateVoiceAndMusic(file, (msg) => {
+            setProgress(p => Math.min(p + 5, 80));
+            setStatusText(msg);
+          });
+          vocalsTrackUrl = audioResult.vocalsUrl;
+          accompanimentTrackUrl = audioResult.accompanimentUrl;
+        } catch (audioErr) {
+          console.warn('Audio separation failed:', audioErr);
+        }
+
         // Convert detected scenes to trackItems
         const generatedTracks: VideoTrackItem[] = scenes.map((s, idx) => ({
           id: `track_cut_${idx}_${Date.now()}`,
@@ -182,6 +197,38 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
           beatType: idx === 0 ? 'hook' : s.contentType === 'a_roll' ? 'problem' : 'proof',
           scriptText: s.sceneTag,
         }));
+
+        if (vocalsTrackUrl) {
+          generatedTracks.push({
+            id: `track_vocals_${Date.now()}`,
+            title: `Isolated Vocals`,
+            startTime: 0,
+            endTime: scenes.reduce((acc, s) => acc + s.duration, 0),
+            duration: scenes.reduce((acc, s) => acc + s.duration, 0),
+            type: 'audio',
+            url: vocalsTrackUrl,
+            audioUrl: vocalsTrackUrl,
+            isBroll: false,
+            beatType: 'hook',
+            scriptText: '',
+          });
+        }
+        
+        if (accompanimentTrackUrl) {
+          generatedTracks.push({
+            id: `track_music_${Date.now()}`,
+            title: `Accompaniment (Music)`,
+            startTime: 0,
+            endTime: scenes.reduce((acc, s) => acc + s.duration, 0),
+            duration: scenes.reduce((acc, s) => acc + s.duration, 0),
+            type: 'audio',
+            url: accompanimentTrackUrl,
+            audioUrl: accompanimentTrackUrl,
+            isBroll: false,
+            beatType: 'proof',
+            scriptText: '',
+          });
+        }
 
         const shotsData: ShotRecord[] = scenes.map((s) => ({
           project_id: projectId,

@@ -167,53 +167,45 @@ export async function detectCinematicScenes(
 
       onProgress?.({ progressPct: 15, statusMsg: 'Scanning video keyframes...' });
 
-      // Step interval: sample every 0.35s (or adaptive for long videos)
-      const step = duration > 120 ? 0.6 : duration > 60 ? 0.45 : 0.35;
-      const timestamps: number[] = [];
-      for (let t = 0; t < duration; t += step) {
-        timestamps.push(t);
-      }
+      onProgress?.({ progressPct: 15, statusMsg: 'Sending video to AI Engine...' });
 
-      let prevFrameData: Uint8ClampedArray | null = null;
-      const cutTimestamps: number[] = [0];
-      const CUT_THRESHOLD = 0.26;
-      const MIN_SHOT_DURATION = 1.2;
+      let cutTimestamps: number[] = [0];
 
-      for (let i = 0; i < timestamps.length; i++) {
-        const time = timestamps[i];
-        video.currentTime = time;
+      try {
+        let fileToUpload: File | Blob;
+        if (typeof source === 'string') {
+          const response = await fetch(source);
+          fileToUpload = await response.blob();
+        } else {
+          fileToUpload = source;
+        }
 
-        await new Promise<void>((res) => {
-          const onSeeked = () => {
-            video.removeEventListener('seeked', onSeeked);
-            res();
-          };
-          video.addEventListener('seeked', onSeeked);
+        const formData = new FormData();
+        formData.append('file', fileToUpload, 'video.mp4');
+
+        onProgress?.({ progressPct: 45, statusMsg: 'Running PySceneDetect Shot Boundary Analysis...' });
+
+        const apiRes = await fetch('http://localhost:8000/detect-scenes', {
+          method: 'POST',
+          body: formData
         });
 
-        sampleCtx.drawImage(video, 0, 0, sampleCanvas.width, sampleCanvas.height);
-        const currData = sampleCtx.getImageData(0, 0, sampleCanvas.width, sampleCanvas.height).data;
+        if (!apiRes.ok) {
+          throw new Error('API failed');
+        }
 
-        if (prevFrameData) {
-          const delta = computeFrameDifference(prevFrameData, currData);
-          const lastCut = cutTimestamps[cutTimestamps.length - 1];
-
-          if (delta >= CUT_THRESHOLD && (time - lastCut) >= MIN_SHOT_DURATION) {
-            cutTimestamps.push(parseFloat(time.toFixed(2)));
+        const data = await apiRes.json();
+        
+        if (data.scenes && data.scenes.length > 0) {
+          cutTimestamps = data.scenes.map((s: any) => s.start_time);
+          if (cutTimestamps[0] > 0.1) {
+              cutTimestamps.unshift(0);
           }
         }
-        prevFrameData = new Uint8ClampedArray(currData);
-
-        if (i % 8 === 0) {
-          const pct = Math.min(75, 15 + Math.floor((i / timestamps.length) * 60));
-          onProgress?.({ progressPct: pct, statusMsg: `Analyzing scene cuts (${cutTimestamps.length} found)...` });
-        }
-      }
-
-      // If video has only 1 cut (e.g. talking head or long continuous footage), create rhythmic beats
-      if (cutTimestamps.length <= 1 && duration >= 6) {
+      } catch (err) {
+        console.warn('Python AI API failed, falling back to basic rhythmic cuts', err);
         const interval = Math.min(6, Math.max(2.5, duration / 4));
-        cutTimestamps.length = 0;
+        cutTimestamps = [];
         for (let t = 0; t < duration; t += interval) {
           cutTimestamps.push(parseFloat(t.toFixed(2)));
         }
