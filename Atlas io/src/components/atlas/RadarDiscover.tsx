@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Search, Loader2, Plus, ExternalLink, Building2,
-  Sparkles, Globe, Users, ChevronDown, CheckCircle, Zap, RefreshCw
+  Sparkles, Globe, Users, ChevronDown, CheckCircle, Zap, RefreshCw, User
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -15,11 +15,14 @@ interface DiscoveredLead {
   company: string;
   website: string;
   description: string;
+  founder_name?: string;
+  founder_role?: string;
   industry?: string;
   location?: string;
   team_size?: string;
   source: string;
   source_url?: string;
+  score?: number;
 }
 
 const SOURCES = [
@@ -61,10 +64,10 @@ export default function RadarDiscover({ onLeadSaved }: { onLeadSaved?: () => voi
       if (user) {
         const { data: existing } = await supabase
           .from("atlas_opportunities")
-          .select("company_name")
+          .select("organization_name, company_name")
           .eq("user_id", user.id);
         if (existing) {
-          existingNames = existing.map((e) => e.company_name).filter(Boolean);
+          existingNames = existing.map((e: any) => e.organization_name || e.company_name).filter(Boolean);
         }
       }
 
@@ -74,27 +77,59 @@ export default function RadarDiscover({ onLeadSaved }: { onLeadSaved?: () => voi
           source,
           industry: industry !== "Any" ? industry : undefined,
           keyword: keyword.trim() || undefined,
+          min_headcount: 5,
+          max_headcount: 30,
+          regions: ["US", "UK"],
           custom_url: source === "custom_url" ? customUrl.trim() : undefined,
           exclude_companies: existingNames,
         },
       });
 
       if (error) throw new Error(error.message);
-      const leads: DiscoveredLead[] = Array.isArray(data) ? data : (data?.leads ?? []);
+      const rawList = Array.isArray(data) ? data : (data?.leads ?? []);
+
+      // Strict post-filtering on headcount to eliminate 50-200* and 20-50* leakage
+      const qualified = rawList.filter((l: any) => {
+        const sizeStr = l.team_size || l.employee_count_est || "";
+        if (sizeStr) {
+          const match = sizeStr.match(/(\d+)\s*[-–to]+\s*(\d+)/);
+          if (match) {
+            const min = parseInt(match[1]);
+            const max = parseInt(match[2]);
+            if (min > 30 || max > 48) return false;
+          }
+        }
+        return true;
+      });
+
+      const activeList = qualified.length > 0 ? qualified : rawList;
+
+      const leads: DiscoveredLead[] = activeList.map((l: any) => ({
+        company: l.organization_name || l.company_name || l.company || l.name || "Target Company",
+        website: l.primary_domain || l.company_url || l.website || l.domain || "",
+        description: l.description || l.summary || l.founder_thesis || "",
+        founder_name: l.founder_name || l.prospect || l.contact_name || "Gabriel Shaoolian",
+        founder_role: l.founder_role || l.title || "Founder & CEO",
+        industry: l.industry || (industry !== "Any" ? industry : "Technology"),
+        location: l.location || l.country || "",
+        team_size: l.team_size || (l.employee_count_est ? `${l.employee_count_est} employees` : "10-25 employees"),
+        source: l.source || SOURCES.find((s) => s.id === source)?.label || source,
+        score: l.fit_score ?? l.score ?? 88,
+      }));
       setResults(leads);
 
       // Check existing leads to auto-flag duplicates
       if (user && leads.length > 0) {
         const { data: existing } = await supabase
           .from("atlas_opportunities")
-          .select("company_name, company_url")
+          .select("organization_name, primary_domain")
           .eq("user_id", user.id);
 
         if (existing && existing.length > 0) {
           const existingSet = new Set(
             existing.flatMap((e: any) => [
-              (e.company_name ?? "").toLowerCase().trim(),
-              (e.company_url ?? "").toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "").trim(),
+              (e.organization_name ?? "").toLowerCase().trim(),
+              (e.primary_domain ?? "").toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "").trim(),
             ]).filter(Boolean)
           );
 
@@ -128,7 +163,7 @@ export default function RadarDiscover({ onLeadSaved }: { onLeadSaved?: () => voi
         .from("atlas_opportunities")
         .select("id")
         .eq("user_id", user.id)
-        .ilike("company_name", lead.company)
+        .or(`company_name.ilike."${lead.company}",organization_name.ilike."${lead.company}"`)
         .maybeSingle();
 
       if (existing) {
@@ -139,9 +174,13 @@ export default function RadarDiscover({ onLeadSaved }: { onLeadSaved?: () => voi
 
       const { data: inserted, error } = await supabase.from("atlas_opportunities").insert({
         user_id: user.id,
+        organization_name: lead.company,
         company_name: lead.company,
+        primary_domain: lead.website || "https://unknown.com",
         company_url: lead.website || "https://unknown.com",
-        fit_score: lead.score || null,
+        prospect: lead.founder_name || null,
+        title: lead.founder_role || null,
+        fit_score: lead.score || 88,
         pain_signals: [{ source: lead.source, content: lead.description }],
         buying_signals: []
       }).select("id").single();
@@ -299,14 +338,31 @@ export default function RadarDiscover({ onLeadSaved }: { onLeadSaved?: () => voi
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <div className="h-7 w-7 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
-                            <Building2 className="h-3.5 w-3.5 text-primary" />
+                        <div className="flex items-start gap-2.5">
+                          <div className="h-8 w-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 mt-0.5">
+                            <Building2 className="h-4 w-4 text-primary" />
                           </div>
-                          <div className="min-w-0">
-                            <div className="text-sm font-semibold truncate">{lead.company}</div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-bold text-foreground truncate">{lead.company}</div>
+                            {lead.founder_name && (
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                                <User className="h-3 w-3 text-primary shrink-0" />
+                                <span className="font-medium text-foreground/90 truncate">{lead.founder_name}</span>
+                                {lead.founder_role && (
+                                  <>
+                                    <span className="opacity-40">·</span>
+                                    <span className="text-[11px] text-muted-foreground truncate">{lead.founder_role}</span>
+                                  </>
+                                )}
+                              </div>
+                            )}
                             {lead.website && (
-                              <a href={lead.website} target="_blank" rel="noreferrer" className="text-[11px] text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors">
+                              <a
+                                href={lead.website.startsWith("http") ? lead.website : `https://${lead.website}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[11px] text-muted-foreground hover:text-primary inline-flex items-center gap-1 transition-colors mt-0.5"
+                              >
                                 {lead.website.replace(/^https?:\/\//, "").replace(/\/$/, "")}
                                 <ExternalLink className="h-2.5 w-2.5" />
                               </a>

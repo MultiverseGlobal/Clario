@@ -87,31 +87,56 @@ export default function HqReport() {
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
       // Fetch all necessary data
-      const [revRes, outRes, dealRes] = await Promise.all([
+      const [revRes, outRes, dealRes, oppRes] = await Promise.all([
         supabase.from("atlas_revenue_summary").select("*").eq("user_id", user.id).maybeSingle(),
-        supabase.from("atlas_outreach").select("status").eq("user_id", user.id).gte("created_at", weekStart.toISOString()),
+        supabase.from("atlas_outreach").select("status, created_at").eq("user_id", user.id),
         supabase.from("atlas_deals").select("*").eq("user_id", user.id).order("updated_at", { ascending: false }),
+        supabase.from("atlas_opportunities").select("*").eq("user_id", user.id),
       ]);
 
       const rev = revRes.data ?? {};
-      const outData = outRes.data ?? [];
+      const outData = (outRes.data ?? []) as any[];
       const deals = (dealRes.data ?? []) as any[];
+      const opps = (oppRes.data ?? []) as any[];
 
-      const outreach_sent = outData.filter((o: any) => o.status !== "draft").length;
-      const replies = outData.filter((o: any) => ["replied", "booked"].includes(o.status)).length;
+      // Filter outreach
+      const weeklyOutreach = outData.filter((o: any) => new Date(o.created_at) >= weekStart);
+      const activeOutreach = weeklyOutreach.length > 0 ? weeklyOutreach : outData;
+      const outreach_sent = activeOutreach.filter((o: any) => o.status !== "draft").length;
+      const replies = activeOutreach.filter((o: any) => ["replied", "booked"].includes(o.status)).length;
 
       const wonDeals = deals.filter((d) => d.stage === "won");
       const lostDeals = deals.filter((d) => d.stage === "lost");
       const activeDeals = deals.filter((d) => !["won", "lost"].includes(d.stage));
-      const stalledDeals = activeDeals
-        .map((d) => ({ ...d, daysSince: Math.floor((Date.now() - new Date(d.updated_at).getTime()) / 86400000) }))
-        .filter((d) => d.daysSince >= 5)
-        .slice(0, 3);
 
-      const revenue_this_month = Number(rev.revenue_this_month ?? 0);
-      const pipeline_weighted = Number(rev.pipeline_weighted ?? 0);
+      const wonFromOpps = opps.filter((o) => o.pipeline_stage === "closed_won");
+      const lostFromOpps = opps.filter((o) => o.pipeline_stage === "closed_lost");
+      const activeOpps = opps.filter((o) => !["closed_won", "closed_lost"].includes(o.pipeline_stage));
+
+      const totalDealsWon = wonDeals.length + wonFromOpps.length;
+      const totalDealsLost = lostDeals.length + lostFromOpps.length;
+
+      const oppsPipelineValue = activeOpps.reduce((sum, o) => sum + (Number(o.deal_value_usd) || 0), 0);
+      const pipeline_weighted = Number(rev.pipeline_weighted ?? 0) > 0 ? Number(rev.pipeline_weighted) : oppsPipelineValue;
+
+      const wonRevenue = wonFromOpps.reduce((sum, o) => sum + (Number(o.deal_value_usd) || 0), 0);
+      const revenue_this_month = Number(rev.revenue_this_month ?? 0) > 0 ? Number(rev.revenue_this_month) : wonRevenue;
+
       const replyRate = outreach_sent > 0 ? Math.round((replies / outreach_sent) * 100) : 0;
       const pct = Math.round((revenue_this_month / GOAL) * 100);
+
+      const stalledDeals = [
+        ...activeDeals.map((d) => ({
+          company_name: d.company_name,
+          daysSince: Math.floor((Date.now() - new Date(d.updated_at).getTime()) / 86400000),
+        })),
+        ...activeOpps.map((o) => ({
+          company_name: o.organization_name,
+          daysSince: Math.floor((Date.now() - new Date(o.updated_at || o.created_at).getTime()) / 86400000),
+        })),
+      ]
+        .filter((d) => d.daysSince >= 5)
+        .slice(0, 3);
 
       // Generate AI narrative for the key sections
       let aiContent: { whats_working: string; whats_not: string; the_decision: string } = {
@@ -125,30 +150,46 @@ export default function HqReport() {
           body: {
             action: "generate-report",
             report_data: {
-              revenue_this_month, pipeline_weighted, outreach_sent, replies, replyRate,
-              deals_won: wonDeals.length, deals_lost: lostDeals.length,
-              active_deals: activeDeals.length, stalled_deals: stalledDeals.length,
-              goal: GOAL, pct_of_goal: pct,
+              revenue_this_month,
+              pipeline_weighted,
+              outreach_sent,
+              replies,
+              replyRate,
+              deals_won: totalDealsWon,
+              deals_lost: totalDealsLost,
+              active_deals: activeDeals.length + activeOpps.length,
+              stalled_deals: stalledDeals.length,
+              goal: GOAL,
+              pct_of_goal: pct,
             },
           },
         });
         if (aiData) {
-          aiContent.whats_working = aiData.whats_working ?? aiData.what_is_working ?? generateWorkingInsight(outreach_sent, replies, replyRate, wonDeals.length);
-          aiContent.whats_not = aiData.whats_not ?? aiData.what_is_not ?? generateNotWorkingInsight(stalledDeals.length, outreach_sent, replyRate);
-          aiContent.the_decision = aiData.the_decision ?? aiData.decision ?? generateDecision(outreach_sent, stalledDeals, activeDeals, pct);
+          aiContent.whats_working =
+            aiData.whats_working ??
+            aiData.what_is_working ??
+            generateWorkingInsight(outreach_sent, replies, replyRate, totalDealsWon);
+          aiContent.whats_not =
+            aiData.whats_not ??
+            aiData.what_is_not ??
+            generateNotWorkingInsight(stalledDeals.length, outreach_sent, replyRate);
+          aiContent.the_decision =
+            aiData.the_decision ??
+            aiData.decision ??
+            generateDecision(outreach_sent, stalledDeals, [...activeDeals, ...activeOpps], pct);
         }
       } catch {
         // Fall back to rule-based insights
-        aiContent.whats_working = generateWorkingInsight(outreach_sent, replies, replyRate, wonDeals.length);
+        aiContent.whats_working = generateWorkingInsight(outreach_sent, replies, replyRate, totalDealsWon);
         aiContent.whats_not = generateNotWorkingInsight(stalledDeals.length, outreach_sent, replyRate);
-        aiContent.the_decision = generateDecision(outreach_sent, stalledDeals, activeDeals, pct);
+        aiContent.the_decision = generateDecision(outreach_sent, stalledDeals, [...activeDeals, ...activeOpps], pct);
       }
-      
+
       const reportContent = {
         revenue_this_month,
         pipeline_weighted,
-        deals_won: wonDeals.length,
-        deals_lost: lostDeals.length,
+        deals_won: totalDealsWon,
+        deals_lost: totalDealsLost,
         outreach_sent,
         replies,
         advanced: [],
@@ -156,7 +197,7 @@ export default function HqReport() {
         lost_deals: lostDeals.slice(0, 3).map((d) => ({ company: d.company_name, reason: d.lost_reason })),
         whats_working: aiContent.whats_working,
         whats_not: aiContent.whats_not,
-        next_week_priorities: generatePriorities(stalledDeals, outreach_sent, activeDeals, pct),
+        next_week_priorities: generatePriorities(stalledDeals, outreach_sent, [...activeDeals, ...activeOpps], pct),
         the_decision: aiContent.the_decision,
       };
 

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   MessageSquare, Zap, Loader2, Copy, Send,
   Target, ExternalLink, ChevronRight, Globe,
-  Plus, Video, Clock, CheckCircle2, Link2
+  Plus, Video, Clock, CheckCircle2, Link2, Trash2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -120,14 +120,27 @@ export default function HqRadar() {
   // ── Load waiting Clario drafts for the active opportunity ─────────────────
   const loadWaitingDrafts = useCallback(async () => {
     if (!activeOpportunityId || !user) return;
-    const { data } = await supabase
-      .from("atlas_outreach")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("opportunity_id", activeOpportunityId)
-      .eq("status", "waiting_for_clario")
-      .order("created_at", { ascending: false });
-    setWaitingDrafts(data || []);
+    try {
+      const { data, error } = await supabase
+        .from("atlas_outreach")
+        .select("*")
+        .eq("user_id", user.id)
+        .or(`opportunity_id.eq.${activeOpportunityId},company_id.eq.${activeOpportunityId}`)
+        .eq("status", "waiting_for_clario")
+        .order("created_at", { ascending: false });
+
+      if (!error && data) {
+        setWaitingDrafts(
+          data.map((d: any) => ({
+            ...d,
+            draft_subject: d.draft_subject || d.subject || "",
+            draft_body: d.draft_body || d.body || "",
+          }))
+        );
+      }
+    } catch (err) {
+      console.error("Failed to load waiting drafts:", err);
+    }
   }, [activeOpportunityId, user]);
 
   useEffect(() => { loadWaitingDrafts(); }, [loadWaitingDrafts]);
@@ -174,6 +187,49 @@ export default function HqRadar() {
       toast.success(`Stage updated to ${nextStage}`);
     } catch (e: any) {
       toast.error(`Failed to update stage: ${e.message}`);
+    }
+  };
+
+  const handleDeleteLead = async (oppId: string, oppName?: string) => {
+    const displayName = oppName || "this lead";
+    if (!window.confirm(`Are you sure you want to delete ${displayName}? This will remove it from your pipeline.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from("atlas_opportunities").delete().eq("id", oppId);
+      if (error) throw error;
+      toast.success(`Removed ${displayName}`);
+      setOpportunities((prev) => {
+        const remaining = prev.filter((o) => o.id !== oppId);
+        if (activeOpportunityId === oppId) {
+          setActiveOpportunityId(remaining.length > 0 ? remaining[0].id : null);
+        }
+        return remaining;
+      });
+    } catch (e: any) {
+      toast.error(`Failed to delete lead: ${e.message}`);
+    }
+  };
+
+  const handleClearAllLeads = async () => {
+    if (!user || opportunities.length === 0) return;
+    if (
+      !window.confirm(
+        `Are you sure you want to delete all ${opportunities.length} leads in your pipeline? This action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from("atlas_opportunities").delete().eq("user_id", user.id);
+      if (error) throw error;
+      toast.success(`Pipeline cleared: removed all leads`);
+      setOpportunities([]);
+      setActiveOpportunityId(null);
+    } catch (e: any) {
+      toast.error(`Failed to clear pipeline: ${e.message}`);
     }
   };
 
@@ -296,10 +352,14 @@ export default function HqRadar() {
         .from("atlas_outreach")
         .insert({
           user_id: user.id,
+          company_id: activeOpportunityId,
           opportunity_id: activeOpportunityId,
           contact_id: activeContact?.id || null,
+          type: "cold_email",
           channel: "email",
+          subject: drafts.email.subject,
           draft_subject: drafts.email.subject,
+          body: drafts.email.body,
           draft_body: drafts.email.body,
           status: "waiting_for_clario",
           clario_requested_at: new Date().toISOString(),
@@ -413,13 +473,26 @@ export default function HqRadar() {
             <h2 className="font-display text-sm tracking-tight font-bold">PIPELINE</h2>
             <p className="text-[11px] font-mono text-muted-foreground mt-0.5">{opportunities.length} active opportunities</p>
           </div>
-          <Button
-            onClick={() => setActiveOpportunityId(null)}
-            size="sm"
-            className="h-8 px-3 rounded-lg bg-foreground text-background text-xs font-medium flex items-center gap-1.5"
-          >
-            <Plus className="w-3.5 h-3.5" /> Add Lead
-          </Button>
+          <div className="flex items-center gap-1.5">
+            {opportunities.length > 0 && (
+              <Button
+                onClick={handleClearAllLeads}
+                variant="ghost"
+                size="sm"
+                title="Clear all leads from pipeline"
+                className="h-8 px-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 text-xs font-medium"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </Button>
+            )}
+            <Button
+              onClick={() => setActiveOpportunityId(null)}
+              size="sm"
+              className="h-8 px-3 rounded-lg bg-foreground text-background text-xs font-medium flex items-center gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add Lead
+            </Button>
+          </div>
         </div>
 
         <div className="p-4 border-b border-border/60 bg-card/20">
@@ -454,10 +527,10 @@ export default function HqRadar() {
             .map((opp) => {
             const isSelected = opp.id === activeOpportunityId;
             return (
-              <button
+              <div
                 key={opp.id}
                 onClick={() => setActiveOpportunityId(opp.id)}
-                className={`w-full text-left p-4 rounded-xl border transition-all ${
+                className={`w-full group/lead text-left p-4 rounded-xl border transition-all cursor-pointer relative ${
                   isSelected
                     ? "bg-card/60 backdrop-blur-xl border-foreground/30 shadow-md"
                     : "bg-background/40 backdrop-blur-md border-border/40 hover:border-foreground/20 opacity-80 hover:opacity-100"
@@ -465,7 +538,20 @@ export default function HqRadar() {
               >
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-[14px] font-bold tracking-tight truncate pr-2">{opp.organization_name}</span>
-                  <span className="text-[12px] font-mono text-muted-foreground">£{(opp.deal_value_usd || 0).toLocaleString()}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[12px] font-mono text-muted-foreground">£{(opp.deal_value_usd || 0).toLocaleString()}</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteLead(opp.id, opp.organization_name);
+                      }}
+                      title="Delete lead"
+                      className="opacity-0 group-hover/lead:opacity-100 hover:text-destructive text-muted-foreground transition-opacity p-0.5 rounded"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className={`text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded border ${opp.pipeline_stage === "contacted" ? "border-emerald-500/30 text-emerald-500 bg-emerald-500/10" : "border-border/60 text-muted-foreground bg-muted/50"}`}>
@@ -473,7 +559,7 @@ export default function HqRadar() {
                   </span>
                   <ChevronRight className={`w-4 h-4 ${isSelected ? "text-foreground" : "text-muted-foreground"}`} />
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
@@ -503,9 +589,20 @@ export default function HqRadar() {
                     </a>
                   )}
                 </div>
-                <Button variant="outline" size="sm" onClick={handleUpdateStage} className="h-8 text-xs font-semibold">
-                  Update Stage
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={handleUpdateStage} className="h-8 text-xs font-semibold">
+                    Update Stage
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDeleteLead(activeOpp.id, activeOpp.organization_name)}
+                    className="h-8 px-2.5 text-xs font-semibold text-muted-foreground hover:text-destructive hover:border-destructive/40 transition-colors"
+                    title="Delete this lead"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
+                  </Button>
+                </div>
               </div>
             </div>
 

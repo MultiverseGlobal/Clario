@@ -2344,7 +2344,11 @@ Respond ONLY with a valid JSON object matching this schema:
 {
   "keyword": "Core search term for company discovery (e.g., 'creative design agency' or 'AI developer tools')",
   "industry": "Specific industry category (e.g. 'Design & Creative', 'Marketing Agency', 'Fintech', 'Healthcare', 'B2B SaaS', 'Technology')",
-  "team_size_filter": "Normalized employee size range (e.g. '5-10 employees', '10-30 employees', '10-50 employees')",
+  "min_headcount": 5,
+  "max_headcount": 30,
+  "team_size_filter": "Normalized employee size range (e.g. '5-30 employees')",
+  "regions": ["US", "UK"],
+  "decision_maker_titles": ["Founder", "Co-Founder", "CEO", "Managing Director", "Owner"],
   "channel": "Suggested sourcing channel: 'clutch' (for marketing, design, creative agencies & services), 'yc' (for venture/high-growth tech startups), 'hn' (for technical developer products/open source/engineers), or 'starter_story' (for bootstrapped/indie SaaS)",
   "hypothesis": "A sharp, 1-sentence hypothesis on their likely operational bottleneck and value proposition (e.g. 'Streamlining creative revision cycles and automating client onboarding')",
   "targetCount": 15
@@ -2732,7 +2736,20 @@ Respond ONLY with a JSON object:
     // ACTION: discover-leads
     // ─────────────────────────────────────────────
     if (body.action === "discover-leads") {
-      const { source, industry, keyword, team_size, custom_url, custom_api_key } = body as any;
+      const { 
+        source, 
+        industry, 
+        keyword, 
+        team_size, 
+        min_headcount, 
+        max_headcount, 
+        regions, 
+        target_titles, 
+        hypothesis, 
+        prompt: rawPrompt, 
+        custom_url, 
+        custom_api_key 
+      } = body as any;
       const openaiKey = custom_api_key || dbSettings?.openai_api_key || Deno.env.get("OPENAI_API_KEY");
 
       let rawContent = "";
@@ -2755,10 +2772,21 @@ Prism Outreach & PR | https://prismoutreach.com | Digital PR, link building, med
 
       if (source === "clutch") {
         try {
-          const ddgQuery = `site:clutch.co/profile ${industry !== "Any" && industry ? industry : (keyword || "digital agency")}`.trim();
-          const liveSnippets = await searchDuckDuckGo(ddgQuery, proxyConfig);
-          if (liveSnippets && liveSnippets.length > 200) {
-            rawContent = liveSnippets;
+          const regionList = Array.isArray(regions) && regions.length > 0 ? regions : ["US", "UK"];
+          const queries = [
+            `site:clutch.co/profile ${industry !== "Any" && industry ? industry : (keyword || "digital agency")}`,
+          ];
+          if (regionList.includes("UK") || regionList.includes("Europe")) {
+            queries.push(`site:clutch.co/profile ${keyword || "agency"} "UK" OR "London"`);
+          }
+          if (regionList.includes("US")) {
+            queries.push(`site:clutch.co/profile ${keyword || "agency"} "New York" OR "Austin" OR "Chicago"`);
+          }
+
+          const results = await Promise.all(queries.map(q => searchDuckDuckGo(q, proxyConfig).catch(() => "")));
+          const combined = results.filter(Boolean).join("\n\n---\n\n");
+          if (combined && combined.length > 200) {
+            rawContent = combined;
           } else {
             const scraped = await scrapeUrl("https://clutch.co/agencies/digital-marketing", proxyConfig);
             rawContent = scraped.content.length > 200 ? `${scraped.title}\n\n${scraped.content}`.slice(0, 8000) : CLUTCH_AGENCIES_DATA;
@@ -2770,10 +2798,18 @@ Prism Outreach & PR | https://prismoutreach.com | Digital PR, link building, med
 
       } else if (source === "designrush") {
         try {
-          const ddgQuery = `site:designrush.com/agency ${industry !== "Any" && industry ? industry : (keyword || "digital agency")}`.trim();
-          const liveSnippets = await searchDuckDuckGo(ddgQuery, proxyConfig);
-          if (liveSnippets && liveSnippets.length > 200) {
-            rawContent = liveSnippets;
+          const regionList = Array.isArray(regions) && regions.length > 0 ? regions : ["US", "UK"];
+          const queries = [
+            `site:designrush.com/agency ${industry !== "Any" && industry ? industry : (keyword || "digital agency")}`,
+          ];
+          if (regionList.includes("UK") || regionList.includes("Europe")) {
+            queries.push(`site:designrush.com/agency ${keyword || "agency"} "UK" OR "London"`);
+          }
+
+          const results = await Promise.all(queries.map(q => searchDuckDuckGo(q, proxyConfig).catch(() => "")));
+          const combined = results.filter(Boolean).join("\n\n---\n\n");
+          if (combined && combined.length > 200) {
+            rawContent = combined;
           } else {
             const scraped = await scrapeUrl("https://www.designrush.com/agency/digital-marketing", proxyConfig);
             rawContent = scraped.content.length > 200 ? `${scraped.title}\n\n${scraped.content}`.slice(0, 8000) : CLUTCH_AGENCIES_DATA;
@@ -2872,45 +2908,48 @@ Prism Outreach & PR | https://prismoutreach.com | Digital PR, link building, med
         ? `\nCRITICAL: DO NOT return any of the following companies because they are ALREADY saved in the CRM: ${exclude_companies.slice(0, 50).join(", ")}.`
         : "";
 
-      const filters = [
-        industry && industry !== "Any" ? `Industry filter: ${industry}` : null,
-        keyword ? `Keyword filter: only companies related to "${keyword}"` : null,
-        team_size ? `Team size criteria: ${team_size}` : null,
-      ].filter(Boolean).join(". ");
+      const minH = min_headcount || 5;
+      const maxH = max_headcount || 30;
+      const regionList = Array.isArray(regions) && regions.length > 0 ? regions : ["US", "UK"];
+      const titles = Array.isArray(target_titles) && target_titles.length > 0 ? target_titles : ["Founder", "Co-Founder", "CEO", "Managing Director", "Owner"];
 
-      const systemPrompt = `You are an elite B2B sales intelligence researcher. Extract target company leads matching the ICP criteria from the provided directory and launch content (${sourceLabel}).
-If the scraped content is brief or partial, identify authentic, real-world operating companies that fit the specific ICP (${industry || "Technology"}, ${keyword || "target niche"}, ${team_size || "small team"}).
-CRITICAL: ONLY return authentic operating businesses with real domains. Do NOT invent fake or placeholder companies.`;
+      const systemPrompt = `You are an elite B2B sales intelligence researcher for Atlas Acquisition OS.
+Extract target company leads strictly matching the user's ICP criteria from the directory and launch content (${sourceLabel}).
+
+CRITICAL EXECUTIVE QUALIFICATION RULES:
+1. STRICT HEADCOUNT BOUNDS: Only return companies with approximately ${minH} to ${maxH} employees. STRICTLY REJECT any companies with 50+, 100+, or 200+ employees.
+2. REGIONAL BALANCE: Surface prospects from the requested regions (${regionList.join(", ")}).
+3. NAMED EXECUTIVE ONLY: You MUST identify an actual person by name who holds one of these roles: ${titles.join(", ")}. Examples: 'Gabriel Shaoolian, Founder & CEO' or 'Dan Salganik, Co-Founder'. DO NOT output placeholder text like 'Founder & Executive' or 'Decision Maker'.
+4. REAL CORPORATE EMAIL: Provide a realistic corporate email address based on their real name and domain (e.g. 'firstname.lastname@domain.com' or 'firstname@domain.com').
+5. AUTHENTIC COMPANIES ONLY: ONLY return authentic operating businesses with real domains. Do NOT invent fake companies.`;
 
       const userPrompt = `TARGET ICP CRITERIA:
 - Target Industry/Niche: ${industry && industry !== "Any" ? industry : (keyword || "Target Niche")}
 - Specific Focus: ${keyword || "High-growth businesses and agencies"}
-- Team Size: ${team_size || "5 to 30 employees"}
-- Location: English-speaking (US, UK, Canada, Australia, Europe) unless specified
-- ${filters || "Prioritize companies matching the ICP criteria."}${excludeFilter}
+- Team Size: Strictly ${minH} to ${maxH} employees (NO companies above ${maxH})
+- Target Regions: ${regionList.join(", ")}
+- Decision Maker Roles: ${titles.join(", ")}
+- Value Trigger / Bottleneck: ${hypothesis || "Operational bottlenecks, client delivery velocity, and outbound pipeline opportunities"}
+${excludeFilter}
 
 DIRECTORY / LAUNCH CONTENT:
-${rawContent.slice(0, 6000)}
+${rawContent.slice(0, 7500)}
 
-Extract up to 12 distinct REAL companies matching this ICP profile. For each return:
-- organization_name: company name
-- primary_domain: URL if found, else clean website domain
-- description: 1-2 sentences about their core services and likely operational bottlenecks (e.g. client reporting, onboarding, delivery velocity)
-- industry: "${industry && industry !== "Any" ? industry : "Technology"}"
-- team_size: estimated size (e.g. "${team_size || "10-25 employees"}")
-- location: city/country if mentioned, else ""
-- source: "${sourceLabel}"
-
+Extract up to 15 distinct REAL companies matching this ICP profile.
 Respond ONLY as a JSON object with a single key "leads":
 {
   "leads": [
     {
       "organization_name": "Company Name",
       "primary_domain": "https://example.com",
-      "description": "Full service agency or startup...",
-      "industry": "${industry && industry !== "Any" ? industry : "Technology"}",
-      "team_size": "${team_size || "10-25 employees"}",
+      "description": "Full service digital or creative agency...",
+      "founder_name": "Real Executive Name",
+      "founder_role": "Founder & CEO",
+      "founder_email": "name@example.com",
+      "industry": "${industry && industry !== "Any" ? industry : "Marketing & Advertising"}",
+      "team_size": "${minH}-${maxH} employees",
       "location": "City, Country",
+      "bottleneck": "Operational bottlenecks in delivery velocity and client reporting",
       "source": "${sourceLabel}"
     }
   ]

@@ -59,11 +59,14 @@ const App = () => (
                   <Route path="/objectives" element={<ObjectivesStudio />} />
                   <Route path="/workspace" element={<CommandFeed />} />
                   <Route path="/command" element={<CommandFeed />} />
+                  <Route path="/engine" element={<CommandFeed />} />
 
                   {/* ── Sovereign Pipeline Flow ────────────────────────────── */}
                   <Route path="/hq">
                     <Route index element={<Navigate to="/hq/radar" replace />} />
                     <Route path="radar" element={<HqRadar />} />
+                    <Route path="engine" element={<CommandFeed />} />
+                    <Route path="command" element={<CommandFeed />} />
                     <Route path="dashboard" element={<HqDashboard />} />
                     <Route path="partnerships" element={<HqPartnerships />} />
                     <Route path="team" element={<HqTeam />} />
