@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import type { VideoClipAsset, Asset, VideoTrackItem } from "../../types/assets";
+import { analyzeAudioEnergy } from "../../lib/audioAnalyser";
 
 interface VideoCanvasProps {
   trackItems: VideoTrackItem[];
@@ -44,6 +45,10 @@ export function VideoCanvas({
   const [zoom, setZoom] = useState(1);
   const [showSwapDrawer, setShowSwapDrawer] = useState(false);
   const [showCaptionsOverlay, setShowCaptionsOverlay] = useState(true);
+  const [captionStripMode, setCaptionStripMode] = useState<"none" | "punch_in" | "blur_mask">("none");
+  const [isVoiceMuted, setIsVoiceMuted] = useState(false);
+  const [isMusicMuted, setIsMusicMuted] = useState(false);
+  const [waveformSamples, setWaveformSamples] = useState<number[]>([]);
   const [isReassembling, setIsReassembling] = useState(false);
   const [videoError, setVideoError] = useState(false);
 
@@ -106,6 +111,28 @@ export function VideoCanvas({
       videoElemRef.current.pause();
     }
   }, [isPlaying]);
+
+  // Real Audio Waveform Analyzer
+  useEffect(() => {
+    if (!currentVideoSrc) return;
+    let active = true;
+    analyzeAudioEnergy(currentVideoSrc)
+      .then((res) => {
+        if (active && res.waveformSamples.length > 0) {
+          setWaveformSamples(res.waveformSamples);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [currentVideoSrc]);
+
+  // Audio track muting sync
+  useEffect(() => {
+    if (!videoElemRef.current) return;
+    videoElemRef.current.muted = isVoiceMuted && isMusicMuted;
+  }, [isVoiceMuted, isMusicMuted]);
 
   const handleLoadFile = (file: File) => {
     const url = URL.createObjectURL(file);
@@ -401,7 +428,14 @@ export function VideoCanvas({
             <video
               ref={videoElemRef}
               src={currentVideoSrc}
-              style={{ maxHeight: "calc(100vh - 350px)", maxWidth: "100%", display: "block" }}
+              style={{
+                maxHeight: "calc(100vh - 350px)",
+                maxWidth: "100%",
+                display: "block",
+                transform: captionStripMode === "punch_in" ? "scale(1.22) translateY(-7%)" : "none",
+                transformOrigin: "center 35%",
+                transition: "transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+              }}
               onClick={onTogglePlay}
               onError={() => setVideoError(true)}
               onTimeUpdate={(e) => {
@@ -412,6 +446,27 @@ export function VideoCanvas({
               }}
               onEnded={() => onTogglePlay()}
             />
+
+            {/* Studio Blur Matte (Caption Stripping Mode: Blur Mask) */}
+            {captionStripMode === "blur_mask" && (
+              <div style={{
+                position: "absolute",
+                bottom: "10%", left: "6%", right: "6%", height: "18%",
+                background: "rgba(10, 11, 14, 0.82)",
+                backdropFilter: "blur(24px)",
+                WebkitBackdropFilter: "blur(24px)",
+                borderRadius: 12,
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+                pointerEvents: "none",
+                zIndex: 8,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <span style={{ fontSize: 10, color: "rgba(255, 255, 255, 0.5)", fontFamily: "Space Mono, monospace", letterSpacing: "0.05em" }}>
+                  [BURNT-IN CAPTION SUPPRESSED · STUDIO MATTE ACTIVE]
+                </span>
+              </div>
+            )}
 
             {/* Kinetic Caption Overlay */}
             {showCaptionsOverlay && activeItem?.scriptText && (
@@ -624,6 +679,22 @@ export function VideoCanvas({
             💬 Captions {showCaptionsOverlay ? "ON" : "OFF"}
           </button>
 
+          {/* Caption Stripping Mode (Punch-In Crop / Studio Matte / Off) */}
+          <button
+            onClick={() => setCaptionStripMode(m => m === "none" ? "punch_in" : m === "punch_in" ? "blur_mask" : "none")}
+            style={{
+              display: "flex", alignItems: "center", gap: 5,
+              padding: "4px 10px", borderRadius: 7,
+              background: captionStripMode !== "none" ? "rgba(244,63,94,0.12)" : "var(--surface)",
+              border: `1px solid ${captionStripMode !== "none" ? "rgba(244,63,94,0.4)" : "var(--border)"}`,
+              color: captionStripMode !== "none" ? "#F43F5E" : "var(--text-muted)", fontSize: 11, fontWeight: 600,
+              cursor: "pointer",
+            }}
+            title="Strip burnt-in pixel captions: Punch-in zoom crop (cuts lower 22% subtitle zone) or studio blur matte"
+          >
+            {captionStripMode === "punch_in" ? "✂️ Strip (Punch-In)" : captionStripMode === "blur_mask" ? "🌫️ Strip (Matte)" : "🚫 Strip Off"}
+          </button>
+
           <div style={{ width: 1, height: 16, background: "var(--border)" }} />
 
           {/* Save Asset Pack to Reference Library */}
@@ -721,11 +792,25 @@ export function VideoCanvas({
             </div>
             {/* Track 2: Voice Track */}
             <div style={{ height: 38, borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", padding: "0 8px", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 9, color: "var(--emerald)", fontWeight: 700, fontFamily: "Space Mono, monospace" }}>🎙️ VOICE</span>
+              <span style={{ fontSize: 9, color: isVoiceMuted ? "var(--text-muted)" : "var(--emerald)", fontWeight: 700, fontFamily: "Space Mono, monospace" }}>🎙️ VOICE</span>
+              <button
+                onClick={() => setIsVoiceMuted(!isVoiceMuted)}
+                title={isVoiceMuted ? "Unmute Voice Track" : "Mute Voice Track"}
+                style={{ background: "none", border: "none", cursor: "pointer", fontSize: 10, padding: 0, opacity: isVoiceMuted ? 0.4 : 0.9 }}
+              >
+                {isVoiceMuted ? "🔇" : "🔊"}
+              </button>
             </div>
             {/* Track 3: Music Bed */}
             <div style={{ height: 38, borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", padding: "0 8px", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 9, color: "var(--accent)", fontWeight: 700, fontFamily: "Space Mono, monospace" }}>🎵 MUSIC</span>
+              <span style={{ fontSize: 9, color: isMusicMuted ? "var(--text-muted)" : "var(--accent)", fontWeight: 700, fontFamily: "Space Mono, monospace" }}>🎵 MUSIC</span>
+              <button
+                onClick={() => setIsMusicMuted(!isMusicMuted)}
+                title={isMusicMuted ? "Unmute Music Bed" : "Mute Music Bed"}
+                style={{ background: "none", border: "none", cursor: "pointer", fontSize: 10, padding: 0, opacity: isMusicMuted ? 0.4 : 0.9 }}
+              >
+                {isMusicMuted ? "🔇" : "🔊"}
+              </button>
             </div>
             {/* Track 4: Captions */}
             <div style={{ height: 36, display: "flex", alignItems: "center", padding: "0 8px" }}>
@@ -860,6 +945,13 @@ export function VideoCanvas({
               <div style={{ height: 38, borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", padding: "0 6px", gap: 4, background: "rgba(16,185,129,0.03)" }}>
                 {trackItems.map((item) => {
                   const widthPct = Math.max(4, (item.duration / effectiveDuration) * 100);
+                  const totalBars = waveformSamples.length > 0 ? waveformSamples.length : 60;
+                  const startIdx = Math.floor(((item.startTime || 0) / effectiveDuration) * totalBars);
+                  const endIdx = Math.ceil(((item.endTime || item.duration) / effectiveDuration) * totalBars);
+                  const itemSamples = waveformSamples.length > 0
+                    ? waveformSamples.slice(startIdx, Math.max(startIdx + 8, endIdx))
+                    : [0.3, 0.6, 0.9, 0.4, 0.7, 0.5, 0.8, 0.4, 0.6, 0.2];
+
                   return (
                     <div
                       key={`voice_${item.id}`}
@@ -867,21 +959,37 @@ export function VideoCanvas({
                         width: `${widthPct}%`,
                         height: 28,
                         borderRadius: 6,
-                        background: "rgba(16,185,129,0.12)",
-                        border: "1px solid rgba(16,185,129,0.3)",
+                        background: isVoiceMuted ? "rgba(100,116,139,0.08)" : "rgba(16,185,129,0.12)",
+                        border: `1px solid ${isVoiceMuted ? "rgba(100,116,139,0.2)" : "rgba(16,185,129,0.3)"}`,
                         display: "flex",
                         alignItems: "center",
                         padding: "0 6px",
                         gap: 3,
                         overflow: "hidden",
+                        opacity: isVoiceMuted ? 0.35 : 1,
+                        transition: "opacity 0.2s",
                       }}
                       title="Clean Speech Audio (Isolated Vocals)"
                     >
-                      <span style={{ fontSize: 8, color: "var(--emerald)", fontWeight: 700 }}>🎙️ Speech</span>
-                      <div style={{ display: "flex", alignItems: "center", gap: 1.5, flex: 1, opacity: 0.6 }}>
-                        {[8, 14, 20, 12, 16, 22, 10, 18, 14, 6, 12, 18, 22, 8].map((h, i) => (
-                          <div key={i} style={{ width: 2, height: h, background: "var(--emerald)", borderRadius: 1 }} />
-                        ))}
+                      <span style={{ fontSize: 8, color: isVoiceMuted ? "var(--text-muted)" : "var(--emerald)", fontWeight: 700, flexShrink: 0 }}>🎙️ Speech</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 1.5, flex: 1, height: "100%", padding: "4px 0" }}>
+                        {itemSamples.map((sample, sIdx) => {
+                          const barH = Math.max(4, Math.min(22, sample * 24));
+                          return (
+                            <div
+                              key={sIdx}
+                              style={{
+                                flex: 1,
+                                minWidth: 1.5,
+                                maxWidth: 3,
+                                height: barH,
+                                background: isVoiceMuted ? "var(--text-muted)" : "var(--emerald)",
+                                borderRadius: 1,
+                                opacity: 0.85
+                              }}
+                            />
+                          );
+                        })}
                       </div>
                     </div>
                   );
@@ -894,17 +1002,19 @@ export function VideoCanvas({
                   width: "100%",
                   height: 28,
                   borderRadius: 6,
-                  background: "rgba(99,102,241,0.12)",
-                  border: "1px solid rgba(99,102,241,0.3)",
+                  background: isMusicMuted ? "rgba(100,116,139,0.08)" : "rgba(99,102,241,0.12)",
+                  border: `1px solid ${isMusicMuted ? "rgba(100,116,139,0.2)" : "rgba(99,102,241,0.3)"}`,
                   display: "flex",
                   alignItems: "center",
                   padding: "0 10px",
                   gap: 6,
+                  opacity: isMusicMuted ? 0.35 : 1,
+                  transition: "opacity 0.2s",
                 }}>
-                  <span style={{ fontSize: 8, color: "var(--accent)", fontWeight: 700 }}>🎵 Soundtrack (Ambient Bed)</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: 2, flex: 1, opacity: 0.5 }}>
+                  <span style={{ fontSize: 8, color: isMusicMuted ? "var(--text-muted)" : "var(--accent)", fontWeight: 700 }}>🎵 Soundtrack (Ambient Bed)</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 2, flex: 1, opacity: isMusicMuted ? 0.2 : 0.5 }}>
                     {Array.from({ length: 30 }).map((_, i) => (
-                      <div key={i} style={{ width: 3, height: (i % 3 === 0 ? 16 : 8), background: "var(--accent)", borderRadius: 1 }} />
+                      <div key={i} style={{ width: 3, height: (i % 3 === 0 ? 16 : 8), background: isMusicMuted ? "var(--text-muted)" : "var(--accent)", borderRadius: 1 }} />
                     ))}
                   </div>
                 </div>

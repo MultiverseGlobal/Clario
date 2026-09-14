@@ -69,13 +69,13 @@ export async function checkServerHealth(): Promise<boolean> {
   // 2. Try current configured API base (Render cloud by default)
   try {
     const currentBase = getApiBase();
-    const res = await fetch(`${currentBase}/health`, { signal: AbortSignal.timeout(4000) });
+    const res = await fetch(`${currentBase}/api/v1/health`, { signal: AbortSignal.timeout(12000) });
     if (res.ok) return true;
   } catch {}
 
   // 3. Fallback check to production Render backend
   try {
-    const prodRes = await fetch(`${RENDER_PROD_URL}/api/v1/health`, { signal: AbortSignal.timeout(4000) });
+    const prodRes = await fetch(`${RENDER_PROD_URL}/api/v1/health`, { signal: AbortSignal.timeout(12000) });
     if (prodRes.ok) {
       memoryApiBase = RENDER_PROD_URL;
       return true;
