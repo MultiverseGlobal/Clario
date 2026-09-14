@@ -182,8 +182,20 @@ export function VideoCanvas({
     if (!rulerRef.current || !effectiveDuration) return;
     const rect = rulerRef.current.getBoundingClientRect();
     const frac = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    onSeek(frac * effectiveDuration);
-  }, [effectiveDuration, onSeek]);
+    const targetTime = frac * effectiveDuration;
+
+    // Magnetic snapping: snap to track item boundaries within 0.25s
+    let acc = 0;
+    const snapPoints: number[] = [0];
+    for (const item of trackItems) {
+      acc += item.duration;
+      snapPoints.push(acc);
+    }
+    const closestSnap = snapPoints.find(pt => Math.abs(pt - targetTime) <= 0.25);
+    const finalTime = closestSnap !== undefined ? closestSnap : targetTime;
+
+    onSeek(parseFloat(finalTime.toFixed(1)));
+  }, [effectiveDuration, onSeek, trackItems]);
 
   // ── "Try Again & Make Better" Dopamine Re-Assembly ─────────────────────────
   const handleReassembleDopamine = () => {
@@ -468,35 +480,67 @@ export function VideoCanvas({
               </div>
             )}
 
-            {/* Kinetic Caption Overlay */}
-            {showCaptionsOverlay && activeItem?.scriptText && (
-              <div style={{
-                position: "absolute",
-                bottom: 36, left: 20, right: 20,
-                display: "flex", justifyContent: "center",
-                pointerEvents: "none", zIndex: 10,
-              }}>
+            {/* Kinetic Karaoke Caption Overlay */}
+            {showCaptionsOverlay && activeItem?.scriptText && (() => {
+              const words = activeItem.scriptText.split(/\s+/).filter(Boolean);
+              const dur = Math.max(activeItem.duration || 1, 0.1);
+              const currentWordIdx = words.length > 0
+                ? Math.min(words.length - 1, Math.floor((timeInItem / dur) * words.length))
+                : -1;
+              return (
                 <div style={{
-                  background: "rgba(0, 0, 0, 0.75)",
-                  backdropFilter: "blur(8px)",
-                  border: "1px solid rgba(255, 255, 255, 0.15)",
-                  borderRadius: 10,
-                  padding: "8px 16px",
-                  maxWidth: "90%",
-                  textAlign: "center",
+                  position: "absolute",
+                  bottom: captionStripMode === "punch_in" ? 48 : 36,
+                  left: 16, right: 16,
+                  display: "flex", justifyContent: "center",
+                  pointerEvents: "none", zIndex: 10,
+                  transition: "bottom 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
                 }}>
-                  <span style={{
-                    color: "#FFFFFF",
-                    fontSize: 15,
-                    fontWeight: 700,
-                    fontFamily: "var(--font-sans)",
-                    letterSpacing: "-0.01em",
+                  <div style={{
+                    background: "rgba(7, 8, 12, 0.82)",
+                    backdropFilter: "blur(12px)",
+                    WebkitBackdropFilter: "blur(12px)",
+                    border: "1px solid rgba(255, 255, 255, 0.14)",
+                    borderRadius: 12,
+                    padding: "8px 18px",
+                    maxWidth: "92%",
+                    textAlign: "center",
+                    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.6)",
+                    display: "flex",
+                    flexWrap: "wrap",
+                    justifyContent: "center",
+                    gap: "4px 7px",
                   }}>
-                    {activeItem.scriptText}
-                  </span>
+                    {words.map((word, wIdx) => {
+                      const isActive = wIdx === currentWordIdx;
+                      const isPast = wIdx < currentWordIdx;
+                      return (
+                        <span
+                          key={wIdx}
+                          style={{
+                            display: "inline-block",
+                            fontFamily: "var(--font-sans, Inter, sans-serif)",
+                            fontWeight: 800,
+                            fontSize: isActive ? 16 : 14,
+                            letterSpacing: "-0.015em",
+                            color: isActive
+                              ? "#FBBF24"
+                              : isPast
+                              ? "#FFFFFF"
+                              : "rgba(255, 255, 255, 0.55)",
+                            transform: isActive ? "scale(1.12) translateY(-1px)" : "scale(1)",
+                            textShadow: isActive ? "0 0 14px rgba(251, 191, 36, 0.8)" : "none",
+                            transition: "all 0.12s cubic-bezier(0.34, 1.56, 0.64, 1)",
+                          }}
+                        >
+                          {word}
+                        </span>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Play Button Overlay (when paused) */}
             {!isPlaying && (
