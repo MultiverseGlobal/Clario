@@ -47,7 +47,7 @@ export function ProofEngineModal({
     setLoading(true);
     
     try {
-      const { data, error } = await supabase.functions.invoke("sourcing-machine", {
+      const { data, error } = await invokeSourcingMachine( {
         body: {
           action: "generate-proof",
           company: companyName,
@@ -174,7 +174,8 @@ export function ProofEngineModal({
                   className="h-7 text-xs gap-1 border-border/60"
                   onClick={() =>
                     copyToClipboard(
-                      `[HOOK]\n${proof.loomScript.hook}\n\n[DIAGNOSIS]\n${proof.loomScript.diagnosis}\n\n[PROOF DEMO]\n${proof.loomScript.proofDemo}\n\n[CALL TO ACTION]\n${proof.loomScript.callToAction}`,
+                      `[HOOK]\import { invokeSourcingMachine } from "@/lib/sourcingMachineProxy";
+n${proof.loomScript.hook}\n\n[DIAGNOSIS]\n${proof.loomScript.diagnosis}\n\n[PROOF DEMO]\n${proof.loomScript.proofDemo}\n\n[CALL TO ACTION]\n${proof.loomScript.callToAction}`,
                       "full_script"
                     )
                   }

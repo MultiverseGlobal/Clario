@@ -17,6 +17,8 @@ interface VideoCanvasProps {
   onSaveAssetPack?: () => void;
   onMakeNewVideo?: () => void;
   projectName?: string;
+  targetPurpose?: 'sales_outreach' | 'content_creator';
+  category?: 'sales' | 'content';
 }
 
 function pad(n: number) { return String(Math.floor(n)).padStart(2, "0"); }
@@ -40,8 +42,9 @@ const BEAT_COLORS: Record<string, { bg: string; border: string; badge: string; t
 export function VideoCanvas({
   trackItems, assets, videoUrl, duration, currentTime,
   isPlaying, selectedItemId, onChange, onSeek, onTogglePlay, onSelectItem,
-  onSaveAssetPack, onMakeNewVideo, projectName,
+  onSaveAssetPack, onMakeNewVideo, projectName, targetPurpose, category,
 }: VideoCanvasProps) {
+  const isSalesOutreach = targetPurpose === 'sales_outreach' || category === 'sales';
   const [zoom, setZoom] = useState(1);
   const [showSwapDrawer, setShowSwapDrawer] = useState(false);
   const [showCaptionsOverlay, setShowCaptionsOverlay] = useState(true);
@@ -201,50 +204,86 @@ export function VideoCanvas({
 
   // ── "Try Again & Make Better" Dopamine Re-Assembly ─────────────────────────
   const handleReassembleDopamine = () => {
-    if (trackItems.length === 0 || clipAssets.length === 0) return;
+    if (trackItems.length === 0) return;
     setIsReassembling(true);
 
     setTimeout(() => {
-      let offset = 0;
-      const bRollClips = clipAssets.filter(c => (c.sourceFileIndex ?? 0) > 0);
-      const aRollClips = clipAssets.filter(c => (c.sourceFileIndex ?? 0) === 0);
+      const videoTracks = trackItems.filter(t => t.type === 'video');
+      const audioTracks = trackItems.filter(t => t.type === 'audio');
 
-      const reassembled = trackItems.map((item, idx) => {
-        let chosenClip: VideoClipAsset;
-
-        if (item.beatType === "dopamine" && bRollClips.length > 0) {
-          chosenClip = bRollClips[Math.floor(Math.random() * bRollClips.length)];
-        } else if (bRollClips.length > 0 && idx % 2 === 1) {
-          chosenClip = bRollClips[Math.floor(Math.random() * bRollClips.length)];
-        } else if (aRollClips.length > 0) {
-          chosenClip = aRollClips[Math.floor(Math.random() * aRollClips.length)];
-        } else {
-          chosenClip = clipAssets[Math.floor(Math.random() * clipAssets.length)];
+      // Sort video tracks by dopamineScore descending
+      const sortedByDopamine = [...videoTracks].sort((a, b) => (b.dopamineScore || 5) - (a.dopamineScore || 5));
+      
+      // Extract beat types
+      const hooks = sortedByDopamine.filter(t => t.beatType === 'hook');
+      const bestHook = hooks.length > 0 ? hooks[0] : sortedByDopamine[0];
+      
+      const problems = sortedByDopamine.filter(t => t.beatType === 'problem' && t.id !== bestHook?.id);
+      const proofs = sortedByDopamine.filter(t => (t.beatType === 'proof' || t.beatType === 'b_roll' || t.isBroll) && t.id !== bestHook?.id);
+      const ctas = sortedByDopamine.filter(t => t.beatType === 'cta' && t.id !== bestHook?.id);
+      
+      // Assemble new sequence
+      const newVideoSequence: VideoTrackItem[] = [];
+      if (bestHook) newVideoSequence.push(bestHook);
+      
+      if (isSalesOutreach) {
+        // Sales Conversion Arc: Hook -> Problem Pain-Point -> Product Demonstration -> Next Steps CTA
+        if (problems.length > 0) newVideoSequence.push(problems[0]);
+        for (const pr of proofs) {
+          newVideoSequence.push(pr);
         }
-
-        const dur = item.duration;
-        const inPt = chosenClip.startTime || 0;
-
+        for (let i = 1; i < problems.length; i++) {
+          newVideoSequence.push(problems[i]);
+        }
+        if (ctas.length > 0) newVideoSequence.push(ctas[0]);
+      } else {
+        // TikTok / Viral Content Arc: Fast interleaving of A-roll and B-roll
+        let pIdx = 0, prIdx = 0;
+        while (newVideoSequence.length < videoTracks.length) {
+          if (pIdx < problems.length) newVideoSequence.push(problems[pIdx++]);
+          if (prIdx < proofs.length) newVideoSequence.push(proofs[prIdx++]);
+          if (pIdx >= problems.length && prIdx >= proofs.length) break;
+        }
+        if (ctas.length > 0) newVideoSequence.push(ctas[0]);
+      }
+      
+      // Add any remaining
+      const usedIds = new Set(newVideoSequence.map(t => t.id));
+      for (const t of sortedByDopamine) {
+        if (!usedIds.has(t.id)) newVideoSequence.push(t);
+      }
+      
+      // Recalculate start times and enforce intelligent pacing
+      let offset = 0;
+      const reassembled = newVideoSequence.map((item) => {
+        let idealDur = item.duration;
+        if (isSalesOutreach) {
+          // B2B Sales Pacing: Natural conversational delivery so prospects absorb the pitch
+          if (item.beatType === 'hook') idealDur = Math.max(item.duration, 4.0);
+          else if (item.beatType === 'problem') idealDur = Math.max(item.duration, 5.5);
+          else if (item.beatType === 'cta') idealDur = Math.max(item.duration, 4.0);
+          else idealDur = item.duration;
+        } else {
+          // TikTok pacing rules: rapid dopamine cuts
+          if (item.beatType === 'hook') idealDur = Math.min(item.duration, 1.5);
+          else if (item.isBroll || item.beatType === 'b_roll') idealDur = Math.min(item.duration, 1.2);
+          else idealDur = Math.min(item.duration, 2.5);
+        }
+        
         const updated: VideoTrackItem = {
           ...item,
-          assetId: chosenClip.id,
           startTime: offset,
-          thumbnail: chosenClip.thumbnail,
-          videoUrl: chosenClip.blobUrl || item.videoUrl,
-          sourceFileName: chosenClip.sourceFileName || item.sourceFileName,
-          sourceFileIndex: chosenClip.sourceFileIndex ?? 0,
-          inPoint: inPt,
-          outPoint: inPt + dur,
-          isBroll: (chosenClip.sourceFileIndex ?? 0) > 0,
+          duration: idealDur,
+          inPoint: item.inPoint || 0,
+          outPoint: (item.inPoint || 0) + idealDur,
         };
-
-        offset += dur;
+        offset += idealDur;
         return updated;
       });
 
-      onChange(reassembled);
+      onChange([...reassembled, ...audioTracks]);
       setIsReassembling(false);
-    }, 400);
+    }, 600);
   };
 
   // ── Swap footage for selected beat ─────────────────────────────────────────
@@ -396,33 +435,93 @@ export function VideoCanvas({
 
   const selectedItem = trackItems.find(i => i.id === selectedItemId);
 
-  // ── Export Video Pipeline ───────────────────────────────────────────────────
+  // ── Cloud Rendering Engine (FFmpeg on Modal) ────────────────────────────────
   const handleExportVideo = async () => {
     if (!currentVideoSrc) return;
     setIsExporting(true);
-    setExportProgress(15);
+    setExportProgress(10);
 
     try {
       const safeName = (projectName || "clario_export").replace(/[^a-z0-9]/gi, "_").toLowerCase();
-      setExportProgress(45);
+      const apiBase = import.meta.env.VITE_AI_ENGINE_BASE || 'https://multiverseglobals--clario-ai-engine-fastapi-app.modal.run';
+      
+      const videoTracks = trackItems.filter(t => t.type === 'video');
+      const audioTracks = trackItems.filter(t => t.type === 'audio');
 
-      let blob: Blob | null = null;
-      try {
-        const res = await fetch(currentVideoSrc);
-        if (res.ok) {
-          blob = await res.blob();
+      // 1. Prepare timeline Edit Decision List (EDL)
+      const edl = {
+        projectName: safeName,
+        clips: videoTracks.map(t => ({
+          url: t.videoUrl || t.url || currentVideoSrc,
+          inPoint: t.inPoint ?? t.startTime,
+          outPoint: t.outPoint ?? ((t.inPoint ?? t.startTime) + t.duration),
+          duration: t.duration,
+          startTime: t.startTime,
+          beatType: t.beatType,
+          sourceType: t.sourceType || 'uploaded',
+        })),
+        audioTracks: audioTracks.map(a => ({
+          url: a.audioUrl || a.url,
+          volume: 1.0,
+          startTime: a.startTime,
+          duration: a.duration,
+        }))
+      };
+
+      setExportProgress(25);
+
+      // 2. Fetch source blob if local blob URL
+      let videoBlob: Blob | null = null;
+      if (currentVideoSrc.startsWith('blob:') || currentVideoSrc.startsWith('data:')) {
+        try {
+          const res = await fetch(currentVideoSrc);
+          if (res.ok) videoBlob = await res.blob();
+        } catch (e) {
+          console.warn("Could not fetch local video blob for upload:", e);
         }
-      } catch (e) {
-        console.warn("Direct blob fetch fallback:", e);
       }
 
+      setExportProgress(45);
+
+      // 3. Dispatch to Modal Cloud FFmpeg Rendering Engine
+      const formData = new FormData();
+      formData.append('timeline_edl', JSON.stringify(edl));
+      if (videoBlob) {
+        formData.append('file', videoBlob, `${safeName}.mp4`);
+      }
+
+      setExportProgress(65);
+
+      const renderRes = await fetch(`${apiBase}/render-timeline`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (renderRes.ok) {
+        setExportProgress(90);
+        const data = await renderRes.json();
+        if (data.rendered_url) {
+          // Download the cloud-rendered MP4 video!
+          const link = document.createElement("a");
+          link.href = data.rendered_url;
+          link.download = data.filename || `${safeName}.mp4`;
+          link.target = "_blank";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          setExportProgress(100);
+          return;
+        }
+      }
+
+      // Graceful fallback if cloud render was offline
+      console.warn("Cloud render endpoint did not return 200, using direct local download fallback");
       setExportProgress(85);
-      if (blob) {
-        const ext = blob.type.includes("mp4") ? "mp4" : "webm";
-        const downloadUrl = URL.createObjectURL(blob);
+      if (videoBlob) {
+        const downloadUrl = URL.createObjectURL(videoBlob);
         const a = document.createElement("a");
         a.href = downloadUrl;
-        a.download = `${safeName}.${ext}`;
+        a.download = `${safeName}.mp4`;
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -430,7 +529,7 @@ export function VideoCanvas({
       } else {
         const a = document.createElement("a");
         a.href = currentVideoSrc;
-        a.download = `${safeName}.webm`;
+        a.download = `${safeName}.mp4`;
         a.target = "_blank";
         document.body.appendChild(a);
         a.click();
@@ -439,12 +538,12 @@ export function VideoCanvas({
       setExportProgress(100);
     } catch (err) {
       console.error("Export failed:", err);
-      alert("Failed to export video. Please ensure video source is valid.");
+      alert("Failed to render video on Cloud Engine. Falling back to preview.");
     } finally {
       setTimeout(() => {
         setIsExporting(false);
         setExportProgress(0);
-      }, 800);
+      }, 1000);
     }
   };
 
@@ -463,7 +562,7 @@ export function VideoCanvas({
         style={{
           flex: 1,
           minHeight: 0,
-          background: "var(--base)",
+          background: "#0A0B0E",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -729,6 +828,19 @@ export function VideoCanvas({
 
           <div style={{ width: 1, height: 16, background: "var(--border)" }} />
 
+          {/* Engine Mode Indicator Badge */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 5,
+            padding: "3px 8px", borderRadius: 6,
+            background: isSalesOutreach ? "rgba(245,158,11,0.12)" : "rgba(168,85,247,0.12)",
+            border: `1px solid ${isSalesOutreach ? "rgba(245,158,11,0.3)" : "rgba(168,85,247,0.3)"}`,
+            color: isSalesOutreach ? "#FBBF24" : "#C084FC",
+            fontSize: 10, fontFamily: "Space Mono, monospace", fontWeight: 700,
+            textTransform: "uppercase", letterSpacing: "0.04em"
+          }}>
+            <span>{isSalesOutreach ? "🎯 Sales Outbound Arc" : "⚡ Viral Dopamine Arc"}</span>
+          </div>
+
           {/* AI Re-Assemble / Try Again Action */}
           <button
             onClick={handleReassembleDopamine}
@@ -736,13 +848,14 @@ export function VideoCanvas({
             style={{
               display: "flex", alignItems: "center", gap: 6,
               padding: "4px 12px", borderRadius: 7,
-              background: "var(--emerald-dim)", border: "1px solid rgba(16,185,129,0.3)",
-              color: "var(--emerald)", fontSize: 11, fontWeight: 600,
+              background: isSalesOutreach ? "rgba(245,158,11,0.15)" : "var(--emerald-dim)",
+              border: `1px solid ${isSalesOutreach ? "rgba(245,158,11,0.35)" : "rgba(16,185,129,0.3)"}`,
+              color: isSalesOutreach ? "#FBBF24" : "var(--emerald)", fontSize: 11, fontWeight: 600,
               cursor: isReassembling || trackItems.length === 0 ? "default" : "pointer",
             }}
-            title="Automatically re-times and swaps clips for high engagement flow"
+            title={isSalesOutreach ? "Re-orders narrative for high B2B sales conversion (Hook -> Problem -> Proof -> CTA)" : "Automatically re-times and swaps clips for high engagement flow"}
           >
-            {isReassembling ? "⚡ Re-Cutting Narrative…" : "✦ Auto Re-Cut"}
+            {isReassembling ? "⚡ Re-Cutting Narrative…" : isSalesOutreach ? "✦ Optimize Sales Arc" : "✦ Auto Re-Cut"}
           </button>
 
           {/* Swap Footage Drawer Trigger */}
@@ -1032,11 +1145,11 @@ export function VideoCanvas({
                           />
                         )}
 
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", zIndex: 2 }}>
-                          <span style={{ fontSize: 8, fontWeight: 800, textTransform: "uppercase", color: beatStyle.badge }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", zIndex: 2, whiteSpace: "nowrap", overflow: "hidden" }}>
+                          <span style={{ fontSize: 8, fontWeight: 800, textTransform: "uppercase", color: beatStyle.badge, overflow: "hidden", textOverflow: "ellipsis" }}>
                             {item.beatType?.toUpperCase() || "SCENE"}
                           </span>
-                          <span style={{ fontSize: 8, color: "var(--text-secondary)", fontFamily: "Space Mono, monospace" }}>
+                          <span style={{ fontSize: 8, color: "var(--text-secondary)", fontFamily: "Space Mono, monospace", marginLeft: 4 }}>
                             {item.duration.toFixed(1)}s
                           </span>
                         </div>
@@ -1045,12 +1158,12 @@ export function VideoCanvas({
                           {item.title || item.scriptText || item.label}
                         </div>
 
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", zIndex: 2 }}>
-                          <span style={{ fontSize: 7.5, color: "var(--text-muted)", background: "var(--surface)", padding: "1px 4px", borderRadius: 3 }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", zIndex: 2, whiteSpace: "nowrap", overflow: "hidden" }}>
+                          <span style={{ fontSize: 7.5, color: "var(--text-muted)", background: "var(--surface)", padding: "1px 4px", borderRadius: 3, flexShrink: 0 }}>
                             {item.isBroll ? "⚡ B-Roll" : "📹 A-Roll"}
                           </span>
                           {isSelected && (
-                            <div style={{ display: "flex", gap: 2 }}>
+                            <div style={{ display: "flex", gap: 2, marginLeft: 4, flexShrink: 0 }}>
                               <button onClick={e => { e.stopPropagation(); duplicateItem(item.id); }} style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text-secondary)", borderRadius: 3, padding: "1px 4px", cursor: "pointer", fontSize: 8 }}>⧉</button>
                               <button onClick={e => { e.stopPropagation(); removeItem(item.id); }} style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "var(--rose)", borderRadius: 3, padding: "1px 4px", cursor: "pointer", fontSize: 8 }}>×</button>
                             </div>

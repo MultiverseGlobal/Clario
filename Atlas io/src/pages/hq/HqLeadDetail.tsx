@@ -19,6 +19,7 @@ import { OfferBuilder } from "@/components/atlas/OfferBuilder";
 import type { PainHypothesis } from "@/components/atlas/PainEngine";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { invokeSourcingMachine } from "@/lib/sourcingMachineProxy";
 
 type Tab = "overview" | "research" | "pain" | "offer" | "outreach" | "timeline" | "proposal" | "notes" | "referrals";
 
@@ -184,7 +185,7 @@ export default function HqLeadDetail() {
     if (!lead?.website) { toast.error("No website set — add one first"); return; }
     setResearching(true);
     try {
-      const { data, error } = await supabase.functions.invoke("sourcing-machine", {
+      const { data, error } = await invokeSourcingMachine( {
         body: { action: "source", url: lead.website },
       });
       if (error) throw new Error(error.message);

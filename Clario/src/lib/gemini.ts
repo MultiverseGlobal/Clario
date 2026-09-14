@@ -661,3 +661,96 @@ export async function deconstructVideoScene(
     ],
   };
 }
+
+export async function analyzeNarrativeArc(shots: ShotRecord[], purpose: string): Promise<Record<string, { beatType: 'hook'|'problem'|'proof'|'cta'|'b_roll', dopamineScore: number }>> {
+  const isSales = purpose.toLowerCase().includes('sales') || purpose.toLowerCase().includes('outbound') || purpose.toLowerCase().includes('pitch');
+
+  const buildFallback = (): Record<string, any> => {
+    const fallback: Record<string, any> = {};
+    shots.forEach((s, idx) => {
+      if (isSales) {
+        let bType: 'hook'|'problem'|'proof'|'cta'|'b_roll' = 'b_roll';
+        let score = 7;
+        if (idx === 0) { bType = 'hook'; score = 9; }
+        else if (idx === 1) { bType = 'problem'; score = 8; }
+        else if (idx === shots.length - 1 && shots.length > 2) { bType = 'cta'; score = 9; }
+        else { bType = idx % 2 === 0 ? 'proof' : 'b_roll'; score = 7; }
+        fallback[s.shot_id] = { beatType: bType, dopamineScore: score };
+      } else {
+        fallback[s.shot_id] = {
+          beatType: idx === 0 ? 'hook' : idx === shots.length - 1 ? 'cta' : 'b_roll',
+          dopamineScore: idx === 0 ? 9 : 6
+        };
+      }
+    });
+    return fallback;
+  };
+
+  if (!isGeminiAvailable()) {
+    return buildFallback();
+  }
+
+  const prompt = isSales
+    ? `You are an elite B2B video sales strategist and narrative director (expert in Loom, VSL, and cold outreach demos).
+I am providing you a chronological sequence of shots from a video with their visual descriptions.
+The video purpose is: ${purpose}.
+
+Your goal is to map this sequence into a high-converting sales narrative arc:
+1. "hook" (Shot 1 / greeting, pattern interrupt, relevance hook)
+2. "problem" (Calling out manual inefficiency, bottleneck, or prospect pain)
+3. "proof" (Live screen walkthrough, product demo, ROI metric, dashboard validation)
+4. "b_roll" (Supplementary UI inserts or visual transitions)
+5. "cta" (Low friction next step: booking link, reply ask)
+
+For each shot, assign a "beatType" (hook, problem, proof, b_roll, cta) and a "dopamineScore" (1 to 10, indicating audience engagement/retention).
+
+Shots:
+${shots.map(s => `Shot ${s.shot_id} (${s.duration}s): ${s.visual_description} | Source Text: ${s.source_text}`).join('\n')}
+
+Return ONLY a valid JSON object where keys are the shot_ids, and values are objects with "beatType" and "dopamineScore".
+Example:
+{
+  "shot_001": { "beatType": "hook", "dopamineScore": 9 },
+  "shot_002": { "beatType": "problem", "dopamineScore": 7 },
+  "shot_003": { "beatType": "proof", "dopamineScore": 8 },
+  "shot_004": { "beatType": "cta", "dopamineScore": 9 }
+}`
+    : `You are an expert TikTok/Reels retention engineer and narrative director.
+I am providing you a chronological sequence of shots from a video with their visual descriptions.
+The video purpose is: ${purpose}.
+
+Your goal is to map this sequence into a highly engaging retention curve.
+For each shot, assign a "beatType" (hook, problem, proof, b_roll, cta) and a "dopamineScore" (1 to 10, where 10 is highest visual retention/action).
+
+Shots:
+${shots.map(s => `Shot ${s.shot_id} (${s.duration}s): ${s.visual_description} | Source Text: ${s.source_text}`).join('\n')}
+
+Return ONLY a valid JSON object where keys are the shot_ids, and values are objects with "beatType" and "dopamineScore".
+Example:
+{
+  "shot_001": { "beatType": "hook", "dopamineScore": 9 },
+  "shot_002": { "beatType": "problem", "dopamineScore": 6 }
+}`;
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${getApiKey()}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.1, response_mime_type: "application/json" },
+        }),
+      }
+    );
+
+    if (!res.ok) throw new Error("Gemini API error");
+    const json = await res.json();
+    const text = json.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+    return JSON.parse(text);
+  } catch (err) {
+    console.error("Narrative Arc Analysis failed:", err);
+    return buildFallback();
+  }
+}

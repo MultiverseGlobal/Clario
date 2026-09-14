@@ -451,6 +451,8 @@ export default function App() {
           isPlaying={canvasIsPlaying}
           selectedItemId={canvasSelectedItemId}
           projectName={currentProject?.name}
+          targetPurpose={currentProject?.targetPurpose as any}
+          category={currentProject?.category as any}
           onSaveAssetPack={async () => {
             if (!currentProject) return;
             // Iterate over track items and save each as a shot & vault asset in Dexie

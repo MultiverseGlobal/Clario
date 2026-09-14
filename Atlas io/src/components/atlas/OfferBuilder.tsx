@@ -40,7 +40,7 @@ export function OfferBuilder({ companyId, companyName, website, researchData, in
     setLoading(true);
     setOffer(null);
     try {
-      const { data, error } = await supabase.functions.invoke("sourcing-machine", {
+      const { data, error } = await invokeSourcingMachine( {
         body: {
           action: "generate-offer",
           company: companyName,
@@ -76,7 +76,8 @@ export function OfferBuilder({ companyId, companyName, website, researchData, in
   };
 
   const offerText = offer
-    ? `OFFER FOR ${companyName.toUpperCase()}\n\n` +
+    ? `OFFER FOR ${companyName.toUpperCase()}\import { invokeSourcingMachine } from "@/lib/sourcingMachineProxy";
+n\n` +
       `Problem: ${offer.problem}\n\n` +
       `Outcome: ${offer.outcome}\n\n` +
       `Solution: ${offer.solution}\n\n` +

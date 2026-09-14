@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import { invokeSourcingMachine } from "@/lib/sourcingMachineProxy";
 
 export default function HqTeam() {
   const { user } = useAuth();
@@ -22,7 +23,7 @@ export default function HqTeam() {
   const performSystemCheck = async () => {
     setTestingFunction(true);
     try {
-      const { data, error } = await supabase.functions.invoke("sourcing-machine", {
+      const { data, error } = await invokeSourcingMachine( {
         body: { action: "list-notion-databases" }
       });
 

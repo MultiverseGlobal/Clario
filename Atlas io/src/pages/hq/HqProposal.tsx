@@ -111,7 +111,7 @@ export default function HqProposal() {
     setGenerating(true);
     setProposal(null);
     try {
-      const { data, error } = await supabase.functions.invoke("sourcing-machine", {
+      const { data, error } = await invokeSourcingMachine( {
         body: {
           action: "generate-proposal",
           lead: {

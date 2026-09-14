@@ -3,7 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Camera, Video, Mic, MicOff, VideoOff,
   ArrowLeft, Maximize, Activity,
-  MonitorUp, Target, Sparkles, UploadCloud
+  MonitorUp, Target, Sparkles, UploadCloud,
+  Play, Pause, RotateCcw, Type, Move,
+  Layout, Edit3
 } from 'lucide-react';
 
 interface RecordingStudioProps {
@@ -12,28 +14,61 @@ interface RecordingStudioProps {
   initialCategory?: 'sales' | 'content';
 }
 
+export const PROMPTER_PRESETS = [
+  {
+    id: 'sales_loom',
+    category: 'sales' as const,
+    title: 'B2B Loom Pitch',
+    text: "• Hey [First Name]! Saw what you're building and wanted to share a quick insight.\n\n" +
+      "• Most teams I talk to are frustrated with manual pipeline stagnation.\n\n" +
+      "• We engineered an autonomous engine to solve exactly that in 3 clicks.\n\n" +
+      "• Here's a live look at how it extracts and verifies target founders...\n\n" +
+      "• Would you be open to a 10-minute walkthrough this Thursday?"
+  },
+  {
+    id: 'sales_pain',
+    category: 'sales' as const,
+    title: 'Pain-Point Pattern Interrupt',
+    text: "• Quick question: how much time is your team losing to lead qualification every week?\n\n" +
+      "• If you're like most founders, it's 8 to 12 hours of copy-pasting data between tabs.\n\n" +
+      "• Let me show you what happens when autonomous AI handles that entire workflow.\n\n" +
+      "• Look at this live extraction happening right here in real time...\n\n" +
+      "• Hit reply or grab 10 minutes on my calendar below to test it on your lead list."
+  },
+  {
+    id: 'content_viral',
+    category: 'content' as const,
+    title: 'Viral Social Hook (3 Steps)',
+    text: "• STOP SCROLLING. Here is the 1 growth secret nobody is telling you.\n\n" +
+      "• 90% of creators do this completely backwards and wonder why their reach died.\n\n" +
+      "• Here's the 3-step breakdown you can execute right now.\n\n" +
+      "• Step 1: Hook them in 2 seconds. Step 2: Strip all filler. Step 3: Fast b-roll cuts.\n\n" +
+      "• Save this video and comment 'ACCESS' for the complete template."
+  },
+  {
+    id: 'content_demo',
+    category: 'content' as const,
+    title: 'Feature Launch Teaser',
+    text: "• We just shipped the feature our community has been requesting for 6 months.\n\n" +
+      "• Instead of editing for hours, you drop your raw clip right here.\n\n" +
+      "• The engine automatically isolates vocals, detects scenes, and cuts out dead air.\n\n" +
+      "• Watch the export finish in under 10 seconds.\n\n" +
+      "• Link in bio to try it free today."
+  }
+];
+
 const PURPOSE_CONFIG = {
   sales: {
     label: "Sales & Outreach Pitch",
     badge: "Outbound / Loom",
     directive: "Auto-zoom smoothly on clicks & active fields, 24px padded studio canvas with rounded 16px corners, dark mesh backdrop, cut silences >1.2s, 1.25x punch-in on value demo. High conversion B2B outbound framing.",
-    teleprompter: 
-      "• Hey [First Name]! Saw what you're building and wanted to share a quick insight.\n\n" +
-      "• Most teams I talk to are frustrated with manual pipeline stagnation.\n\n" +
-      "• We engineered an autonomous engine to solve exactly that in 3 clicks.\n\n" +
-      "• Here's a live look at how it extracts and verifies target founders...\n\n" +
-      "• Would you be open to a 10-minute walkthrough this Thursday?",
+    teleprompter: PROMPTER_PRESETS[0].text,
   },
   content: {
     label: "Social & Viral Content",
     badge: "Shorts / Reels / YouTube",
     directive: "Fast snappy zoom cuts on key beats, eliminate pauses >0.8s, 9:16 vertical punch-ins, high-contrast framing with caption safe zones. Dynamic dopamine pacing.",
-    teleprompter:
-      "• STOP SCROLLING. Here is the 1 growth secret nobody is telling you.\n\n" +
-      "• 90% of creators do this completely backwards and wonder why their reach died.\n\n" +
-      "• Here's the 3-step breakdown you can execute right now.\n\n" +
-      "• Step 1: Hook them in 2 seconds. Step 2: Strip all filler. Step 3: Fast b-roll cuts.\n\n" +
-      "• Save this video and comment 'ACCESS' for the complete template.",
+    teleprompter: PROMPTER_PRESETS[2].text,
   }
 };
 
@@ -61,6 +96,77 @@ export function RecordingStudio({ onBack, onFinish, initialCategory = 'sales' }:
   const [teleprompterText, setTeleprompterText] = useState(
     PURPOSE_CONFIG[initialCategory].teleprompter
   );
+
+  // Modern Studio Prompter States
+  const [prompterLayout, setPrompterLayout] = useState<'hud' | 'sidebar'>('hud');
+  const [prompterIsScrolling, setPrompterIsScrolling] = useState(false);
+  const [prompterSpeed, setPrompterSpeed] = useState(3);
+  const [prompterFontSize, setPrompterFontSize] = useState(22);
+  const [prompterOpacity, setPrompterOpacity] = useState(0.85);
+  const [prompterEditMode, setPrompterEditMode] = useState(false);
+
+  const prompterHudScrollRef = useRef<HTMLDivElement>(null);
+  const prompterSidebarScrollRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll animation loop
+  useEffect(() => {
+    if (!prompterIsScrolling) return;
+    let animFrame: number;
+    let lastTime = performance.now();
+
+    const scroll = (now: number) => {
+      const delta = (now - lastTime) / 1000;
+      lastTime = now;
+      const targetRef = prompterLayout === 'hud' ? prompterHudScrollRef : prompterSidebarScrollRef;
+      if (targetRef.current) {
+        const pixelsPerSec = 16 + prompterSpeed * 10;
+        targetRef.current.scrollTop += pixelsPerSec * delta;
+        const { scrollTop, scrollHeight, clientHeight } = targetRef.current;
+        if (scrollTop + clientHeight >= scrollHeight - 3) {
+          setPrompterIsScrolling(false);
+          return;
+        }
+      }
+      animFrame = requestAnimationFrame(scroll);
+    };
+
+    animFrame = requestAnimationFrame(scroll);
+    return () => cancelAnimationFrame(animFrame);
+  }, [prompterIsScrolling, prompterSpeed, prompterLayout]);
+
+  // Spacebar toggle for auto-scroll
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && (e.target as HTMLElement).tagName !== 'TEXTAREA' && (e.target as HTMLElement).tagName !== 'INPUT') {
+        if (scriptMode === 'teleprompter') {
+          e.preventDefault();
+          setPrompterIsScrolling(s => !s);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [scriptMode]);
+
+  // Auto-scroll on record start
+  useEffect(() => {
+    if (isRecording && scriptMode === 'teleprompter') {
+      const timer = setTimeout(() => {
+        setPrompterIsScrolling(true);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [isRecording, scriptMode]);
+
+  const handleResetPrompter = () => {
+    setPrompterIsScrolling(false);
+    if (prompterHudScrollRef.current) prompterHudScrollRef.current.scrollTop = 0;
+    if (prompterSidebarScrollRef.current) prompterSidebarScrollRef.current.scrollTop = 0;
+  };
+
+  const wordCount = teleprompterText.trim() ? teleprompterText.trim().split(/\s+/).length : 0;
+  const estSeconds = Math.ceil((wordCount / 130) * 60);
+  const readTimeDisplay = estSeconds > 60 ? `${Math.floor(estSeconds / 60)}m ${estSeconds % 60}s` : `${estSeconds}s`;
 
   const handleSelectPurpose = (next: 'sales' | 'content') => {
     setVideoPurpose(next);
@@ -344,6 +450,138 @@ export function RecordingStudio({ onBack, onFinish, initialCategory = 'sales' }:
           {/* Live screen stream */}
           <video ref={screenVideoRef} autoPlay muted playsInline className="w-full h-full object-contain bg-black" />
 
+          {/* Floating Camera-Line Teleprompter HUD (Aligned with Webcam for Eye Contact) */}
+          <AnimatePresence>
+            {scriptMode === 'teleprompter' && prompterLayout === 'hud' && (
+              <motion.div
+                drag
+                dragConstraints={{ left: -220, right: 220, top: 0, bottom: 260 }}
+                dragElastic={0.06}
+                initial={{ opacity: 0, y: -20, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                style={{ backgroundColor: `rgba(10, 11, 14, ${prompterOpacity})` }}
+                className="absolute top-4 left-1/2 -translate-x-1/2 w-[92%] max-w-[620px] z-30 rounded-2xl border border-white/20 backdrop-blur-2xl shadow-[0_25px_60px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden select-none"
+              >
+                {/* HUD Header & Drag Handle */}
+                <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/10 bg-white/5 cursor-move">
+                  <div className="flex items-center gap-2">
+                    <Move className="w-3.5 h-3.5 text-amber-400/80" />
+                    <span className="text-[11px] font-mono font-bold text-white uppercase tracking-wider">
+                      Eye-Line Prompter
+                    </span>
+                    <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold">
+                      Camera Aligned
+                    </span>
+                  </div>
+
+                  {/* Prompter Controls in HUD */}
+                  <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      onClick={() => setPrompterIsScrolling(!prompterIsScrolling)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                        prompterIsScrolling
+                          ? 'bg-amber-400 text-black shadow-[0_0_15px_rgba(251,191,36,0.4)]'
+                          : 'bg-white/15 text-white hover:bg-white/25'
+                      }`}
+                      title="Toggle Auto-Scroll (Spacebar)"
+                    >
+                      {prompterIsScrolling ? <Pause className="w-3 h-3 fill-current" /> : <Play className="w-3 h-3 fill-current" />}
+                      <span>{prompterIsScrolling ? 'Pause' : 'Auto-Scroll'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPrompterSpeed(s => s >= 10 ? 1 : s + 1)}
+                      className="px-2 py-1 rounded-lg text-[10px] font-mono font-bold bg-white/10 hover:bg-white/20 text-white/80 border border-white/10 transition-colors cursor-pointer"
+                      title="Scroll Speed (1-10)"
+                    >
+                      {prompterSpeed}x
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPrompterFontSize(f => f >= 30 ? 18 : f + 4)}
+                      className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/80 border border-white/10 transition-colors cursor-pointer"
+                      title={`Font Size: ${prompterFontSize}px`}
+                    >
+                      <Type className="w-3.5 h-3.5" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleResetPrompter}
+                      className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/80 border border-white/10 transition-colors cursor-pointer"
+                      title="Restart from Beginning"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPrompterOpacity(o => o <= 0.6 ? 0.95 : Number((o - 0.15).toFixed(2)))}
+                      className="px-2 py-1 rounded-lg text-[10px] font-mono bg-white/10 hover:bg-white/20 text-white/70 border border-white/10 cursor-pointer"
+                      title="Adjust glass opacity to see screen underneath"
+                    >
+                      {Math.round(prompterOpacity * 100)}%
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPrompterLayout('sidebar')}
+                      className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/80 border border-white/10 cursor-pointer"
+                      title="Dock to Sidebar"
+                    >
+                      <Layout className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* HUD Focal Reading Window */}
+                <div className="relative h-44 overflow-hidden">
+                  {/* Glowing Focus Eye-Line */}
+                  <div className="absolute top-1/2 left-0 right-0 h-10 -translate-y-1/2 bg-amber-500/10 border-y border-amber-500/25 pointer-events-none z-10 flex items-center justify-between px-4">
+                    <span className="text-[9px] font-mono text-amber-400/80 font-bold uppercase tracking-widest">Natural Eye-Contact Zone</span>
+                    <span className="text-[9px] font-mono text-white/40">Look here</span>
+                  </div>
+
+                  {/* Scrolling Viewport */}
+                  <div
+                    ref={prompterHudScrollRef}
+                    className="w-full h-full overflow-y-auto px-8 py-14 scroll-smooth text-center"
+                    style={{
+                      fontSize: `${prompterFontSize}px`,
+                      lineHeight: 1.7,
+                      fontWeight: 600,
+                      color: '#FFFFFF',
+                      textShadow: '0 2px 12px rgba(0,0,0,0.9)'
+                    }}
+                  >
+                    {teleprompterText.split('\n\n').map((para, i) => (
+                      <p key={i} className="mb-8 opacity-90 hover:opacity-100 transition-opacity">
+                        {para}
+                      </p>
+                    ))}
+                  </div>
+
+                  <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-black/90 to-transparent pointer-events-none" />
+                  <div className="absolute top-0 left-0 right-0 h-10 bg-gradient-to-b from-black/90 to-transparent pointer-events-none" />
+                </div>
+
+                {/* HUD Footer Info */}
+                <div className="flex items-center justify-between px-4 py-1.5 bg-black/50 border-t border-white/10 text-[10px] font-mono text-white/60">
+                  <div className="flex items-center gap-3">
+                    <span>{wordCount} words</span>
+                    <span>·</span>
+                    <span className="text-amber-300 font-semibold">~{readTimeDisplay} speaking time</span>
+                  </div>
+                  <span className="text-white/40">Press Spacebar to Play/Pause</span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Draggable PIP webcam */}
           <motion.div
             className="absolute bottom-8 left-8 w-52 aspect-video rounded-2xl overflow-hidden ring-2 ring-white/20 shadow-[0_20px_40px_rgba(0,0,0,0.5)] z-20 cursor-move"
@@ -364,7 +602,7 @@ export function RecordingStudio({ onBack, onFinish, initialCategory = 'sales' }:
         </div>
 
         {/* AI Production Directive & Script Sidebar (Cap.so / Recordly Style) */}
-        <div className="w-full lg:w-[360px] h-[340px] lg:h-full lg:max-h-[600px] bg-white/5 backdrop-blur-md rounded-[24px] flex flex-col shadow-2xl border border-white/10 relative overflow-hidden group shrink-0">
+        <div className="w-full lg:w-[380px] h-[360px] lg:h-full lg:max-h-[600px] bg-white/5 backdrop-blur-md rounded-[24px] flex flex-col shadow-2xl border border-white/10 relative overflow-hidden group shrink-0">
           <div className="p-4 pb-3 border-b border-white/10 text-white shrink-0">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -460,15 +698,183 @@ export function RecordingStudio({ onBack, onFinish, initialCategory = 'sales' }:
                 />
               </div>
             ) : (
-              <div className="flex-1 relative">
-                <textarea
-                  className="w-full h-full bg-transparent text-white/90 text-base leading-relaxed resize-none outline-none placeholder:text-white/30"
-                  value={teleprompterText}
-                  onChange={e => setTeleprompterText(e.target.value)}
-                  placeholder="Write your spoken talking points here..."
-                  spellCheck={false}
-                />
-                <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
+              <div className="flex-1 relative flex flex-col overflow-hidden">
+                {/* Prompter Sub-header & Layout Selector */}
+                <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10 shrink-0">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setPrompterEditMode(false)}
+                      className={`px-2 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                        !prompterEditMode ? 'bg-white/20 text-white shadow-sm' : 'text-white/50 hover:text-white'
+                      }`}
+                    >
+                      <Play className="w-3 h-3" />
+                      <span>Prompter</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPrompterEditMode(true)}
+                      className={`px-2 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                        prompterEditMode ? 'bg-white/20 text-white shadow-sm' : 'text-white/50 hover:text-white'
+                      }`}
+                    >
+                      <Edit3 className="w-3 h-3" />
+                      <span>Edit</span>
+                    </button>
+                  </div>
+
+                  {/* HUD vs Sidebar Dock Button */}
+                  <button
+                    type="button"
+                    onClick={() => setPrompterLayout(l => l === 'hud' ? 'sidebar' : 'hud')}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-mono font-medium flex items-center gap-1 border transition-all cursor-pointer ${
+                      prompterLayout === 'hud'
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm'
+                        : 'bg-white/5 text-white/70 border-white/10 hover:bg-white/10'
+                    }`}
+                    title={prompterLayout === 'hud' ? 'Switch to in-sidebar teleprompter' : 'Pop out camera-line floating HUD'}
+                  >
+                    <Layout className="w-3 h-3" />
+                    <span>{prompterLayout === 'hud' ? 'HUD View' : 'Docked'}</span>
+                  </button>
+                </div>
+
+                {/* Script Presets Pills */}
+                <div className="flex items-center gap-1 overflow-x-auto pb-2 mb-2 shrink-0 scrollbar-none">
+                  {PROMPTER_PRESETS.map(preset => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        setTeleprompterText(preset.text);
+                        setVideoPurpose(preset.category);
+                      }}
+                      className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 hover:bg-white/15 text-white/80 border border-white/10 whitespace-nowrap transition-colors cursor-pointer shrink-0"
+                    >
+                      {preset.title}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Content Area */}
+                {prompterEditMode ? (
+                  <div className="flex-1 flex flex-col gap-2 min-h-0">
+                    <textarea
+                      className="flex-1 w-full bg-black/40 border border-white/10 rounded-xl text-white/90 text-sm leading-relaxed resize-none p-3 outline-none placeholder:text-white/30 focus:border-amber-400/50 transition-colors font-sans"
+                      value={teleprompterText}
+                      onChange={e => setTeleprompterText(e.target.value)}
+                      placeholder="Write your talking points or script here..."
+                      spellCheck={false}
+                    />
+                    <div className="flex items-center justify-between text-[10px] font-mono text-white/50 px-1">
+                      <span>{wordCount} words</span>
+                      <span className="text-amber-300">~{readTimeDisplay} read time</span>
+                    </div>
+                  </div>
+                ) : prompterLayout === 'hud' ? (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center p-4 bg-white/5 rounded-xl border border-white/10">
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center mb-3 shadow-[0_0_15px_rgba(251,191,36,0.2)]">
+                      <Move className="w-5 h-5 text-amber-400" />
+                    </div>
+                    <h4 className="text-sm font-semibold text-white mb-1">Eye-Line HUD Active</h4>
+                    <p className="text-xs text-white/50 mb-4 max-w-[240px] leading-relaxed">
+                      Teleprompter is floating directly beneath your camera lens for natural eye contact while recording.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPrompterIsScrolling(!prompterIsScrolling)}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                          prompterIsScrolling
+                            ? 'bg-amber-400 text-black shadow-lg'
+                            : 'bg-white text-black hover:bg-white/90'
+                        }`}
+                      >
+                        {prompterIsScrolling ? <Pause className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                        <span>{prompterIsScrolling ? 'Pause Scroll' : 'Start Auto-Scroll'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPrompterLayout('sidebar')}
+                        className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-xs text-white transition-colors cursor-pointer"
+                      >
+                        Dock Here
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* In-Sidebar Prompter View */
+                  <div className="flex-1 relative flex flex-col overflow-hidden bg-black/40 rounded-xl border border-white/10">
+                    {/* Control ribbon */}
+                    <div className="flex items-center justify-between px-3 py-1.5 border-b border-white/10 bg-white/5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setPrompterIsScrolling(!prompterIsScrolling)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                          prompterIsScrolling ? 'bg-amber-400 text-black' : 'bg-white/15 text-white hover:bg-white/25'
+                        }`}
+                      >
+                        {prompterIsScrolling ? <Pause className="w-3 h-3 fill-current" /> : <Play className="w-3 h-3 fill-current" />}
+                        <span>{prompterIsScrolling ? 'Pause' : 'Scroll'}</span>
+                      </button>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setPrompterSpeed(s => s >= 10 ? 1 : s + 1)}
+                          className="px-2 py-0.5 rounded text-[10px] font-mono bg-white/10 text-white/80"
+                          title="Speed"
+                        >
+                          {prompterSpeed}x
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPrompterFontSize(f => f >= 28 ? 16 : f + 3)}
+                          className="p-1 rounded bg-white/10 text-white/80"
+                          title="Font Size"
+                        >
+                          <Type className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleResetPrompter}
+                          className="p-1 rounded bg-white/10 text-white/80"
+                          title="Restart"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Scrolling area */}
+                    <div className="relative flex-1 overflow-hidden">
+                      <div className="absolute top-1/2 left-0 right-0 h-8 -translate-y-1/2 bg-amber-500/10 border-y border-amber-500/20 pointer-events-none z-10" />
+                      <div
+                        ref={prompterSidebarScrollRef}
+                        className="w-full h-full overflow-y-auto px-4 py-10 scroll-smooth"
+                        style={{
+                          fontSize: `${prompterFontSize - 2}px`,
+                          lineHeight: 1.6,
+                          color: '#FFFFFF'
+                        }}
+                      >
+                        {teleprompterText.split('\n\n').map((para, i) => (
+                          <p key={i} className="mb-5 opacity-90 hover:opacity-100 transition-opacity">
+                            {para}
+                          </p>
+                        ))}
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
+                      <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-black/80 to-transparent pointer-events-none" />
+                    </div>
+
+                    <div className="flex items-center justify-between px-3 py-1 border-t border-white/10 text-[10px] font-mono text-white/50 shrink-0">
+                      <span>{wordCount} words</span>
+                      <span className="text-amber-300">~{readTimeDisplay}</span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

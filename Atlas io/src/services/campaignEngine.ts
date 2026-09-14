@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { decomposePromptWithGemini, discoverLeadsWithGemini, draftOutreachWithGemini } from "../lib/gemini";
 
 export interface DiscoveredLead {
   id?: string;
@@ -95,19 +96,10 @@ export async function decomposeCampaignPrompt(prompt: string): Promise<Decompose
   const decision_maker_titles = ["Founder", "Co-Founder", "CEO", "Owner", "Managing Director"];
   if (pLower.includes("growth") || pLower.includes("marketing head")) decision_maker_titles.push("Head of Growth");
 
-  // Try server-side LLM decomposition first
+  // Try real Gemini LLM decomposition first
   try {
-    const { data, error } = await supabase.functions.invoke("sourcing-machine", {
-      body: { 
-        action: "decompose-prompt", 
-        prompt,
-        min_headcount,
-        max_headcount,
-        regions,
-      },
-    });
-
-    if (!error && data && data.keyword) {
+    const data = await decomposePromptWithGemini(prompt, min_headcount, max_headcount, regions);
+    if (data && data.keyword) {
       return {
         keyword: data.keyword,
         industry: data.industry || "Technology",
@@ -122,7 +114,7 @@ export async function decomposeCampaignPrompt(prompt: string): Promise<Decompose
       };
     }
   } catch (err) {
-    console.warn("[CampaignEngine] Remote prompt decomposition fallback:", err);
+    console.warn("[CampaignEngine] Gemini prompt decomposition fallback:", err);
   }
 
   // Intelligent heuristic fallback if offline
@@ -178,24 +170,20 @@ export async function discoverCampaignLeads(
   const maxH = options?.max_headcount ?? 30;
   const targetRegions = options?.regions && options.regions.length > 0 ? options.regions : ["US", "UK"];
 
-  // 1. Primary: Server-side AI Sourcing Machine (powered by Gemini + live web search)
+  // 1. Primary: Real Gemini-powered AI Sourcing Machine
   try {
-    const { data, error } = await supabase.functions.invoke("sourcing-machine", {
-      body: {
-        action: "discover-leads",
-        source: channel === "hn" ? "hn_jobs" : channel,
-        keyword: keyword || undefined,
-        industry: industry !== "Any" ? industry : undefined,
-        min_headcount: minH,
-        max_headcount: maxH,
-        regions: targetRegions,
-        target_titles: options?.decision_maker_titles,
-        hypothesis: options?.hypothesis,
-        prompt: options?.raw_prompt,
-      },
-    });
+    const data = await discoverLeadsWithGemini(
+      channel === "hn" ? "hn_jobs" : channel,
+      keyword || "Startups",
+      industry !== "Any" ? industry : "Technology",
+      minH,
+      maxH,
+      targetRegions,
+      options?.hypothesis
+    );
 
     const rawLeads = Array.isArray(data) ? data : (data?.leads ?? []);
+    const error = null;
     if (!error && rawLeads.length > 0) {
       // Strict post-filtering: reject any lead that breaches the requested headcount bracket
       const filtered = rawLeads.filter((l: any) => {

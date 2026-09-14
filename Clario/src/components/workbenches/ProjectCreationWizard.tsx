@@ -14,7 +14,7 @@ import { separateVoiceAndMusic } from '../../lib/audioSeparator';
 import { stripCaptions } from '../../lib/videoInpainter';
 import { db } from '../../lib/dexieDb';
 import type { VideoTrackItem, ShotRecord } from '../../types/assets';
-import { analyzeShotIntelligence } from '../../lib/gemini';
+import { analyzeShotIntelligence, analyzeNarrativeArc } from '../../lib/gemini';
 
 interface ProjectCreationWizardProps {
   onClose: () => void;
@@ -201,58 +201,9 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
           }
         }
 
-        // Convert detected scenes to trackItems
-        const generatedTracks: VideoTrackItem[] = scenes.map((s, idx) => ({
-          id: `track_cut_${idx}_${Date.now()}`,
-          title: `${s.sceneTag} (${s.duration}s)`,
-          startTime: s.startTime,
-          endTime: s.endTime,
-          duration: s.duration,
-          type: 'video',
-          url: inpaintedVideoUrl,
-          videoUrl: inpaintedVideoUrl,
-          isBroll: s.contentType !== 'a_roll',
-          beatType: idx === 0 ? 'hook' : s.contentType === 'a_roll' ? 'problem' : 'proof',
-          scriptText: s.sceneTag,
-        }));
-
-        if (vocalsTrackUrl) {
-          generatedTracks.push({
-            id: `track_vocals_${Date.now()}`,
-            title: `Isolated Vocals`,
-            startTime: 0,
-            endTime: scenes.reduce((acc, s) => acc + s.duration, 0),
-            duration: scenes.reduce((acc, s) => acc + s.duration, 0),
-            type: 'audio',
-            url: vocalsTrackUrl,
-            audioUrl: vocalsTrackUrl,
-            isBroll: false,
-            beatType: 'hook',
-            scriptText: '',
-          });
-        }
-        
-        if (accompanimentTrackUrl) {
-          generatedTracks.push({
-            id: `track_music_${Date.now()}`,
-            title: `Accompaniment (Music)`,
-            startTime: 0,
-            endTime: scenes.reduce((acc, s) => acc + s.duration, 0),
-            duration: scenes.reduce((acc, s) => acc + s.duration, 0),
-            type: 'audio',
-            url: accompanimentTrackUrl,
-            audioUrl: accompanimentTrackUrl,
-            isBroll: false,
-            beatType: 'proof',
-            scriptText: '',
-          });
-        }
-
         setStatusText('Running Gemini Vision AI analysis on extracted scenes...');
         const shotsData: ShotRecord[] = await Promise.all(scenes.map(async (s, index) => {
-          // Call Gemini API to get detailed multimodal analysis
           const intelligence = await analyzeShotIntelligence(s.frameUrl, index, s.startTime, s.endTime, previewUrl);
-          
           return {
             project_id: projectId,
             shot_id: s.id,
@@ -284,6 +235,67 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
             motion_level: intelligence.motion_level || 'moderate'
           } as ShotRecord;
         }));
+
+        const purposeLabel = effectivePurpose === 'sales'
+          ? 'B2B Sales Outreach & Loom Pitch (Hook -> Problem -> Demo -> CTA)'
+          : 'High-Retention Social Content (TikTok/Reels Fast Pacing)';
+        setStatusText(effectivePurpose === 'sales' ? 'Mapping Sales Conversion Narrative Arc...' : 'Mapping Dopamine Retention Curve...');
+        const narrativeMap = await analyzeNarrativeArc(shotsData, purposeLabel);
+
+        // Convert detected scenes to trackItems, using narrativeMap for score and beat
+        const generatedTracks: VideoTrackItem[] = scenes.map((s, idx) => {
+          const shotId = s.id;
+          const narrative = narrativeMap[shotId] || { beatType: idx === 0 ? 'hook' : 'b_roll', dopamineScore: 5 };
+          
+          return {
+            id: `track_cut_${idx}_${Date.now()}`,
+            title: `${s.sceneTag} (${s.duration}s)`,
+            startTime: s.startTime,
+            endTime: s.endTime,
+            duration: s.duration,
+            type: 'video',
+            url: inpaintedVideoUrl,
+            videoUrl: inpaintedVideoUrl,
+            isBroll: s.contentType !== 'a_roll',
+            beatType: narrative.beatType as any,
+            dopamineScore: narrative.dopamineScore,
+            scriptText: s.sceneTag,
+          };
+        });
+
+        if (vocalsTrackUrl) {
+          generatedTracks.push({
+            id: `track_vocals_${Date.now()}`,
+            title: `Isolated Vocals`,
+            startTime: 0,
+            endTime: scenes.reduce((acc, s) => acc + s.duration, 0),
+            duration: scenes.reduce((acc, s) => acc + s.duration, 0),
+            type: 'audio',
+            url: vocalsTrackUrl,
+            audioUrl: vocalsTrackUrl,
+            isBroll: false,
+            beatType: 'hook',
+            dopamineScore: 10,
+            scriptText: '',
+          });
+        }
+        
+        if (accompanimentTrackUrl) {
+          generatedTracks.push({
+            id: `track_music_${Date.now()}`,
+            title: `Accompaniment (Music)`,
+            startTime: 0,
+            endTime: scenes.reduce((acc, s) => acc + s.duration, 0),
+            duration: scenes.reduce((acc, s) => acc + s.duration, 0),
+            type: 'audio',
+            url: accompanimentTrackUrl,
+            audioUrl: accompanimentTrackUrl,
+            isBroll: false,
+            beatType: 'proof',
+            dopamineScore: 8,
+            scriptText: '',
+          });
+        }
 
         const updatedProject: ClarioProject = {
           ...initialProject,

@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { invokeSourcingMachine } from "@/lib/sourcingMachineProxy";
 
 export interface PainHypothesis {
   problem: string;
@@ -38,7 +39,7 @@ export function PainEngine({ companyId, companyName, website, researchData, onBu
   const handleAnalyse = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("sourcing-machine", {
+      const { data, error } = await invokeSourcingMachine( {
         body: {
           action: "analyze-pain",
           company: companyName,

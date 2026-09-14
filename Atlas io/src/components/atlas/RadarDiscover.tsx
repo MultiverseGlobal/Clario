@@ -10,6 +10,7 @@ import { useIntegrations } from "@/hooks/useIntegrations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { invokeSourcingMachine } from "@/lib/sourcingMachineProxy";
 
 interface DiscoveredLead {
   company: string;
@@ -71,7 +72,7 @@ export default function RadarDiscover({ onLeadSaved }: { onLeadSaved?: () => voi
         }
       }
 
-      const { data, error } = await supabase.functions.invoke("sourcing-machine", {
+      const { data, error } = await invokeSourcingMachine( {
         body: {
           action: "discover-leads",
           source,
@@ -192,7 +193,7 @@ export default function RadarDiscover({ onLeadSaved }: { onLeadSaved?: () => voi
 
       // Fire auto-enrich pipeline asynchronously
       if (inserted?.id) {
-        supabase.functions.invoke("sourcing-machine", {
+        invokeSourcingMachine( {
           body: { action: "auto-enrich", lead_id: inserted.id, company: lead.company, website: lead.website },
         }).catch((e) => console.warn("Auto-enrich error:", e));
 
@@ -201,7 +202,7 @@ export default function RadarDiscover({ onLeadSaved }: { onLeadSaved?: () => voi
           const autoNotion = notionIntegration.settings?.auto_notion === true;
           const defaultDbId = notionIntegration.settings?.notion_database_id;
           if (autoNotion && defaultDbId) {
-          supabase.functions.invoke("sourcing-machine", {
+          invokeSourcingMachine( {
             body: {
               action: "export-notion",
               database_id: defaultDbId,

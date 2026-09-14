@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { format, startOfWeek, endOfWeek, subWeeks, addWeeks } from "date-fns";
+import { invokeSourcingMachine } from "@/lib/sourcingMachineProxy";
 
 interface WeeklyReport {
   id: string;
@@ -148,7 +149,7 @@ export default function HqReport() {
       };
 
       try {
-        const { data: aiData } = await supabase.functions.invoke("sourcing-machine", {
+        const { data: aiData } = await invokeSourcingMachine( {
           body: {
             action: "generate-report",
             report_data: {

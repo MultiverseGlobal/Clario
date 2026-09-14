@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { invokeSourcingMachine } from "@/lib/sourcingMachineProxy";
 
 export interface PartnerProfile {
   id: string;
@@ -38,7 +39,7 @@ export function PartnerEngineModal({ isOpen, onClose, onSelectPartner }: Partner
     setLoading(true);
     
     try {
-      const { data, error } = await supabase.functions.invoke("sourcing-machine", {
+      const { data, error } = await invokeSourcingMachine( {
         body: {
           action: "partner-search",
           query: query

@@ -1,12 +1,15 @@
 import modal
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from typing import Optional
 import tempfile
 import os
 import subprocess
 import uuid
+import json
+import requests
 import cv2
 import numpy as np
 
@@ -21,8 +24,9 @@ image = (
         "opencv-python-headless",
         "scenedetect",
         "easyocr",
-        "spleeter",
-        "numpy"
+        "demucs",
+        "numpy",
+        "requests"
     )
 )
 
@@ -41,7 +45,7 @@ web_app.add_middleware(
 
 @web_app.post("/detect-scenes")
 async def detect_scenes_endpoint(file: UploadFile = File(...)):
-    from scenedetect import detect, ContentDetector
+    from scenedetect import detect, AdaptiveDetector
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
     try:
@@ -51,7 +55,7 @@ async def detect_scenes_endpoint(file: UploadFile = File(...)):
             tmp.write(content)
             tmp_path = tmp.name
         
-        scene_list = detect(tmp_path, ContentDetector(threshold=27.0))
+        scene_list = detect(tmp_path, AdaptiveDetector(adaptive_threshold=3.0))
         
         results = []
         for i, scene in enumerate(scene_list):
@@ -83,8 +87,7 @@ async def split_audio_endpoint(file: UploadFile = File(...)):
             tmp_path = tmp.name
             
         subprocess.run([
-            "spleeter", "separate", 
-            "-p", "spleeter:2stems", 
+            "demucs", "--two-stems", "vocals", 
             "-o", "/data/output", 
             tmp_path
         ], check=True)
@@ -93,12 +96,12 @@ async def split_audio_endpoint(file: UploadFile = File(...)):
         
         filename_without_ext = os.path.splitext(os.path.basename(tmp_path))[0]
         # In a real environment, this should dynamically determine the host or be configured via env
-        base_url = "https://multiverseglobal--clario-ai-engine-fastapi-app-dev.modal.run"
+        base_url = "https://multiverseglobals--clario-ai-engine-fastapi-app.modal.run"
         
         os.remove(tmp_path)
         return {
-            "vocals": f"{base_url}/media/{filename_without_ext}/vocals.wav",
-            "accompaniment": f"{base_url}/media/{filename_without_ext}/accompaniment.wav"
+            "vocals": f"{base_url}/media/htdemucs/{filename_without_ext}/vocals.wav",
+            "accompaniment": f"{base_url}/media/htdemucs/{filename_without_ext}/no_vocals.wav"
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -174,11 +177,132 @@ async def inpaint_video_endpoint(file: UploadFile = File(...)):
             
         volume.commit()
         
-        base_url = "https://multiverseglobal--clario-ai-engine-fastapi-app-dev.modal.run"
+        base_url = "https://multiverseglobals--clario-ai-engine-fastapi-app.modal.run"
         return {
             "cleaned_video": f"{base_url}/media/{output_filename}"
         }
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@web_app.post("/render-timeline")
+async def render_timeline_endpoint(
+    timeline_edl: str = Form(...),
+    file: Optional[UploadFile] = File(None)
+):
+    try:
+        edl = json.loads(timeline_edl)
+        clips = edl.get("clips", [])
+        audio_tracks = edl.get("audioTracks", [])
+        project_name = edl.get("projectName", "clario_project")
+        safe_name = "".join(c for c in project_name if c.isalnum() or c in ("-", "_")).lower() or "clario_cut"
+        
+        job_id = str(uuid.uuid4())
+        work_dir = tempfile.mkdtemp(prefix=f"render_{job_id}_")
+        
+        # 1. Handle uploaded base file if provided
+        uploaded_source_path = None
+        if file and file.filename:
+            suffix = os.path.splitext(file.filename)[1] or ".mp4"
+            uploaded_source_path = os.path.join(work_dir, f"uploaded_source{suffix}")
+            content = await file.read()
+            with open(uploaded_source_path, "wb") as f:
+                f.write(content)
+
+        # 2. Extract and render each clip segment in EDL sequence
+        rendered_clip_paths = []
+        for idx, clip in enumerate(clips):
+            in_point = float(clip.get("inPoint", 0.0) or 0.0)
+            duration = float(clip.get("duration", 0.0) or 0.0)
+            if duration <= 0.0:
+                duration = float(clip.get("outPoint", in_point + 1.0) - in_point)
+            if duration <= 0.0:
+                duration = 1.0
+
+            # Determine source file for this clip
+            clip_source_path = None
+            clip_url = clip.get("url") or clip.get("videoUrl")
+
+            if uploaded_source_path and (not clip_url or "blob:" in clip_url or "uploaded" in str(clip.get("sourceType", ""))):
+                clip_source_path = uploaded_source_path
+            elif clip_url:
+                # Check if it references local media in volume
+                if "/media/" in clip_url:
+                    rel_path = clip_url.split("/media/")[-1]
+                    vol_path = os.path.join("/data/output", rel_path)
+                    if os.path.exists(vol_path):
+                        clip_source_path = vol_path
+                
+                # If not found in volume and is http URL, download it
+                if not clip_source_path and clip_url.startswith("http"):
+                    clip_dl_path = os.path.join(work_dir, f"dl_clip_{idx}.mp4")
+                    resp = requests.get(clip_url, timeout=30)
+                    if resp.status_code == 200:
+                        with open(clip_dl_path, "wb") as f:
+                            f.write(resp.content)
+                        clip_source_path = clip_dl_path
+
+            if not clip_source_path and uploaded_source_path:
+                clip_source_path = uploaded_source_path
+
+            if not clip_source_path:
+                continue
+
+            clip_out = os.path.join(work_dir, f"cut_{idx:03d}.mp4")
+            # Precise cut with re-encoding for timestamp and aspect alignment
+            cmd = [
+                "ffmpeg", "-y",
+                "-ss", f"{in_point:.3f}",
+                "-i", clip_source_path,
+                "-t", f"{duration:.3f}",
+                "-vf", "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,fps=30",
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+                "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
+                "-avoid_negative_ts", "make_zero",
+                clip_out
+            ]
+            subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+            if os.path.exists(clip_out):
+                rendered_clip_paths.append(clip_out)
+
+        if not rendered_clip_paths:
+            raise HTTPException(status_code=400, detail="No valid video clips could be rendered from timeline.")
+
+        # 3. Concatenate all cut clips
+        concat_txt = os.path.join(work_dir, "concat_list.txt")
+        with open(concat_txt, "w") as f:
+            for p in rendered_clip_paths:
+                escaped = p.replace("'", "'\\''")
+                f.write(f"file '{escaped}'\n")
+
+        os.makedirs("/data/output", exist_ok=True)
+        final_filename = f"{job_id}_{safe_name}.mp4"
+        final_output_path = os.path.join("/data/output", final_filename)
+
+        concat_cmd = [
+            "ffmpeg", "-y",
+            "-f", "concat",
+            "-safe", "0",
+            "-i", concat_txt,
+            "-c:v", "libx264", "-preset", "fast", "-crf", "19",
+            "-c:a", "aac", "-b:a", "192k",
+            "-movflags", "+faststart",
+            final_output_path
+        ]
+        subprocess.run(concat_cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+
+        volume.commit()
+
+        base_url = "https://multiverseglobals--clario-ai-engine-fastapi-app.modal.run"
+        return {
+            "status": "completed",
+            "job_id": job_id,
+            "filename": f"{safe_name}.mp4",
+            "rendered_url": f"{base_url}/media/{final_filename}",
+            "clip_count": len(rendered_clip_paths)
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @web_app.get("/media/{path:path}")
