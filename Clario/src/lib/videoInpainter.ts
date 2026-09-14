@@ -17,7 +17,7 @@ export async function stripCaptions(
 
   onProgress?.('Running OCR and AI Video Inpainting (this may take a while)...');
 
-  const apiBase = import.meta.env.VITE_AI_ENGINE_BASE || 'https://multiverseglobal--clario-ai-engine-fastapi-app-dev.modal.run';
+  const apiBase = import.meta.env.VITE_AI_ENGINE_BASE || 'https://multiverseglobals--clario-ai-engine-fastapi-app.modal.run';
   const response = await fetch(`${apiBase}/inpaint-video`, {
     method: 'POST',
     body: formData,

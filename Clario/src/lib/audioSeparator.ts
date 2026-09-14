@@ -22,7 +22,7 @@ export async function separateVoiceAndMusic(
 
   onProgress?.('Running Spleeter 2-stem source separation...');
 
-  const apiBase = import.meta.env.VITE_AI_ENGINE_BASE || 'https://multiverseglobal--clario-ai-engine-fastapi-app-dev.modal.run';
+  const apiBase = import.meta.env.VITE_AI_ENGINE_BASE || 'https://multiverseglobals--clario-ai-engine-fastapi-app.modal.run';
   const response = await fetch(`${apiBase}/split-audio`, {
     method: 'POST',
     body: formData,

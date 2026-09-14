@@ -172,7 +172,7 @@ export async function detectCinematicScenes(
 
         onProgress?.({ progressPct: 45, statusMsg: 'Running PySceneDetect Shot Boundary Analysis...' });
 
-        const apiBase = import.meta.env.VITE_AI_ENGINE_BASE || 'https://multiverseglobal--clario-ai-engine-fastapi-app-dev.modal.run';
+        const apiBase = import.meta.env.VITE_AI_ENGINE_BASE || 'https://multiverseglobals--clario-ai-engine-fastapi-app.modal.run';
         const apiRes = await fetch(`${apiBase}/detect-scenes`, {
           method: 'POST',
           body: formData
