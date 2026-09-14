@@ -11,6 +11,7 @@ import { getApiBase } from '../../lib/apiClient';
 import { supabase } from '../../lib/supabase';
 import { detectCinematicScenes, type DetectedScene } from '../../lib/clientSceneDetector';
 import { separateVoiceAndMusic } from '../../lib/audioSeparator';
+import { stripCaptions } from '../../lib/videoInpainter';
 import { db } from '../../lib/dexieDb';
 import type { VideoTrackItem, ShotRecord } from '../../types/assets';
 
@@ -183,6 +184,21 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
           console.warn('Audio separation failed:', audioErr);
         }
 
+        // Caption Stripping Step (AI Inpainting)
+        let inpaintedVideoUrl = previewUrl;
+        if (hasAnyCaptions) {
+          try {
+            const inpaintResult = await stripCaptions(file, (msg) => {
+              setProgress(p => Math.min(p + 5, 95));
+              setStatusText(msg);
+            });
+            inpaintedVideoUrl = inpaintResult;
+            setCaptionStripMode('inpaint');
+          } catch (inpaintErr) {
+            console.warn('Video inpainting failed:', inpaintErr);
+          }
+        }
+
         // Convert detected scenes to trackItems
         const generatedTracks: VideoTrackItem[] = scenes.map((s, idx) => ({
           id: `track_cut_${idx}_${Date.now()}`,
@@ -191,8 +207,8 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
           endTime: s.endTime,
           duration: s.duration,
           type: 'video',
-          url: previewUrl,
-          videoUrl: previewUrl,
+          url: inpaintedVideoUrl,
+          videoUrl: inpaintedVideoUrl,
           isBroll: s.contentType !== 'a_roll',
           beatType: idx === 0 ? 'hook' : s.contentType === 'a_roll' ? 'problem' : 'proof',
           scriptText: s.sceneTag,
