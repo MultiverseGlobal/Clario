@@ -18,16 +18,16 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", os.getenv("SUPABASE_ANON_KEY", ""))
 supabase: Client | None = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
-async def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    if not supabase:
+async def get_current_user_id(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> Optional[str]:
+    if not supabase or not credentials:
         return None
     try:
         user_response = supabase.auth.get_user(credentials.credentials)
-        return user_response.user.id
-    except Exception as e:
-        raise HTTPException(status_code=401, detail="Invalid authentication credentials")
+        return user_response.user.id if user_response and user_response.user else None
+    except Exception:
+        return None
 
 from models.schemas import (
     HarvestProject,
@@ -43,7 +43,8 @@ from worker.ffmpeg_worker import (
     detect_scenes_ffmpeg,
     extract_frame_at_timestamp,
     generate_contact_sheet_pillow,
-    cut_segment_ffmpeg
+    cut_segment_ffmpeg,
+    remove_captions_ffmpeg
 )
 from worker.vision_worker import analyze_shot_frame
 
@@ -171,12 +172,23 @@ async def process_video_harvest_job(job_id: str, project_id: str, video_path: st
                 success = download_from_supabase("clario-raw", video_path, local_video_path)
                 if not success:
                     raise Exception("Failed to download remote asset from clario-raw bucket.")
-                update_job(job_id, {"progress_pct": 10, "status_msg": "Detecting shot boundaries with FFmpeg…"})
+                update_job(job_id, {"progress_pct": 10, "status_msg": "Cleaning video & removing captions..."})
+
+            # 0. Clean captions and subtitle tracks
+            update_job(job_id, {
+                "progress_pct": 15,
+                "status_msg": "Removing captions & stripping subtitle streams..."
+            })
+            clean_video_filename = f"clean_{video_filename}"
+            clean_video_path = os.path.join(project_dir, clean_video_filename)
+            if remove_captions_ffmpeg(local_video_path, clean_video_path):
+                local_video_path = clean_video_path
+                video_filename = clean_video_filename
 
             video_media_url = upload_to_supabase(local_video_path, "clario-exports", f"{project_id}/{video_filename}")
 
-            # 1. Scene detection
-            intervals = detect_scenes_ffmpeg(local_video_path, threshold=0.3)
+            # 1. Cinematic scene detection
+            intervals = detect_scenes_ffmpeg(local_video_path, threshold=0.25)
             # If no scene breaks found, treat whole video as one shot
             if not intervals:
                 dur = get_video_duration(local_video_path)
@@ -244,9 +256,7 @@ async def process_video_harvest_job(job_id: str, project_id: str, video_path: st
             generate_contact_sheet_pillow(frame_paths, labels, contact_sheet_path)
             upload_to_supabase(contact_sheet_path, "clario-frames", f"{project_id}/{contact_sheet_filename}")
     
-            # 4. Assemble Project Record
-            video_filename = os.path.basename(video_path)
-            video_media_url = f"/media/{project_id}/{video_filename}"
+            # 4. Assemble Project Record (using clean export video filename and public Supabase url)
             project = HarvestProject(
                 id=project_id,
                 name=f"Harvest {project_id[:8]}",
@@ -639,9 +649,11 @@ async def cut_segment(
         "filename": segment_filename
     }
 
-@app.post("/api/v1/projects/{project_id}/export-zip")
-async def export_project_zip(project_id: str, user_id: str = Depends(get_current_user_id)):
+@app.api_route("/api/v1/projects/{project_id}/export-zip", methods=["GET", "POST"])
+async def export_project_zip(project_id: str, user_id: Optional[str] = Depends(get_current_user_id)):
     project_data = get_project(project_id, user_id)
+    if not project_data and user_id:
+        project_data = get_project(project_id, None)
     if not project_data:
         raise HTTPException(status_code=404, detail="Project not found")
 
@@ -1058,6 +1070,83 @@ async def reference_generate_image(req: GenerateImageRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+
+class EditDirectiveRequest(BaseModel):
+    script_text: str
+    duration: float = 30.0
+    style_preset: str = "cap_so_studio"
+    gemini_api_key: str | None = None
+
+@app.post("/api/v1/recording/edit-directive")
+async def process_edit_directive(req: EditDirectiveRequest):
+    """
+    Cap.so / Recordly style script-driven edit planner.
+    Analyzes the user's video editing directive prompt and generates structured
+    visual production decisions: auto-zooms, framing, padded canvas, silence cuts,
+    and pacing rules.
+    """
+    import json
+    api_key = req.gemini_api_key or os.getenv("GEMINI_API_KEY", "")
+    
+    prompt = f"""You are an elite Cap.so and Recordly style automated video production director.
+A creator recorded a {req.duration}s screen/walkthrough video.
+They supplied this Edit Directive Script:
+"{req.script_text}"
+
+Style Preset: {req.style_preset}
+
+Produce a structured JSON editing plan specifying:
+1. canvas: padding (px, e.g. 24), border_radius (px, e.g. 16), shadow_blur (px, e.g. 32), background_style ("dark_mesh_gradient", "minimal_studio", or "custom")
+2. zoom_events: list of dynamic punch-in/zoom moments based on their instructions (timestamp in seconds, duration in seconds, scale between 1.1x and 1.45x, focus: "center"|"cursor"|"bottom_right", and reason)
+3. silence_trims: list of dead air intervals to tighten (e.g. [{{"start": 4.1, "end": 5.2}}])
+4. highlights: list of text callout pills or spotlight moments
+5. pacing: "fast" | "cinematic" | "balanced"
+6. summary: 1 sentence summary of the Cap.so style production applied.
+
+Respond ONLY with valid JSON matching this schema:
+{{
+  "canvas": {{ "padding": 24, "border_radius": 16, "shadow_blur": 32, "background_style": "dark_mesh_gradient" }},
+  "zoom_events": [
+    {{ "timestamp": 2.5, "duration": 3.0, "scale": 1.3, "focus": "center", "reason": "Focus on interaction" }}
+  ],
+  "silence_trims": [],
+  "highlights": [],
+  "pacing": "fast",
+  "summary": "Applied Cap.so studio framing with smooth zooms and tightened pauses"
+}}"""
+
+    if api_key:
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}",
+                    json={
+                        "contents": [{"parts": [{"text": prompt}]}],
+                        "generationConfig": {"temperature": 0.3, "responseMimeType": "application/json"}
+                    }
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
+                    return json.loads(raw_text)
+        except Exception as e:
+            print(f"Gemini edit directive generation error: {e}")
+
+    # Heuristic fallback if Gemini is offline
+    return {
+        "canvas": { "padding": 24, "border_radius": 16, "shadow_blur": 32, "background_style": "dark_mesh_gradient" },
+        "zoom_events": [
+            { "timestamp": max(1.0, req.duration * 0.15), "duration": 4.0, "scale": 1.25, "focus": "center", "reason": "Initial punch-in on core demonstration" },
+            { "timestamp": max(5.0, req.duration * 0.65), "duration": 3.5, "scale": 1.35, "focus": "cursor", "reason": "Detail zoom on product outcome" }
+        ],
+        "silence_trims": [
+            { "start": req.duration * 0.4, "end": req.duration * 0.43 }
+        ] if req.duration > 10 else [],
+        "highlights": ["Cap.so Studio Polish", "Recordly Smooth Zoom"],
+        "pacing": "fast",
+        "summary": "Studio padded canvas with 16px rounded corners, smooth zooms, and dead-air tightening."
+    }
 
 
 if __name__ == "__main__":

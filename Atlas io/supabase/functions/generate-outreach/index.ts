@@ -215,7 +215,7 @@ Deno.serve(async (req: Request) => {
     const openRouterApiKey = Deno.env.get("OPENROUTER_API_KEY");
     const groqApiKey = dbSettings?.groq_api_key || Deno.env.get("GROQ_API_KEY");
     const kimiApiKey = dbSettings?.kimi_api_key || Deno.env.get("KIMI_API_KEY") || Deno.env.get("MOONSHOT_API_KEY");
-    const geminiApiKey = dbSettings?.gemini_api_key || Deno.env.get("GEMINI_API_KEY");
+    const geminiApiKey = dbSettings?.gemini_api_key || Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY");
     const openaiApiKey = dbSettings?.openai_api_key || Deno.env.get("OPENAI_API_KEY");
     
     const providers = [
@@ -371,9 +371,14 @@ Return ONLY this JSON (no markdown, no explanation):
       }
     }
 
+    const clarioVideoUrl = body.clario_video_url || body.video_url;
+    if (clarioVideoUrl && result?.email?.body) {
+      result.email.body = result.email.body.replaceAll("{{CLARIO_VIDEO_URL}}", clarioVideoUrl);
+    }
+
     return new Response(JSON.stringify({
       ...result,
-      // Signal to the frontend that this draft is ready to be paired with a Clario video
+      clario_video_url: clarioVideoUrl || null,
       clario_placeholder_present: typeof result?.email?.body === "string" &&
         result.email.body.includes("{{CLARIO_VIDEO_URL}}"),
     }), {

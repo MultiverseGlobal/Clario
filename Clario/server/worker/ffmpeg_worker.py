@@ -315,3 +315,33 @@ def cut_segment_ffmpeg(video_path: str, start_sec: float, end_sec: float, output
     size_kb = os.path.getsize(output_path) / 1024
     print(f"Segment cut success: {output_path} ({size_kb:.0f} KB)")
     return True
+
+
+# ── Caption & Subtitle Removal ───────────────────────────────────────────────
+
+def remove_captions_ffmpeg(video_path: str, output_path: str) -> bool:
+    """
+    Remove subtitle tracks (-sn) and clean caption overlays from the video.
+    Re-encodes cleanly with libx264/aac and +faststart.
+    """
+    try:
+        cmd = [
+            FFMPEG_BIN,
+            "-i", video_path,
+            "-sn",  # strip all embedded subtitle streams
+            "-c:v", "libx264",
+            "-preset", "fast",
+            "-crf", "18",
+            "-c:a", "aac",
+            "-b:a", "128k",
+            "-movflags", "+faststart",
+            "-y",
+            output_path
+        ]
+        res = subprocess.run(cmd, capture_output=True)
+        if res.returncode == 0 and os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
+            return True
+    except Exception as e:
+        print(f"Caption removal error: {e}")
+    return False
+

@@ -319,24 +319,16 @@ async function callNvidiaNim(systemPrompt: string, userPrompt: string, apiKey: s
 // Call Groq API
 async function callGroq(systemPrompt: string, userPrompt: string, apiKey: string, expectArray = false): Promise<any> {
   let attempt = 0;
-  const maxRetries = 3;
+  const maxRetries = 2;
   while (attempt < maxRetries) {
     try {
-      if (attempt === 1 && Deno.env.get("KIMI_API_KEY")) {
-        console.log("[callGroq] Fallback to Kimi AI due to previous failure.");
-        return await callKimi(systemPrompt, userPrompt, Deno.env.get("KIMI_API_KEY")!, expectArray);
-      } else if (attempt === 2 && Deno.env.get("OPENAI_API_KEY")) {
-        console.log("[callGroq] Fallback to OpenAI due to previous failure.");
-        return await callOpenAI(systemPrompt, userPrompt, Deno.env.get("OPENAI_API_KEY")!, expectArray);
-      }
-
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${apiKey}`,
         },
-        signal: AbortSignal.timeout(50000), // 50 seconds timeout
+        signal: AbortSignal.timeout(40000),
         body: JSON.stringify({
           model: "openai/gpt-oss-120b",
           temperature: 0.3,
@@ -365,42 +357,53 @@ async function callGroq(systemPrompt: string, userPrompt: string, apiKey: string
         throw err;
       }
       console.warn(`[callGroq] Attempt ${attempt} failed: ${err.message}. Retrying...`);
-      await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000));
+      await new Promise(r => setTimeout(r, 1000));
     }
   }
 }
 
 // Call Google Gemini
 async function callGemini(systemPrompt: string, userPrompt: string, apiKey: string, expectArray = false): Promise<any> {
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    signal: AbortSignal.timeout(50000), // 50 seconds timeout
-    body: JSON.stringify({
-      system_instruction: {
-        parts: [{ text: systemPrompt }]
-      },
-      contents: [{
-        parts: [{ text: userPrompt }]
-      }],
-      generationConfig: {
-        temperature: 0.3,
-        response_mime_type: "application/json"
+  const modelsToTry = [
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent",
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent",
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent",
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent",
+  ];
+
+  let lastErr = "";
+  for (const modelUrl of modelsToTry) {
+    try {
+      const res = await fetch(`${modelUrl}?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(40000),
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ parts: [{ text: userPrompt }] }],
+          generationConfig: {
+            temperature: 0.3,
+            response_mime_type: "application/json"
+          }
+        }),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.warn(`[callGemini] ${modelUrl} failed: ${res.status} ${errorText}`);
+        lastErr = `${modelUrl.split("/").pop()?.split(":")[0]}: ${res.status} ${errorText}`;
+        continue;
       }
-    }),
-  });
-  if (!res.ok) {
-    const errorText = await res.text();
-    if (res.status === 400 && errorText.includes("API key not valid")) {
-      throw new Error("AUTH_ERROR: Gemini API key is invalid.");
+
+      const data = await res.json();
+      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+      return extractJson(rawText, expectArray);
+    } catch (e: any) {
+      lastErr = e.message;
     }
-    throw new Error(`Gemini API error: ${res.status} ${errorText}`);
   }
-  const data = await res.json();
-  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-  return extractJson(rawText, expectArray);
+  throw new Error(`Gemini API error: ${lastErr}`);
 }
 
 // Parse structured markdown notes into Notion block formats
@@ -732,6 +735,8 @@ Deno.serve(async (req: Request) => {
     const kimiApiKey = dbSettings?.kimi_api_key || Deno.env.get("KIMI_API_KEY") || Deno.env.get("MOONSHOT_API_KEY");
     const nimApiKey = dbSettings?.nim_api_key || Deno.env.get("NVIDIA_NIM_API_KEY");
     const openaiApiKey = dbSettings?.openai_api_key || Deno.env.get("OPENAI_API_KEY");
+    const openaiKey = openaiApiKey;
+    const geminiApiKey = dbSettings?.gemini_api_key || Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY");
 
     const proxyConfig: ProxyConfig | undefined = dbSettings?.proxy_url
       ? { url: dbSettings.proxy_url, auth: dbSettings.proxy_auth ?? undefined }
@@ -2278,6 +2283,125 @@ Return ONLY a valid JSON array:
       }
     }
 
+    if (body.action === "list-models") {
+      const groqApiKey = Deno.env.get("GROQ_API_KEY");
+      const geminiApiKey = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY");
+      let groqModels = null;
+      let geminiModels = null;
+
+      if (groqApiKey) {
+        try {
+          const r = await fetch("https://api.groq.com/openai/v1/models", {
+            headers: { Authorization: `Bearer ${groqApiKey}` }
+          });
+          groqModels = await r.json();
+        } catch (e: any) { groqModels = e.message; }
+      }
+
+      if (geminiApiKey) {
+        try {
+          const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${geminiApiKey}`);
+          geminiModels = await r.json();
+        } catch (e: any) { geminiModels = e.message; }
+      }
+
+      return new Response(JSON.stringify({ groqModels, geminiModels }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ══════════════════════════════════════════════════════
+    // ACTION: decompose-prompt
+    // Decomposes raw user prompt into high-precision ICP parameters
+    // ══════════════════════════════════════════════════════
+    if (body.action === "decompose-prompt") {
+      const { prompt: userPromptText } = body;
+      if (!userPromptText || typeof userPromptText !== "string") {
+        return new Response(JSON.stringify({ error: "Missing or invalid prompt" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const systemPrompt = `You are a campaign intelligence strategist for Atlas B2B acquisition platform.
+Analyze the user's natural language campaign prompt and decompose it into precise search and qualification parameters.
+Respond ONLY with a valid JSON object matching this schema:
+{
+  "keyword": "Core search term for company discovery (e.g., 'creative design agency' or 'AI developer tools')",
+  "industry": "Specific industry category (e.g. 'Design & Creative', 'Marketing Agency', 'Fintech', 'Healthcare', 'B2B SaaS', 'Technology')",
+  "team_size_filter": "Normalized employee size range (e.g. '5-10 employees', '10-30 employees', '10-50 employees')",
+  "channel": "Suggested sourcing channel: 'clutch' (for marketing, design, creative agencies & services), 'yc' (for venture/high-growth tech startups), 'hn' (for technical developer products/open source/engineers), or 'starter_story' (for bootstrapped/indie SaaS)",
+  "hypothesis": "A sharp, 1-sentence hypothesis on their likely operational bottleneck and value proposition (e.g. 'Streamlining creative revision cycles and automating client onboarding')",
+  "targetCount": 15
+}`;
+
+      let parsedResult: any = null;
+      const errors: Record<string, string> = {};
+
+      if (geminiApiKey) {
+        try {
+          parsedResult = await callGemini(systemPrompt, `Decompose this campaign prompt:\n\n"${userPromptText}"`, geminiApiKey, false);
+        } catch (e: any) {
+          errors.gemini = e.message;
+        }
+      }
+
+      if (!parsedResult && groqApiKey) {
+        try {
+          parsedResult = await callGroq(systemPrompt, `Decompose this campaign prompt:\n\n"${userPromptText}"`, groqApiKey, false);
+        } catch (e: any) {
+          errors.groq = e.message;
+        }
+      }
+
+      if (!parsedResult && openaiKey) {
+        try {
+          parsedResult = await callOpenAI(systemPrompt, `Decompose this campaign prompt:\n\n"${userPromptText}"`, openaiKey, false);
+        } catch (e: any) {
+          errors.openai = e.message;
+        }
+      }
+
+      // Fallback heuristics if all AI APIs are unavailable
+      if (!parsedResult || typeof parsedResult !== "object" || !parsedResult.keyword) {
+        const pLower = userPromptText.toLowerCase();
+        let channel: "hn" | "yc" | "clutch" | "starter_story" = "clutch";
+        if (pLower.includes("hn") || pLower.includes("hacker news") || pLower.includes("engineer")) channel = "hn";
+        else if (pLower.includes("agency") || pLower.includes("service") || pLower.includes("design") || pLower.includes("marketing")) channel = "clutch";
+        else if (pLower.includes("bootstrapped") || pLower.includes("indie")) channel = "starter_story";
+        else if (pLower.includes("ai") || pLower.includes("startup") || pLower.includes("saas") || pLower.includes("yc")) channel = "yc";
+
+        let industry = "Technology";
+        if (pLower.includes("marketing")) industry = "Marketing Agency";
+        else if (pLower.includes("design") || pLower.includes("creative")) industry = "Design & Creative";
+        else if (pLower.includes("finance") || pLower.includes("fintech")) industry = "Fintech";
+        else if (pLower.includes("health")) industry = "Healthcare";
+
+        // Extract numbers like "10-5" or "5-10"
+        const sizeMatch = userPromptText.match(/(\d+)\s*[-–to]+\s*(\d+)/i);
+        const team_size_filter = sizeMatch ? `${Math.min(parseInt(sizeMatch[1]), parseInt(sizeMatch[2]))}-${Math.max(parseInt(sizeMatch[1]), parseInt(sizeMatch[2]))} employees` : "5-30 employees";
+
+        const cleanKeyword = userPromptText
+          .replace(/(launch|create|run|start|cold email|campaign|for|our|targeting|find|reach out to)/gi, "")
+          .trim()
+          .slice(0, 40) || (industry !== "Technology" ? industry : "B2B SaaS");
+
+        parsedResult = {
+          keyword: cleanKeyword,
+          industry,
+          team_size_filter,
+          channel,
+          hypothesis: `Solving operational throughput constraints for ${cleanKeyword} teams.`,
+          targetCount: 15,
+          fallback_used: true,
+          provider_errors: errors,
+        };
+      }
+
+      return new Response(JSON.stringify(parsedResult), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // ══════════════════════════════════════════════════════
     // ACTION: generate-outreach
     // Generates personalized outreach copy for a company
@@ -2544,25 +2668,25 @@ Respond with ONLY this JSON (no markdown):
 ${researchContext}
 
 PROJECT DETAILS:
-What they need: ${form.what_they_need}
-Budget range: ${form.budget_range}
-Timeline: ${form.timeline}
-Approach/Tech: ${form.your_approach || "best fit for the project"}
+What they need: ${form?.what_they_need || "Operations workflow automation"}
+Budget range: ${form?.budget_range || "£3,000 - £5,000"}
+Timeline: ${form?.timeline || "2-4 weeks"}
+Approach/Tech: ${form?.your_approach || "best fit for the project"}
 
 Write a concise, professional proposal. Be specific. Use the research to make it feel personalised.
 Focus on their business outcomes, not technical features.
 
-Respond ONLY with a JSON object using this exact shape:
+Respond ONLY with a JSON object:
 {
   "executive_summary": "2-3 sentences. What you'll do and the business outcome they'll get.",
-  "problem_statement": "1-2 sentences. Describe their current pain precisely, using any details from the research.",
-  "proposed_solution": "2-3 sentences. Your specific solution and why this approach fits their situation.",
-  "scope": ["Line item 1", "Line item 2", "Line item 3", "Line item 4", "Line item 5"],
-  "deliverables": ["Deliverable 1", "Deliverable 2", "Deliverable 3", "Deliverable 4"],
-  "timeline": "Specific timeline with key phases e.g. Week 1: Discovery & setup. Week 2-3: Build. Week 4: Testing & launch.",
-  "investment": "Clear pricing statement e.g. Fixed price: ${form.budget_range}. 50% upfront, 50% on delivery.",
-  "why_us": "2 sentences. Why you specifically are the right person for this project.",
-  "next_steps": "One clear call to action e.g. Reply to confirm and I'll send a contract within 24 hours."
+  "problem_statement": "1-2 sentences. Describe their current pain precisely.",
+  "proposed_solution": "2-3 sentences. Your specific solution and why this fits.",
+  "scope": ["Line item 1", "Line item 2", "Line item 3"],
+  "deliverables": ["Deliverable 1", "Deliverable 2"],
+  "timeline": "Specific timeline with key phases.",
+  "investment": "Clear pricing statement.",
+  "why_us": "2 sentences why you are right for this.",
+  "next_steps": "One clear call to action."
 }`;
 
       const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -2589,10 +2713,98 @@ Respond ONLY with a JSON object using this exact shape:
     }
 
     // ─────────────────────────────────────────────
+    // ACTION: decompose-prompt
+    // ─────────────────────────────────────────────
+    if (body.action === "decompose-prompt") {
+      const { prompt: userPromptInput } = body as any;
+      if (!userPromptInput || typeof userPromptInput !== "string") {
+        return new Response(JSON.stringify({ error: "Missing or invalid prompt string." }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+
+      const systemPrompt = `You are an expert campaign strategy assistant for an outbound B2B engine.
+Analyze the user's natural language campaign request and extract actionable structured parameters for automated lead sourcing.
+
+Available channels:
+- "clutch": Best for marketing agencies, digital agencies, creative design studios, consultancies, dev shops, service companies.
+- "yc": Best for venture-backed startups, high-growth tech companies, AI labs, early-stage SaaS.
+- "hn": Best for developer tools, engineering-led companies, tech founders, open-source startups.
+- "starter_story": Best for bootstrapped businesses, indie founders, e-commerce brands, solo founders.
+- "custom": When a specific URL or custom source is specified.
+
+Respond ONLY with a JSON object:
+{
+  "channel": "clutch" | "yc" | "hn" | "starter_story" | "custom",
+  "industry": "Clean industry name (e.g. Design & Creative, AI SaaS, Fintech, B2B Marketing)",
+  "keyword": "Concise search term to query directories and web indexes (e.g. creative design agency, developer tools)",
+  "team_size": "Target company team size if specified (e.g. 5-10 employees, 10-50 employees), default '5-25 employees'",
+  "hypothesis": "A razor-sharp 1-2 sentence hypothesis identifying the single biggest operational bottleneck or pain point this specific target profile is facing.",
+  "targetCount": 15
+}`;
+
+      const userDecompPrompt = `Campaign prompt: "${userPromptInput}"`;
+      const geminiApiKey = dbSettings?.gemini_api_key || Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY");
+      const openaiKey = dbSettings?.openai_api_key || Deno.env.get("OPENAI_API_KEY");
+
+      let decompResult: any = null;
+      let lastDecompErr = "";
+
+      if (!decompResult && groqApiKey) {
+        try {
+          decompResult = await callGroq(systemPrompt, userDecompPrompt, groqApiKey, false);
+        } catch (e: any) { lastDecompErr = `Groq: ${e.message}`; }
+      }
+      if (!decompResult && geminiApiKey) {
+        try {
+          decompResult = await callGemini(systemPrompt, userDecompPrompt, geminiApiKey, false);
+        } catch (e: any) { lastDecompErr = `Gemini: ${e.message}`; }
+      }
+      if (!decompResult && openaiKey) {
+        try {
+          decompResult = await callOpenAI(systemPrompt, userDecompPrompt, openaiKey, false);
+        } catch (e: any) { lastDecompErr = `OpenAI: ${e.message}`; }
+      }
+
+      if (!decompResult || !decompResult.keyword) {
+        // Intelligent fallback if AI is unavailable
+        const pLower = userPromptInput.toLowerCase();
+        let ch = "yc";
+        if (pLower.includes("agency") || pLower.includes("design") || pLower.includes("marketing") || pLower.includes("service")) ch = "clutch";
+        else if (pLower.includes("hn") || pLower.includes("dev") || pLower.includes("tech") || pLower.includes("engineer")) ch = "hn";
+        else if (pLower.includes("bootstrapped") || pLower.includes("indie")) ch = "starter_story";
+
+        // Detect team size patterns like "10-5", "5-10", "10 to 5", "10-20"
+        const sizeMatch = userPromptInput.match(/\b(\d+)\s*(?:-|to)\s*(\d+)\b/);
+        let teamSizeStr = "5-25 employees";
+        if (sizeMatch) {
+          const n1 = parseInt(sizeMatch[1], 10);
+          const n2 = parseInt(sizeMatch[2], 10);
+          const min = Math.min(n1, n2);
+          const max = Math.max(n1, n2);
+          teamSizeStr = `${min}-${max} employees`;
+        }
+
+        decompResult = {
+          channel: ch,
+          industry: pLower.includes("design") ? "Design & Creative" : (pLower.includes("marketing") ? "Marketing & Advertising" : (pLower.includes("agency") ? "Digital Agencies" : "Technology")),
+          keyword: userPromptInput.replace(/(launch|create|run|start|cold email|campaign|for|our|targeting|find|reach out to)/gi, "").trim().slice(0, 40) || "Startups",
+          team_size: teamSizeStr,
+          hypothesis: `Targeting operational bottlenecks and sales automation constraints for ${userPromptInput.slice(0, 50)}`,
+          targetCount: 15
+        };
+      }
+
+      return new Response(JSON.stringify(decompResult), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    // ─────────────────────────────────────────────
     // ACTION: discover-leads
     // ─────────────────────────────────────────────
     if (body.action === "discover-leads") {
-      const { source, industry, keyword, custom_url, custom_api_key } = body as any;
+      const { source, industry, keyword, team_size, custom_url, custom_api_key } = body as any;
       const openaiKey = custom_api_key || dbSettings?.openai_api_key || Deno.env.get("OPENAI_API_KEY");
 
       let rawContent = "";
@@ -2615,7 +2827,7 @@ Prism Outreach & PR | https://prismoutreach.com | Digital PR, link building, med
 
       if (source === "clutch") {
         try {
-          const ddgQuery = `site:clutch.co/profile ${industry !== "Any" ? industry : "digital marketing"} ${keyword ?? ""}`.trim();
+          const ddgQuery = `site:clutch.co/profile ${industry !== "Any" && industry ? industry : (keyword || "digital agency")}`.trim();
           const liveSnippets = await searchDuckDuckGo(ddgQuery, proxyConfig);
           if (liveSnippets && liveSnippets.length > 200) {
             rawContent = liveSnippets;
@@ -2630,7 +2842,7 @@ Prism Outreach & PR | https://prismoutreach.com | Digital PR, link building, med
 
       } else if (source === "designrush") {
         try {
-          const ddgQuery = `site:designrush.com/agency ${industry !== "Any" ? industry : "digital marketing"} ${keyword ?? ""}`.trim();
+          const ddgQuery = `site:designrush.com/agency ${industry !== "Any" && industry ? industry : (keyword || "digital agency")}`.trim();
           const liveSnippets = await searchDuckDuckGo(ddgQuery, proxyConfig);
           if (liveSnippets && liveSnippets.length > 200) {
             rawContent = liveSnippets;
@@ -2645,7 +2857,7 @@ Prism Outreach & PR | https://prismoutreach.com | Digital PR, link building, med
 
       } else if (source === "upcity") {
         try {
-          const ddgQuery = `site:upcity.com ${industry !== "Any" ? industry : "digital marketing"} ${keyword ?? ""}`.trim();
+          const ddgQuery = `site:upcity.com/profiles ${industry !== "Any" && industry ? industry : (keyword || "digital marketing")}`.trim();
           const liveSnippets = await searchDuckDuckGo(ddgQuery, proxyConfig);
           if (liveSnippets && liveSnippets.length > 200) {
             rawContent = liveSnippets;
@@ -2669,7 +2881,7 @@ Prism Outreach & PR | https://prismoutreach.com | Digital PR, link building, med
             rawContent = (commentsData.hits ?? []).slice(0, 20).map((h: any) => h.comment_text ?? "").join("\n\n---\n\n");
           }
         } catch {
-          rawContent = CLUTCH_AGENCIES_DATA;
+          rawContent = "";
         }
         sourceLabel = "Hacker News Who's Hiring";
 
@@ -2680,7 +2892,7 @@ Prism Outreach & PR | https://prismoutreach.com | Digital PR, link building, med
           const companies = (Array.isArray(ycData) ? ycData : []).slice(0, 80);
           rawContent = companies.map((c: any) => `${c.name ?? ""} | ${c.url ?? ""} | ${c.one_liner ?? ""} | ${c.industry ?? ""}`).join("\n");
         } catch {
-          rawContent = CLUTCH_AGENCIES_DATA;
+          rawContent = "";
         }
         sourceLabel = "YC Companies";
 
@@ -2692,7 +2904,7 @@ Prism Outreach & PR | https://prismoutreach.com | Digital PR, link building, med
           const html = await ssRes.text();
           rawContent = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").slice(0, 8000);
         } catch {
-          rawContent = CLUTCH_AGENCIES_DATA;
+          rawContent = "";
         }
         sourceLabel = "Starter Story";
 
@@ -2701,7 +2913,7 @@ Prism Outreach & PR | https://prismoutreach.com | Digital PR, link building, med
           const scraped = await scrapeUrl(custom_url, proxyConfig);
           rawContent = `${scraped.title}\n\n${scraped.content}`.slice(0, 8000);
         } catch {
-          rawContent = CLUTCH_AGENCIES_DATA;
+          rawContent = "";
         }
         sourceLabel = custom_url;
       }
@@ -2710,7 +2922,6 @@ Prism Outreach & PR | https://prismoutreach.com | Digital PR, link building, med
         rawContent = CLUTCH_AGENCIES_DATA;
       }
 
-      const geminiApiKey = dbSettings?.gemini_api_key || Deno.env.get("GEMINI_API_KEY");
       if (!openaiKey && !groqApiKey && !kimiApiKey && !nimApiKey && !geminiApiKey) {
         return new Response(JSON.stringify({ error: "No AI API keys configured. Please add OpenAI, Groq, Kimi, NIM, or Gemini key." }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -2725,25 +2936,28 @@ Prism Outreach & PR | https://prismoutreach.com | Digital PR, link building, med
       const filters = [
         industry && industry !== "Any" ? `Industry filter: ${industry}` : null,
         keyword ? `Keyword filter: only companies related to "${keyword}"` : null,
+        team_size ? `Team size criteria: ${team_size}` : null,
       ].filter(Boolean).join(". ");
 
-      const systemPrompt = `You are a lead research assistant for a B2B Founder OS. Extract target company leads from the content scraped from: ${sourceLabel}`;
+      const systemPrompt = `You are a lead research assistant for a B2B Founder OS. Extract target company leads from the content scraped from: ${sourceLabel}.
+CRITICAL: ONLY extract companies that are authentic and directly mentioned in the content or are verified operating entities. Do NOT invent fake companies.`;
 
       const userPrompt = `TARGET ICP CRITERIA:
-- Industry: Marketing / Digital / Design / Performance Agencies
-- Team size: 5 to 30 employees
-- Location: English-speaking (US, UK, Canada, Australia)
-- ${filters || "Prioritize marketing and digital agencies with 5-30 employees."}${excludeFilter}
+- Target Industry/Niche: ${industry && industry !== "Any" ? industry : (keyword || "Target Niche")}
+- Specific Focus: ${keyword || "High-growth businesses and agencies"}
+- Team Size: ${team_size || "5 to 30 employees"}
+- Location: English-speaking (US, UK, Canada, Australia, Europe) unless specified
+- ${filters || "Prioritize companies matching the ICP criteria."}${excludeFilter}
 
 CONTENT:
 ${rawContent.slice(0, 6000)}
 
-Extract up to 12 distinct companies matching this ICP profile. For each return:
+Extract up to 12 distinct REAL companies matching this ICP profile. For each return:
 - organization_name: company name
-- primary_domain: URL if found, else ""
-- description: 1-2 sentences about their core services and likely operational bottlenecks (e.g. client reporting, onboarding)
-- industry: "Marketing Agency" or "Digital Agency"
-- team_size: estimated size (e.g. "10-25 employees")
+- primary_domain: URL if found, else clean website domain
+- description: 1-2 sentences about their core services and likely operational bottlenecks (e.g. client reporting, onboarding, delivery velocity)
+- industry: "${industry && industry !== "Any" ? industry : "Technology"}"
+- team_size: estimated size (e.g. "${team_size || "10-25 employees"}")
 - location: city/country if mentioned, else ""
 - source: "${sourceLabel}"
 
@@ -2751,36 +2965,29 @@ Respond ONLY as a JSON object with a single key "leads":
 {
   "leads": [
     {
-      "company": "Agency Name",
-      "website": "https://example.com",
-      "description": "Full service digital marketing agency...",
-      "industry": "Marketing Agency",
-      "team_size": "10-25 employees",
-      "location": "London, UK",
+      "organization_name": "Company Name",
+      "primary_domain": "https://example.com",
+      "description": "Full service agency or startup...",
+      "industry": "${industry && industry !== "Any" ? industry : "Technology"}",
+      "team_size": "${team_size || "10-25 employees"}",
+      "location": "City, Country",
       "source": "${sourceLabel}"
     }
   ]
 }`;
 
-      const DEFAULT_FALLBACK_AGENCIES = [
-        { organization_name: "BrightHire Agency", primary_domain: "https://brighthire.io", description: "B2B performance marketing & paid acquisition agency.", industry: "Marketing Agency", team_size: "15-25 employees", location: "London, UK", source: sourceLabel },
-        { organization_name: "Apex Digital Marketing", primary_domain: "https://apexdigital.com", description: "Full-service digital marketing, SEO, and content strategy.", industry: "Marketing Agency", team_size: "10-20 employees", location: "Austin, TX, US", source: sourceLabel },
-        { organization_name: "Elevate Media Group", primary_domain: "https://elevatemediagroup.com", description: "Paid social and influencer marketing for DTC brands.", industry: "Marketing Agency", team_size: "12-28 employees", location: "Toronto, Canada", source: sourceLabel },
-        { organization_name: "Beacon Growth Marketing", primary_domain: "https://beacongrowth.co", description: "B2B SaaS demand generation and inbound lead gen.", industry: "Marketing Agency", team_size: "8-18 employees", location: "Sydney, Australia", source: sourceLabel },
-        { organization_name: "Vanguard Creative House", primary_domain: "https://vanguardcreative.co", description: "Brand strategy, web design, and digital campaign studio.", industry: "Marketing Agency", team_size: "6-15 employees", location: "Manchester, UK", source: sourceLabel },
-        { organization_name: "Orbit Paid Media", primary_domain: "https://orbitpaidmedia.com", description: "Google Ads and Meta Ads specialist agency.", industry: "Marketing Agency", team_size: "10-22 employees", location: "Denver, CO, US", source: sourceLabel },
-        { organization_name: "Pulse Content Agency", primary_domain: "https://pulsecontent.io", description: "SEO, copy creation, and thought leadership content production.", industry: "Marketing Agency", team_size: "14-30 employees", location: "Melbourne, Australia", source: sourceLabel },
-        { organization_name: "Kinetix Growth Agency", primary_domain: "https://kinetixgrowth.com", description: "Conversion rate optimization and lifecycle email marketing.", industry: "Marketing Agency", team_size: "9-16 employees", location: "Chicago, IL, US", source: sourceLabel },
-        { organization_name: "Lumina Digital UK", primary_domain: "https://luminadigital.co.uk", description: "B2B digital marketing, LinkedIn management, web dev.", industry: "Marketing Agency", team_size: "7-18 employees", location: "Bristol, UK", source: sourceLabel },
-        { organization_name: "Summit Point Marketing", primary_domain: "https://summitpointmktg.com", description: "Local SEO, Google Business profile, lead funnels.", industry: "Marketing Agency", team_size: "5-12 employees", location: "Seattle, WA, US", source: sourceLabel },
-        { organization_name: "Aura Creative Studio", primary_domain: "https://auracreative.io", description: "UX/UI design, brand identity, and Webflow implementation.", industry: "Marketing Agency", team_size: "8-20 employees", location: "Vancouver, Canada", source: sourceLabel },
-        { organization_name: "Prism Outreach & PR", primary_domain: "https://prismoutreach.com", description: "Digital PR, link building, media placement.", industry: "Marketing Agency", team_size: "15-28 employees", location: "London, UK", source: sourceLabel },
-      ];
-
       let leads: any[] | null = null;
-      let lastError = "No AI providers available.";
+      let lastError = "No AI providers succeeded.";
 
-      // 1. Try Groq (Llama 3)
+      // 1. Try Gemini (Gemini 2.5 Flash - fastest, highest reliability)
+      if (!leads && geminiApiKey) {
+        try {
+          const res = await callGemini(systemPrompt, userPrompt, geminiApiKey, false);
+          leads = Array.isArray(res) ? res : (res.leads || res.companies || []);
+        } catch (e: any) { lastError = `Gemini Error: ${e.message}`; }
+      }
+
+      // 2. Try Groq (Llama 3 / gpt-oss-120b)
       if (!leads && groqApiKey) {
         try {
           const res = await callGroq(systemPrompt, userPrompt, groqApiKey, false);
@@ -2788,7 +2995,7 @@ Respond ONLY as a JSON object with a single key "leads":
         } catch (e: any) { lastError = `Groq Error: ${e.message}`; }
       }
 
-      // 2. Try Kimi (Moonshot)
+      // 3. Try Kimi (Moonshot)
       if (!leads && kimiApiKey) {
         try {
           const res = await callKimi(systemPrompt, userPrompt, kimiApiKey, false);
@@ -2796,7 +3003,7 @@ Respond ONLY as a JSON object with a single key "leads":
         } catch (e: any) { lastError = `Kimi Error: ${e.message}`; }
       }
 
-      // 3. Try NIM (Llama 3.1)
+      // 4. Try NIM (Llama 3.1)
       if (!leads && nimApiKey) {
         try {
           const res = await callNvidiaNim(systemPrompt, userPrompt, nimApiKey, false);
@@ -2804,7 +3011,7 @@ Respond ONLY as a JSON object with a single key "leads":
         } catch (e: any) { lastError = `NIM Error: ${e.message}`; }
       }
 
-      // 4. Try OpenAI directly (as fallback if others failed or weren't set)
+      // 5. Try OpenAI directly (as fallback)
       if (!leads && openaiKey) {
         try {
           const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -2841,17 +3048,15 @@ Respond ONLY as a JSON object with a single key "leads":
         }
       }
 
-      // 5. Try Gemini
-      if (!leads && geminiApiKey) {
-        try {
-          const res = await callGemini(systemPrompt, userPrompt, geminiApiKey, false);
-          leads = Array.isArray(res) ? res : (res.leads || res.companies || []);
-        } catch (e: any) { lastError = `Gemini Error: ${e.message}`; }
-      }
-
-      // ONLY use fallback if leads is literally null (which happens when AI providers fail)
-      if (!leads) {
-        leads = DEFAULT_FALLBACK_AGENCIES;
+      // DO NOT return fake fallback agencies. If AI fails, return an honest error so user is aware.
+      if (!leads || !Array.isArray(leads) || leads.length === 0) {
+        return new Response(JSON.stringify({
+          error: `Lead discovery failed across all AI providers. Last error: ${lastError}`,
+          leads: [],
+          source: sourceLabel,
+        }), {
+          status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       return new Response(JSON.stringify(leads), {

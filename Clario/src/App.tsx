@@ -22,6 +22,7 @@ export default function App() {
   const [currentPhase, setCurrentPhase] = useState<ClarioPhase>('home');
   const [latestResult, setLatestResult] = useState<any>(null);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
+  const [recordedEditScript, setRecordedEditScript] = useState<string>('');
 
   // Shell modals
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
@@ -233,9 +234,10 @@ export default function App() {
       ) : currentPhase === 'studio' ? (
         <RecordingStudio
           onBack={() => setCurrentPhase('home')}
-          onFinish={(blob) => {
+          onFinish={(blob, editScript) => {
             if (blob) {
               setRecordedBlob(blob);
+              setRecordedEditScript(editScript || '');
               setCurrentPhase('preview');
             } else {
               setCurrentPhase('home');
@@ -246,10 +248,15 @@ export default function App() {
         <RecordingPreview
           blob={recordedBlob}
           projectName={currentProject?.name}
+          editScript={recordedEditScript}
           onBack={() => setCurrentPhase('home')}
           onReRecord={() => {
             setRecordedBlob(null);
+            setRecordedEditScript('');
             setCurrentPhase('studio');
+          }}
+          onMoveToEditor={() => {
+            setCurrentPhase('video_canvas');
           }}
           onSave={async (blob) => {
              const asset = await uploadBlobToVault(blob, currentProject?.name);

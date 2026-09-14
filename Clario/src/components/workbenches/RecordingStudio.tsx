@@ -8,10 +8,8 @@ import {
 
 interface RecordingStudioProps {
   onBack: () => void;
-  onFinish: (videoBlob?: Blob) => void;
+  onFinish: (videoBlob?: Blob, editScript?: string) => void;
 }
-
-
 
 export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
   const screenVideoRef   = useRef<HTMLVideoElement>(null);
@@ -29,6 +27,10 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
   const [camOn, setCamOn] = useState(false);
   const [screenError, setScreenError] = useState<string | null>(null);
   
+  const [scriptMode, setScriptMode] = useState<'edit_script' | 'teleprompter'>('edit_script');
+  const [editDirectiveScript, setEditDirectiveScript] = useState(
+    "Auto-zoom smoothly on clicks & active fields, 24px padded canvas with rounded 16px corners, dark studio backdrop, trim silences >1.2s, 1.25x punch-in on value demo."
+  );
   const [teleprompterText, setTeleprompterText] = useState(
     "• Hey! Thanks for taking the time to review this.\n\n" +
     "• I know you've been struggling with pipeline stagnation recently.\n\n" +
@@ -185,7 +187,7 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
           clearTimeout(compositorRef.current);
           compositorRef.current = null;
         }
-        onFinish(new Blob(chunksRef.current, { type: 'video/webm' }));
+        onFinish(new Blob(chunksRef.current, { type: 'video/webm' }), editDirectiveScript);
       };
       mr.start(500);
       mediaRecorderRef.current = mr;
@@ -275,8 +277,6 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
           {/* Live screen stream */}
           <video ref={screenVideoRef} autoPlay muted playsInline className="w-full h-full object-contain bg-black" />
 
-
-
           {/* Draggable PIP webcam */}
           <motion.div
             className="absolute bottom-8 left-8 w-52 aspect-video rounded-2xl overflow-hidden ring-2 ring-white/20 shadow-[0_20px_40px_rgba(0,0,0,0.5)] z-20 cursor-move"
@@ -296,25 +296,86 @@ export function RecordingStudio({ onBack, onFinish }: RecordingStudioProps) {
           </motion.div>
         </div>
 
-        {/* Teleprompter Sidebar */}
-        <div className="w-full lg:w-[340px] h-[300px] lg:h-full lg:max-h-[600px] bg-white/5 backdrop-blur-md rounded-[24px] flex flex-col shadow-2xl border border-white/10 relative overflow-hidden group shrink-0">
-          <div className="flex items-center justify-between p-6 pb-4 border-b border-white/10 text-white shrink-0">
-            <div className="flex items-center gap-2">
-              <Activity className={`w-4 h-4 ${isRecording ? 'text-red-400' : 'text-accent'}`} />
-              <span className="text-xs font-mono uppercase tracking-widest font-semibold">Talking Points</span>
+        {/* AI Production Directive & Script Sidebar (Cap.so / Recordly Style) */}
+        <div className="w-full lg:w-[360px] h-[340px] lg:h-full lg:max-h-[600px] bg-white/5 backdrop-blur-md rounded-[24px] flex flex-col shadow-2xl border border-white/10 relative overflow-hidden group shrink-0">
+          <div className="p-4 pb-3 border-b border-white/10 text-white shrink-0">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Activity className={`w-4 h-4 ${isRecording ? 'text-red-400' : 'text-accent'}`} />
+                <span className="text-xs font-mono uppercase tracking-widest font-semibold">Video Director</span>
+              </div>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-accent/20 text-accent border border-accent/30 font-semibold">
+                Cap.so AI
+              </span>
+            </div>
+
+            {/* Mode Switcher */}
+            <div className="grid grid-cols-2 p-1 rounded-xl bg-white/5 border border-white/10 text-xs">
+              <button
+                onClick={() => setScriptMode('edit_script')}
+                className={`py-1.5 rounded-lg font-medium transition-all ${scriptMode === 'edit_script' ? 'bg-white/15 text-white shadow-sm' : 'text-white/50 hover:text-white'}`}
+              >
+                Production Directive
+              </button>
+              <button
+                onClick={() => setScriptMode('teleprompter')}
+                className={`py-1.5 rounded-lg font-medium transition-all ${scriptMode === 'teleprompter' ? 'bg-white/15 text-white shadow-sm' : 'text-white/50 hover:text-white'}`}
+              >
+                Teleprompter
+              </button>
             </div>
           </div>
 
-          <div className="flex-1 relative">
-            <textarea
-              className="w-full h-full bg-transparent text-white/90 text-lg leading-relaxed resize-none p-6 outline-none placeholder:text-white/30"
-              value={teleprompterText}
-              onChange={e => setTeleprompterText(e.target.value)}
-              placeholder="Write your talking points here..."
-              spellCheck={false}
-            />
-            {/* Visual fade effect for bottom edge */}
-            <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
+          {/* Body Content */}
+          <div className="flex-1 relative flex flex-col p-4 overflow-hidden">
+            {scriptMode === 'edit_script' ? (
+              <div className="flex-1 flex flex-col gap-3 overflow-y-auto">
+                <p className="text-[11px] text-white/50 leading-relaxed">
+                  Tell the LLM backend how you want the screen recording auto-edited, zoomed, and framed (like Cap.so):
+                </p>
+
+                {/* Quick Presets */}
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    onClick={() => setEditDirectiveScript("Auto-zoom smoothly on clicks & active fields, 24px padded studio canvas with rounded 16px corners, dark mesh backdrop, cut silences >1.2s, 1.25x punch-in on value demo.")}
+                    className="text-[10px] px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white/80 border border-white/10 transition-colors"
+                  >
+                    ⚡ Studio Polish
+                  </button>
+                  <button
+                    onClick={() => setEditDirectiveScript("Punch-in 1.35x on core site problem, rapid pacing under 45s for high conversion cold outreach email, smooth camera pan.")}
+                    className="text-[10px] px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white/80 border border-white/10 transition-colors"
+                  >
+                    🎯 Cold Outreach
+                  </button>
+                  <button
+                    onClick={() => setEditDirectiveScript("Dynamic cursor tracking, spotlight zoom on UI metrics, pop-up annotation callouts, branded outro card.")}
+                    className="text-[10px] px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-white/80 border border-white/10 transition-colors"
+                  >
+                    🚀 Launch Demo
+                  </button>
+                </div>
+
+                <textarea
+                  className="flex-1 min-h-[140px] bg-black/30 border border-white/10 rounded-xl text-white/90 text-sm leading-relaxed resize-none p-3 outline-none placeholder:text-white/30 focus:border-accent/50 transition-colors font-mono"
+                  value={editDirectiveScript}
+                  onChange={e => setEditDirectiveScript(e.target.value)}
+                  placeholder="e.g. Auto-zoom on clicks, 24px padded canvas with rounded 16px corners..."
+                  spellCheck={false}
+                />
+              </div>
+            ) : (
+              <div className="flex-1 relative">
+                <textarea
+                  className="w-full h-full bg-transparent text-white/90 text-base leading-relaxed resize-none outline-none placeholder:text-white/30"
+                  value={teleprompterText}
+                  onChange={e => setTeleprompterText(e.target.value)}
+                  placeholder="Write your spoken talking points here..."
+                  spellCheck={false}
+                />
+                <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
+              </div>
+            )}
           </div>
         </div>
       </div>

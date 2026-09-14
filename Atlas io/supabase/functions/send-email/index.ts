@@ -19,43 +19,49 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { lead_id } = await req.json()
-    if (!lead_id) {
-      throw new Error("Missing lead_id")
+    const body = await req.json()
+    const { lead_id, to_email: directToEmail, subject: directSubject, body: directBody, sender_name } = body
+
+    if (!lead_id && !directToEmail) {
+      throw new Error("Missing lead_id or to_email")
     }
 
-    // 1. Fetch the lead and the drafted message
-    const { data: lead, error: leadError } = await supabaseClient
-      .from('atlas_opportunities')
-      .select('*')
-      .eq('id', lead_id)
-      .single()
+    // 1. Fetch the lead if lead_id is provided
+    let lead: any = null
+    if (lead_id) {
+      const { data, error: leadError } = await supabaseClient
+        .from('atlas_opportunities')
+        .select('*')
+        .eq('id', lead_id)
+        .maybeSingle()
 
-    if (leadError || !lead) {
-      throw new Error("Lead not found")
+      if (leadError && !directToEmail) {
+        throw new Error(`Lead lookup error: ${leadError.message}`)
+      }
+      lead = data
     }
 
-    // Parse draft
-    let emailSubject = `Quick question regarding ${lead.organization_name}`
-    let emailBody = lead.outreach_draft || lead.draft_message || "Hello"
+    // 2. Parse subject & body
+    let emailSubject = directSubject || (lead?.organization_name ? `Quick question regarding ${lead.organization_name}` : "Quick inquiry")
+    let emailBody = directBody || (lead ? (lead.outreach_draft || lead.draft_message || "Hello") : "")
 
     // If it's a JSON string from AI (containing subject/body), try to parse it
     try {
-      if (emailBody.trim().startsWith('{')) {
+      if (typeof emailBody === 'string' && emailBody.trim().startsWith('{')) {
         const parsed = JSON.parse(emailBody)
         if (parsed.subject) emailSubject = parsed.subject
         if (parsed.body) emailBody = parsed.body
       }
-    } catch (e) {
+    } catch (_) {
       // It's just a raw text body
     }
 
-    // 2. Setup Nodemailer with Gmail SMTP
-    const smtpEmail = Deno.env.get('SMTP_EMAIL')
+    // 3. Setup Nodemailer with Gmail SMTP
+    const smtpEmail = Deno.env.get('SMTP_EMAIL') || 'multiverseglobals@gmail.com'
     const smtpPassword = Deno.env.get('SMTP_PASSWORD')
 
     if (!smtpEmail || !smtpPassword) {
-      throw new Error("SMTP credentials missing from environment variables")
+      throw new Error("SMTP credentials missing from environment variables (SMTP_EMAIL, SMTP_PASSWORD)")
     }
 
     const transporter = nodemailer.createTransport({
@@ -66,43 +72,50 @@ serve(async (req) => {
       },
     })
 
-    // 3. Construct recipient
-    // Extract domain from website, fallback to company name
-    let domain = "example.com"
-    if (lead.primary_domain) {
-      try {
-        const url = new URL(lead.primary_domain.startsWith('http') ? lead.primary_domain : `https://${lead.primary_domain}`)
-        domain = url.hostname.replace('www.', '')
-      } catch (e) {
-        domain = lead.primary_domain.replace('www.', '')
+    // 4. Determine recipient
+    let recipientEmail = directToEmail || lead?.contact_email || lead?.email
+    if (!recipientEmail && lead) {
+      let domain = "example.com"
+      if (lead.primary_domain) {
+        try {
+          const url = new URL(lead.primary_domain.startsWith('http') ? lead.primary_domain : `https://${lead.primary_domain}`)
+          domain = url.hostname.replace(/^www\./, '')
+        } catch (_) {
+          domain = lead.primary_domain.replace(/^www\./, '')
+        }
+      } else if (lead.organization_name) {
+        domain = `${lead.organization_name.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`
       }
-    } else {
-      domain = `${lead.organization_name.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`
+      recipientEmail = `founder@${domain}`
     }
-    
-    // We send to the founder's domain, but we BCC the user's email so they can verify it sent!
-    const toEmail = `founder@${domain}`
 
-    console.log(`Sending email to ${toEmail} with subject: ${emailSubject}`)
+    if (!recipientEmail) {
+      throw new Error("No recipient email could be resolved.")
+    }
 
-    // 4. Send the email
+    console.log(`Sending email to ${recipientEmail} with subject: ${emailSubject}`)
+
+    // 5. Send the email with BCC to user's email for proof of delivery
     const info = await transporter.sendMail({
-      from: `"Atlas AI" <${smtpEmail}>`,
-      to: smtpEmail, // Send directly to the user for testing!
+      from: `"${sender_name || 'Atlas AI'}" <${smtpEmail}>`,
+      to: recipientEmail,
+      bcc: smtpEmail, // BCC multiverseglobals@gmail.com so user has instant proof in Gmail
       subject: emailSubject,
       text: emailBody,
     })
 
     console.log("Email sent successfully: ", info.messageId)
 
-    // 5. Update the lead in DB as contacted
-    await supabaseClient
-      .from('atlas_opportunities')
-      .update({ is_contacted: true, pipeline_stage: 'contacted' })
-      .eq('id', lead_id)
+    // 6. Update the lead in DB as contacted if lead_id was provided
+    if (lead_id) {
+      await supabaseClient
+        .from('atlas_opportunities')
+        .update({ is_contacted: true, pipeline_stage: 'contacted' })
+        .eq('id', lead_id)
+    }
 
     return new Response(
-      JSON.stringify({ message: "Email sent successfully", messageId: info.messageId, to: toEmail }),
+      JSON.stringify({ message: "Email sent successfully", messageId: info.messageId, to: recipientEmail, bcc: smtpEmail }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 

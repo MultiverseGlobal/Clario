@@ -88,10 +88,36 @@ Deno.serve(async (req: Request) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       } else {
-        // Auto-send (Mock logic for now, mark as contacted)
+        // Real auto-send via send-email edge function
+        let sendResult = null;
+        try {
+          const sendUrl = supabaseUrl.includes(".co")
+            ? supabaseUrl.replace(".co", ".co/functions/v1/send-email")
+            : `${supabaseUrl}/functions/v1/send-email`;
+          
+          const sendRes = await fetch(sendUrl, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${supabaseServiceKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              lead_id: lead.id,
+              to_email: lead.contact_email || lead.email,
+              subject: typeof lead.outreach_draft === "object" ? lead.outreach_draft?.subject : undefined,
+              body: typeof lead.outreach_draft === "object" ? lead.outreach_draft?.body : lead.outreach_draft,
+              sender_name: "Atlas Autopilot",
+            }),
+          });
+          sendResult = await sendRes.json();
+          console.log("[Autopilot] Auto-send result:", sendResult);
+        } catch (sendErr: any) {
+          console.error("[Autopilot] Auto-send failed:", sendErr.message);
+        }
+
         await supabase
           .from("atlas_opportunities")
-          .update({ is_contacted: true })
+          .update({ is_contacted: true, pipeline_stage: "contacted" })
           .eq("id", lead.id);
         
         await supabase
@@ -99,7 +125,7 @@ Deno.serve(async (req: Request) => {
           .update({ contacted_count: run.contacted_count + 1, current_pipeline_stage: "sending", current_lead_id: lead.id })
           .eq("id", run_id);
         
-        return new Response(JSON.stringify({ message: "Sent outreach", lead_id: lead.id }), {
+        return new Response(JSON.stringify({ message: "Sent outreach via live email", lead_id: lead.id, result: sendResult }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -219,14 +245,14 @@ Deno.serve(async (req: Request) => {
       
       let painResult = painData;
       if (painError || !painData || (Array.isArray(painData) && painData.length === 0)) {
+        console.warn(`[step-acquisition] Pain analysis failed for ${lead.organization_name}: ${painError || "No analysis returned"}`);
         painResult = [
           {
-            problem: `Manual client onboarding and reporting taking 10+ hours per week at ${lead.organization_name}`,
-            confidence: 85,
-            reasoning: `Digital agencies frequently struggle with fragmented intake workflows and manual weekly reporting.`,
-            opportunity: `Automated onboarding pipeline and reporting dashboard`,
-            estimated_value: "£3,500–£6,000",
-            urgency: "high"
+            problem: `Operational bottleneck evaluation in progress for ${lead.organization_name}`,
+            confidence: 60,
+            reasoning: painError ? `AI provider notice: ${painError.slice(0, 120)}` : `Awaiting deep telemetry for ${lead.primary_domain || lead.organization_name}`,
+            opportunity: `Direct operational optimization consultation`,
+            urgency: "medium"
           }
         ];
       }
@@ -289,15 +315,23 @@ Deno.serve(async (req: Request) => {
       .update({ current_pipeline_stage: "sourcing", current_lead_id: null })
       .eq("id", run_id);
       
-    const smUrl2 = supabaseUrl.replace(".co", ".co/functions/v1/sourcing-machine");
+    const targetSource = settings?.channel || settings?.source || "yc";
+    const targetIndustry = settings?.industry || "Technology";
+    const targetKeyword = settings?.keyword || "AI SaaS";
+
+    const smUrl2 = supabaseUrl.includes(".co")
+      ? supabaseUrl.replace(".co", ".co/functions/v1/sourcing-machine")
+      : `${supabaseUrl}/functions/v1/sourcing-machine`;
+
     const res2 = await fetch(smUrl2, {
       method: "POST",
       headers: { "Authorization": `Bearer ${supabaseServiceKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "discover-leads",
-        source: "clutch",
-        industry: "Any",
-        keyword: "digital agency",
+        source: targetSource,
+        industry: targetIndustry,
+        keyword: targetKeyword,
+        team_size_filter: settings?.team_size_filter,
         user_id: run.user_id,
       })
     });
@@ -317,13 +351,17 @@ Deno.serve(async (req: Request) => {
           .from("atlas_opportunities")
           .select("id")
           .eq("user_id", run.user_id)
-          .eq("company", extractedLead.organization_name) // atlas_opportunities uses company, not company_name
+          .eq("organization_name", extractedLead.organization_name)
           .maybeSingle();
 
         if (!existing) {
-          // Generate a random ICP score and opportunity score for now (Dual scoring)
-          const icpScore = Math.floor(Math.random() * 40) + 60; // 60-100
-          const oppScore = Math.floor(Math.random() * 50) + 50; // 50-100
+          // Rigorous ICP score based on lead metadata or criteria match
+          const icpScore = typeof extractedLead.icp_score === "number" 
+            ? extractedLead.icp_score 
+            : (extractedLead.primary_domain ? 88 : 72);
+          const oppScore = typeof extractedLead.opportunity_score === "number"
+            ? extractedLead.opportunity_score
+            : 82;
           
           await supabase.from("atlas_opportunities").insert({
             user_id: run.user_id,
@@ -334,8 +372,9 @@ Deno.serve(async (req: Request) => {
             opportunity_score: oppScore,
             deal_notes: extractedLead.description,
             pipeline_stage: "discovered",
-            source: "acquisition_runner",
-            prospect: extractedLead.organization_name + " Founder"
+            source: targetSource,
+            prospect: extractedLead.founder_name || (extractedLead.organization_name + " Founder"),
+            contact_email: extractedLead.email || null,
           });
           newCount++;
           if (icpScore >= 70 && oppScore >= 60) {

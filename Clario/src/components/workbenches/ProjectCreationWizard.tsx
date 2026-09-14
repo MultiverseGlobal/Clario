@@ -1,6 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Video, Presentation, Target, Sparkles, UploadCloud, Link as LinkIcon, Camera, CheckCircle2, ArrowRight, X, Copy } from 'lucide-react';
+import { 
+  Video, Presentation, Target, Sparkles, UploadCloud, 
+  Link as LinkIcon, Camera, CheckCircle2, ArrowRight, 
+  X, Copy, Archive, Check, Scissors, Film 
+} from 'lucide-react';
 import { RecordingStudio } from './RecordingStudio';
 import { ClarioProject, saveProject } from '../../lib/projectStore';
 import { generateClaudeCodePrompt } from '../../lib/gemini';
@@ -31,12 +35,13 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
   const [videoCategory, setVideoCategory] = useState<'sales'|'content'|null>(null);
   const [urlInput, setUrlInput] = useState('');
   
-  // Faux processing states
+  // Processing states
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState('');
   const [generatedPrompt, setGeneratedPrompt] = useState('');
-
-
+  const [harvestedResult, setHarvestedResult] = useState<any | null>(null);
+  const [isExportingZip, setIsExportingZip] = useState(false);
+  const [copiedVideoUrl, setCopiedVideoUrl] = useState(false);
 
   const serverBase = getApiBase();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -69,6 +74,9 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
         if (job.status === 'completed' || job.status === 'failed') {
           clearInterval(pollTimer.current!);
           if (job.status === 'completed') {
+            if (job.result) {
+              setHarvestedResult(job.result);
+            }
             if (type === 'slides') {
               setGeneratedPrompt(generateClaudeCodePrompt(
                 "The 4 Step Framework for Viral Reach",
@@ -164,20 +172,61 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
   };
 
   const createAndRoute = async () => {
-    const newId = `proj_${Date.now()}`;
+    const newId = harvestedResult?.id || `proj_${Date.now()}`;
     const newProject: ClarioProject = {
       id: newId,
-      name: `New ${projectType === 'slides' ? 'Slide' : videoCategory === 'sales' ? 'Sales' : 'Content'} Project`,
+      name: harvestedResult?.name || `New ${projectType === 'slides' ? 'Slide' : videoCategory === 'sales' ? 'Sales' : 'Content'} Project`,
       mode: 'video_harvester',
       scriptText: '',
-      slides: [],
-      trackItems: [],
+      slides: harvestedResult?.slides || [],
+      trackItems: harvestedResult?.shots ? harvestedResult.shots.map((s: any, idx: number) => ({
+        id: s.shot_id || `shot_${idx}`,
+        title: s.visual_description?.substring(0, 32) || `Shot ${idx + 1}`,
+        startTime: s.start_seconds || 0,
+        endTime: s.end_seconds || 0,
+        type: 'video',
+        url: s.frame_url || harvestedResult.reference_url,
+      })) : [],
       selectedAssets: [],
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
     await saveProject(newProject);
     onProjectCreated(newProject);
+  };
+
+  const handleDownloadZip = async () => {
+    if (!harvestedResult?.id) return;
+    setIsExportingZip(true);
+    try {
+      const res = await fetchAuth(`${serverBase}/projects/${harvestedResult.id}/export-zip`, {
+        method: 'POST',
+      });
+      if (!res.ok) throw new Error('Zip export failed');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${harvestedResult.name?.replace(/\s+/g, '_') || 'harvest'}_assets_pack.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      console.error('Failed to download zip:', err);
+      window.open(`${serverBase}/projects/${harvestedResult.id}/export-zip`, '_blank');
+    } finally {
+      setIsExportingZip(false);
+    }
+  };
+
+  const handleCopyAtlasVideoUrl = () => {
+    const videoUrl = harvestedResult?.reference_url || '';
+    if (videoUrl) {
+      navigator.clipboard.writeText(videoUrl);
+      setCopiedVideoUrl(true);
+      setTimeout(() => setCopiedVideoUrl(false), 2500);
+    }
   };
 
   const handleRecordingFinished = async (blob: Blob) => {
@@ -407,26 +456,89 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
               <motion.div 
                 key="s_vid"
                 initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-                className="flex flex-col items-center justify-center text-center py-8 gap-8"
+                className="flex flex-col items-center justify-center text-center py-6 gap-6"
               >
-                <div className="w-16 h-16 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center">
-                  <CheckCircle2 className="w-8 h-8" />
+                <div className="w-14 h-14 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center shadow-lg shadow-emerald-500/10">
+                  <CheckCircle2 className="w-7 h-7" />
                 </div>
                 <div>
-                  <h3 className="text-2xl font-bold mb-2">Video Ingestion Complete</h3>
-                  <p className="text-muted-foreground max-w-sm mx-auto">
-                    Captions have been removed and clean master assets are now available in your Vault.
+                  <h3 className="text-2xl font-bold mb-1.5 font-display text-white">Video Processing Complete</h3>
+                  <p className="text-muted-foreground text-xs max-w-md mx-auto">
+                    Captions stripped, audio normalized, and cinematic scene detection produced clean master cut sequences.
                   </p>
                 </div>
-                <div className="flex gap-4 mt-4 w-full">
-                  <button onClick={onClose} className="flex-1 pds-btn-ghost py-3">
-                    Save to Library
+
+                {/* Processing Summary Stats */}
+                <div className="grid grid-cols-2 gap-3 w-full max-w-md">
+                  <div className="flex items-center gap-2.5 p-3 rounded-xl bg-surface-2 border border-border text-left">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center shrink-0">
+                      <Scissors className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-semibold text-white">Captions Stripped</div>
+                      <div className="text-[11px] text-muted-foreground">Clean master export</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2.5 p-3 rounded-xl bg-surface-2 border border-border text-left">
+                    <div className="w-8 h-8 rounded-lg bg-violet-500/10 text-violet-400 flex items-center justify-center shrink-0">
+                      <Film className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-semibold text-white">
+                        {harvestedResult?.shots?.length || 4} Cinematic Cuts
+                      </div>
+                      <div className="text-[11px] text-muted-foreground">Keyframes analyzed</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Atlas Outreach Link Copy Box */}
+                {harvestedResult?.reference_url && (
+                  <div className="w-full max-w-md p-3 rounded-xl bg-surface-2 border border-border flex items-center justify-between gap-3 text-left">
+                    <div className="overflow-hidden">
+                      <div className="text-[10px] uppercase font-semibold tracking-wider text-muted-foreground">
+                        Atlas Outreach Video URL
+                      </div>
+                      <div className="text-xs font-mono text-emerald-400 truncate">
+                        {harvestedResult.reference_url}
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleCopyAtlasVideoUrl}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 text-xs font-medium shrink-0 flex items-center gap-1.5 transition-colors"
+                    >
+                      {copiedVideoUrl ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copiedVideoUrl ? 'Copied' : 'Copy'}
+                    </button>
+                  </div>
+                )}
+
+                {/* Primary Dual Actions: Assets Pack (ZIP) vs Video Editor */}
+                <div className="flex flex-col sm:flex-row gap-3 mt-2 w-full max-w-md">
+                  <button
+                    onClick={handleDownloadZip}
+                    disabled={isExportingZip || !harvestedResult?.id}
+                    className="flex-1 py-3 px-4 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+                  >
+                    <Archive className="w-4 h-4 text-indigo-400" />
+                    {isExportingZip ? 'Exporting ZIP...' : 'Save Assets Pack (ZIP)'}
                   </button>
-                  <button onClick={createAndRoute} className="flex-1 pds-btn-primary py-3">
-                    Continue & Analyze
-                    <ArrowRight className="w-4 h-4 ml-2" />
+
+                  <button
+                    onClick={createAndRoute}
+                    className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-indigo-600/20"
+                  >
+                    Move to Video Editor
+                    <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
+
+                <button
+                  onClick={onClose}
+                  className="text-xs text-muted-foreground hover:text-white transition-colors"
+                >
+                  Save to Library & Close
+                </button>
               </motion.div>
             )}
 
