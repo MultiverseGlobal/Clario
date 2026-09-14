@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { listProjects, deleteProject, saveProject, ClarioProject } from '../../lib/projectStore';
 import { Play, Plus, Clock, FileVideo, Trash2, Edit2 } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
 import { ProjectCreationWizard } from './ProjectCreationWizard';
 
 export function HomeView({ 
@@ -157,6 +158,7 @@ export function HomeView({
         </div>
       )}
 
+      <AnimatePresence>
       {showWizard && (
         <ProjectCreationWizard 
           onClose={() => setShowWizard(false)} 
@@ -171,6 +173,7 @@ export function HomeView({
           }}
         />
       )}
+      </AnimatePresence>
 
       {projectToDelete && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fade-in" onClick={() => setProjectToDelete(null)}>
