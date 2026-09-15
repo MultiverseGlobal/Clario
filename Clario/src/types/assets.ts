@@ -68,7 +68,7 @@ export type AssetOutputType =
   | 'generated_original'
   | 'ai_cleaned_reference_still';
 
-export type HarvesterMode = 'video_harvester' | 'slide_harvester' | 'generator' | 'library';
+export type HarvesterMode = 'video_harvester' | 'slide_harvester' | 'generator' | 'library' | 'asset_pack';
 
 /**
  * Canonical Persistent Asset Record Model.

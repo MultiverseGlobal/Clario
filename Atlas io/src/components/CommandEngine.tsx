@@ -775,7 +775,11 @@ export function CommandEngine({
               </div>
             </div>
           </motion.div>
-        {/* ── Slide-Over ICP Suggestions & Market Signals Drawer ── */}
+        )}
+      </AnimatePresence>
+
+      {/* ── Slide-Over ICP Suggestions & Market Signals Drawer ── */}
+      <AnimatePresence>
         {isIcpDrawerOpen && (
           <>
             <motion.div

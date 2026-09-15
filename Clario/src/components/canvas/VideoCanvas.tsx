@@ -315,7 +315,6 @@ export function VideoCanvas({
       
       // Recalculate start times and enforce intelligent pacing
       let offset = 0;
-      let offset = 0;
       const reassembled: VideoTrackItem[] = [];
       let pendingMerge: VideoTrackItem | null = null;
       let pendingDur = 0;
@@ -811,8 +810,7 @@ export function VideoCanvas({
                 </div>
               </div>
             )}
-
-            
+          </div>
         ) : (
           <div style={{ 
             textAlign: "center", 

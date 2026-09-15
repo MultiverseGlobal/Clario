@@ -25,10 +25,11 @@ export interface ClarioProject {
   name: string;
   mode: ContentMode | HarvesterMode;
   format?: CanvasFormat;
-  scriptText: string;
-  slides: CarouselSlideItem[];
-  trackItems: VideoTrackItem[];
-  selectedAssets: Asset[];
+  aspectRatio?: CanvasFormat | string;
+  scriptText?: string;
+  slides?: CarouselSlideItem[];
+  trackItems?: VideoTrackItem[];
+  selectedAssets?: Asset[];
   harvestProject?: HarvestProject;
   category?: 'sales' | 'content' | 'slides';
   targetPurpose?: string;
