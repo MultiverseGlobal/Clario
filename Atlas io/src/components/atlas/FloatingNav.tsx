@@ -8,6 +8,7 @@ import {
   Compass, Handshake, Film, User, Bot, Send
 } from "lucide-react";
 import { AtlasIcon } from "@/components/atlas/EcosystemIcons";
+import { EcosystemSwitcher } from "@/components/atlas/EcosystemSwitcher";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,12 +40,12 @@ export function FloatingNav({ onNewLead }: FloatingNavProps) {
 
   return (
     <>
-      {/* ── Brand Mark — top left ───────────────────────────────────── */}
+      {/* ── Brand Mark & Ecosystem Switcher — top left ─────────────── */}
       <motion.div
         initial={{ opacity: 0, x: -8 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-        className="fixed top-5 left-5 z-50"
+        className="fixed top-5 left-5 z-50 flex items-center gap-2"
       >
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -96,7 +97,12 @@ export function FloatingNav({ onNewLead }: FloatingNavProps) {
             )}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        <div className="flex items-center px-1 py-0.5 rounded-xl bg-card/80 border border-border/50 shadow-sm backdrop-blur-md">
+          <EcosystemSwitcher align="left" isDark={theme === "dark"} />
+        </div>
       </motion.div>
+
 
       {/* ── Main Navigation Dock — top center ────────────────────── */}
       <motion.div

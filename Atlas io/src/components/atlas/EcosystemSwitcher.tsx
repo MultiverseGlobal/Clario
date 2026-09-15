@@ -14,7 +14,7 @@ export const ECOSYSTEM_APPS = [
     id: "pseudonyms_id",
     name: "Pseudonyms ID",
     tagline: "Master Sovereign Account & Hub",
-    url: import.meta.env.VITE_PSEUDONYMS_ID_URL || "http://localhost:3005",
+    url: import.meta.env.VITE_PSEUDONYMS_ID_URL || "https://pseudonyms-id.vercel.app",
     status: "live",
     Icon: PseudonymsIDIcon,
   },
@@ -30,7 +30,7 @@ export const ECOSYSTEM_APPS = [
     id: "metaphor",
     name: "Metaphor OS",
     tagline: "Universal Context Engine",
-    url: import.meta.env.VITE_METAPHOR_URL || "https://metaphor-backend.onrender.com",
+    url: import.meta.env.VITE_METAPHOR_URL || "https://metaphor-three.vercel.app",
     status: "live",
     Icon: MetaphorIcon,
   },
@@ -46,7 +46,7 @@ export const ECOSYSTEM_APPS = [
     id: "orion",
     name: "Orion",
     tagline: "Skia Fluid Mobile Companion",
-    url: import.meta.env.VITE_ORION_URL || "exp://localhost:8081",
+    url: import.meta.env.VITE_ORION_URL || "https://william-web-zeta.vercel.app",
     status: "building",
     Icon: OrionIcon,
   },
@@ -90,7 +90,7 @@ export function EcosystemSwitcher({ align = "right", isDark = true }: EcosystemS
       {/* Dimmed backdrop to prevent background elements from bleeding through */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/55 backdrop-blur-xs transition-opacity animate-in fade-in duration-150"
+          className="fixed inset-0 z-[90] bg-black/55 backdrop-blur-xs transition-opacity animate-in fade-in duration-150"
           onClick={() => setIsOpen(false)}
         />
       )}
@@ -123,7 +123,7 @@ export function EcosystemSwitcher({ align = "right", isDark = true }: EcosystemS
         {/* Sovereign Popover Panel */}
         {isOpen && (
           <div
-            className={`absolute ${align === "right" ? "right-0" : "left-0"} mt-3 w-[360px] rounded-2xl border p-4 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 space-y-3.5 ${
+            className={`absolute ${align === "right" ? "right-0" : "left-0"} mt-3 w-[360px] rounded-2xl border p-4 shadow-2xl z-[100] animate-in fade-in zoom-in-95 duration-150 space-y-3.5 ${
               isDark
                 ? "bg-[#090b10] border-white/15 shadow-[0_25px_65px_rgba(0,0,0,0.92)] text-white"
                 : "bg-white border-neutral-200 shadow-2xl text-neutral-900"
