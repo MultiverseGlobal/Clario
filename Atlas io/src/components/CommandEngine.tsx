@@ -55,10 +55,10 @@ export function CommandEngine({
   }>({ industry: "", keyword: "", hypothesis: "", targetCount: 15, min_headcount: 5, max_headcount: 30, regions: ["US", "UK"], decision_maker_titles: ["Founder", "CEO"] });
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // ── Dynamic & Searchable ICP Suggestions State ──────────────────────────
+  // ── Dynamic & Searchable ICP Suggestions Drawer State ───────────────────
   const [icpCategory, setIcpCategory] = useState<string>("all");
   const [icpSearch, setIcpSearch] = useState<string>("");
-  const [isIcpSearchOpen, setIsIcpSearchOpen] = useState<boolean>(false);
+  const [isIcpDrawerOpen, setIsIcpDrawerOpen] = useState<boolean>(false);
   const [hoveredIcp, setHoveredIcp] = useState<IcpSuggestion | null>(null);
 
   const todayFocus = getTodayIcpFocus();
@@ -358,165 +358,30 @@ export function CommandEngine({
           </div>
         </form>
 
-        {/* ── Dynamic & Searchable ICP Suggestion Tactical Dock (Only when Idle) ── */}
+        {/* ── Minimalist Target Suggestions & Market Signals Trigger (Only when Idle) ── */}
         {!isRunning && (
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            className="mt-5 w-full max-w-3xl flex flex-col items-center"
+            transition={{ delay: 0.1 }}
+            className="mt-4 flex items-center justify-center gap-2"
           >
-            {/* Today's Day Cadence & Search Toggle Header */}
-            <div className="flex items-center justify-between w-full px-2 mb-2.5">
-              <div className="flex items-center gap-2 text-[11px] font-mono text-muted-foreground">
-                <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="font-semibold text-foreground uppercase tracking-wider">{todayFocus.theme.dayName} Focus:</span>
-                <span className="truncate text-foreground/80 font-medium hidden sm:inline">{todayFocus.theme.focusTheme}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsIcpSearchOpen((v) => !v);
-                  soundManager.playClick();
-                }}
-                className={`flex items-center gap-1.5 text-[11px] font-mono transition-all px-2.5 py-1 rounded-lg border cursor-pointer ${
-                  isIcpSearchOpen || icpSearch
-                    ? "bg-foreground text-background border-foreground font-semibold shadow-sm"
-                    : "text-muted-foreground hover:text-foreground bg-card/60 hover:bg-card border-border/50"
-                }`}
-                title="Search ICP presets by keyword or industry"
-              >
-                <Search className="w-3 h-3" />
-                <span>{isIcpSearchOpen ? "Search Active" : "Search ICPs"}</span>
-                {icpSearch && (
-                  <span className="ml-1 text-[9px] px-1 rounded bg-background/20 text-background">
-                    {visibleSuggestions.length}
-                  </span>
-                )}
-              </button>
-            </div>
-
-            {/* Quick Search Input (Togglable) */}
-            <AnimatePresence>
-              {isIcpSearchOpen && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0, marginBottom: 0 }}
-                  animate={{ opacity: 1, height: "auto", marginBottom: 12 }}
-                  exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="w-full overflow-hidden"
-                >
-                  <div className="relative flex items-center w-full">
-                    <Search className="absolute left-3.5 w-3.5 h-3.5 text-muted-foreground" />
-                    <input
-                      type="text"
-                      autoFocus
-                      value={icpSearch}
-                      onChange={(e) => setIcpSearch(e.target.value)}
-                      placeholder="Filter targets by keyword, market conversation, or field (e.g. 'design', 'hacker', 'AI', 'SaaS', 'friction')..."
-                      className="w-full pl-9 pr-9 py-2 text-xs font-mono rounded-xl bg-card/90 border border-border/70 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 shadow-sm backdrop-blur-md"
-                    />
-                    {icpSearch && (
-                      <button
-                        type="button"
-                        onClick={() => setIcpSearch("")}
-                        className="absolute right-3 p-1 text-muted-foreground hover:text-foreground cursor-pointer"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Category Filter Chips */}
-            <div className="flex items-center justify-center gap-1.5 flex-wrap w-full mb-3">
-              {ICP_CATEGORIES.map((cat) => {
-                const isSelected = icpCategory === cat.id;
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => {
-                      setIcpCategory(cat.id);
-                      soundManager.playClick();
-                    }}
-                    className={`px-2.5 py-1 rounded-full text-[11px] font-mono transition-all cursor-pointer ${
-                      isSelected
-                        ? "bg-foreground text-background font-semibold shadow-sm"
-                        : "bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted border border-border/40"
-                    }`}
-                  >
-                    {cat.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Suggestions Pills List */}
-            <div className="flex flex-wrap items-center justify-center gap-2 w-full">
-              {visibleSuggestions.length === 0 ? (
-                <div className="py-4 text-center text-xs font-mono text-muted-foreground">
-                  No ICP presets match "{icpSearch}". Try another industry or keyword.
-                </div>
-              ) : (
-                visibleSuggestions.slice(0, 10).map((preset) => (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onMouseEnter={() => setHoveredIcp(preset)}
-                    onMouseLeave={() => setHoveredIcp(null)}
-                    onClick={() => {
-                      soundManager.playClick();
-                      setInputPrompt(preset.query);
-                      executePrompt(preset.query);
-                    }}
-                    className="group flex items-center gap-2 px-3.5 py-1.5 rounded-full border text-xs font-mono font-medium tracking-tight transition-all cursor-pointer backdrop-blur-md border-neutral-300 bg-white text-neutral-900 hover:border-neutral-400 hover:bg-neutral-50 shadow-sm hover:shadow-md dark:border-white/15 dark:bg-white/[0.07] dark:text-white dark:hover:bg-white/15 dark:hover:border-white/30 dark:hover:shadow-[0_0_15px_rgba(255,255,255,0.12)] active:scale-98"
-                  >
-                    <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-muted/80 text-muted-foreground font-semibold uppercase tracking-wider group-hover:text-foreground transition-colors">
-                      {preset.sourceBadge}
-                    </span>
-                    <span>{preset.label}</span>
-                    {preset.hotMetric && (
-                      <span className="hidden sm:inline-block text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                        {preset.hotMetric}
-                      </span>
-                    )}
-                  </button>
-                ))
-              )}
-            </div>
-
-            {/* Real-time Market Signal / Conversation Telemetry Bar */}
-            <div className="min-h-[30px] mt-2.5 flex items-center justify-center text-center w-full">
-              <AnimatePresence mode="wait">
-                {hoveredIcp ? (
-                  <motion.div
-                    key={hoveredIcp.id}
-                    initial={{ opacity: 0, y: 3 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -3 }}
-                    transition={{ duration: 0.15 }}
-                    className="flex items-center gap-2 px-3.5 py-1 rounded-full bg-card/90 border border-border/60 text-[11px] font-mono text-muted-foreground shadow-sm max-w-2xl"
-                  >
-                    <Flame className="w-3 h-3 text-amber-500 shrink-0" />
-                    <span className="font-semibold text-foreground">Market Conversation:</span>
-                    <span className="truncate">{hoveredIcp.trendingSignal}</span>
-                    {hoveredIcp.headcountRange && (
-                      <span className="text-foreground/80 font-bold ml-1 hidden sm:inline">
-                        • {hoveredIcp.headcountRange}
-                      </span>
-                    )}
-                  </motion.div>
-                ) : (
-                  <div className="text-[10px] font-mono text-muted-foreground/60 flex items-center gap-1.5">
-                    <Sparkles className="w-3 h-3 text-muted-foreground/40 shrink-0" />
-                    <span>Real-time intelligence from YC launches, Hacker News 'Who is Hiring', and Clutch rankings</span>
-                  </div>
-                )}
-              </AnimatePresence>
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setIsIcpDrawerOpen(true);
+                soundManager.playClick();
+              }}
+              className="group flex items-center gap-2.5 px-4 py-2 rounded-full border text-xs font-mono font-medium transition-all cursor-pointer backdrop-blur-md border-border/70 bg-card/70 hover:bg-card text-muted-foreground hover:text-foreground shadow-sm hover:shadow-md hover:border-foreground/30 active:scale-98"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-emerald-500 group-hover:rotate-12 transition-transform" />
+              <span className="font-semibold text-foreground">Target Suggestions & Signals</span>
+              <span className="hidden sm:inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-muted/80 text-muted-foreground border border-border/40">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                {todayFocus.theme.dayName}: {todayFocus.theme.focusTheme}
+              </span>
+              <ChevronRight className="w-3 h-3 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all" />
+            </button>
           </motion.div>
         )}
       </motion.div>
@@ -910,6 +775,153 @@ export function CommandEngine({
               </div>
             </div>
           </motion.div>
+        {/* ── Slide-Over ICP Suggestions & Market Signals Drawer ── */}
+        {isIcpDrawerOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsIcpDrawerOpen(false)}
+              className="fixed inset-0 z-[70] bg-background/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 28, stiffness: 280 }}
+              className="fixed top-0 right-0 bottom-0 w-full max-w-lg z-[80] bg-card border-l border-border/80 shadow-2xl flex flex-col overflow-hidden text-left"
+            >
+              {/* Drawer Header */}
+              <div className="p-5 border-b border-border/60 flex items-center justify-between bg-muted/20">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                    <Sparkles className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-foreground text-sm font-sans flex items-center gap-2">
+                      Target Suggestions & Market Signals
+                    </h3>
+                    <p className="text-[10px] font-mono text-muted-foreground">
+                      Curated targeting angles grounded in live YC batches, HN, and Clutch.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsIcpDrawerOpen(false)}
+                  className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Day Cadence Focus Banner */}
+              <div className="px-5 py-3 bg-muted/30 border-b border-border/40 flex items-center justify-between text-xs font-mono">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="font-semibold text-foreground uppercase tracking-wider">{todayFocus.theme.dayName} Focus:</span>
+                  <span className="text-muted-foreground truncate">{todayFocus.theme.focusTheme}</span>
+                </div>
+              </div>
+
+              {/* Search Bar */}
+              <div className="p-4 border-b border-border/40 bg-card">
+                <div className="relative flex items-center w-full">
+                  <Search className="absolute left-3 w-3.5 h-3.5 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={icpSearch}
+                    onChange={(e) => setIcpSearch(e.target.value)}
+                    placeholder="Search targets by keyword, industry, or signal..."
+                    className="w-full pl-8 pr-8 py-2 text-xs font-mono rounded-xl bg-background border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 shadow-sm"
+                  />
+                  {icpSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setIcpSearch("")}
+                      className="absolute right-2.5 p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Category Chips */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pt-3 pb-1 scrollbar-none">
+                  {ICP_CATEGORIES.map((cat) => {
+                    const isSelected = icpCategory === cat.id;
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => {
+                          setIcpCategory(cat.id);
+                          soundManager.playClick();
+                        }}
+                        className={`px-2.5 py-1 rounded-full text-[10px] font-mono transition-all whitespace-nowrap cursor-pointer ${
+                          isSelected
+                            ? "bg-foreground text-background font-semibold shadow-sm"
+                            : "bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted border border-border/40"
+                        }`}
+                      >
+                        {cat.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Presets List */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
+                {visibleSuggestions.length === 0 ? (
+                  <div className="py-12 text-center text-xs font-mono text-muted-foreground">
+                    No target presets match "{icpSearch}". Try another term.
+                  </div>
+                ) : (
+                  visibleSuggestions.map((preset) => (
+                    <div
+                      key={preset.id}
+                      onClick={() => {
+                        soundManager.playClick();
+                        setIsIcpDrawerOpen(false);
+                        setInputPrompt(preset.query);
+                        executePrompt(preset.query);
+                      }}
+                      className="group p-3.5 rounded-2xl border border-border/60 bg-card hover:bg-muted/40 hover:border-foreground/30 transition-all cursor-pointer shadow-sm hover:shadow-md"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] px-2 py-0.5 rounded-md bg-muted text-foreground font-mono font-bold uppercase tracking-wider">
+                            {preset.sourceBadge}
+                          </span>
+                          <span className="font-semibold text-foreground text-xs font-sans">
+                            {preset.label}
+                          </span>
+                        </div>
+                        {preset.hotMetric && (
+                          <span className="text-[10px] text-emerald-500 font-mono font-bold shrink-0 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                            {preset.hotMetric}
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="text-[11px] text-muted-foreground mt-2 font-mono leading-relaxed">
+                        {preset.trendingSignal}
+                      </p>
+
+                      <div className="mt-3 pt-2.5 border-t border-border/40 flex items-center justify-between text-[10px] font-mono text-muted-foreground">
+                        <span className="truncate">Target: {preset.headcountRange} • {preset.typicalAcv}</span>
+                        <span className="text-foreground font-bold flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                          Select & Launch →
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </div>

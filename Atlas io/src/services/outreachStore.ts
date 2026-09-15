@@ -21,83 +21,24 @@ export interface OutreachRecord {
 
 const STORAGE_KEY = "atlas_dispatched_outreach_v1";
 
-const SEED_OUTREACH_RECORDS: OutreachRecord[] = [
-  {
-    id: "outreach-seed-01",
-    campaign_prompt: "Target YC seed AI startups scaling SDR pipeline and outbound demos",
-    company_name: "Synthex AI",
-    website: "https://synthex.ai",
-    recipient_name: "Marcus Vance",
-    recipient_email: "marcus@synthex.ai",
-    recipient_role: "Co-Founder & CEO",
-    channel: "email",
-    subject: "Question on Synthex AI's outbound SDR ramp",
-    body: "Hi Marcus,\n\nSaw what you're building with Synthex AI out of the recent YC cohort. Impressive momentum on the autonomous eval benchmarks.\n\nQuick question: as your team scales outbound past seed stage, are you handling SDR qualification in-house or systematizing pipeline delivery with autonomous tooling?\n\nWould you be open to comparing notes for 10 minutes this Thursday?\n\nBest,\nAtlas Partner",
-    status: "replied",
-    delivery_provider: "Gmail SMTP",
-    sent_at: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(), // 3 hours ago
-    notes: "Replied: 'Interested — send over your calendar or deck.'",
-  },
-  {
-    id: "outreach-seed-02",
-    campaign_prompt: "Cold outreach to creative design agency founders 10-50 headcount",
-    company_name: "Kite Design Works",
-    website: "https://kitedesign.co",
-    recipient_name: "Elena Rostova",
-    recipient_email: "elena@kitedesign.co",
-    recipient_role: "Founder & Creative Director",
-    channel: "email",
-    subject: "Delivery bottlenecks on Kite's multi-client retainers",
-    body: "Hi Elena,\n\nNoticed Kite Design Works handles high-touch brand and product retainers. When agencies scale past 15 clients, client onboarding and asset handoffs often create friction between Figma and Notion.\n\nWe built an autonomous system that unifies the intake-to-delivery loop in 48 hours.\n\nRecorded a quick 45s walkthrough of how it works for agencies like yours: https://clario.pseudonyms.dev/v/kite-demo\n\nBest,\nAtlas Partner",
-    status: "delivered",
-    delivery_provider: "Resend",
-    sent_at: new Date(Date.now() - 1000 * 60 * 60 * 18).toISOString(), // 18 hours ago
-    clario_video_url: "https://clario.pseudonyms.dev/v/kite-demo",
-  },
-  {
-    id: "outreach-seed-03",
-    campaign_prompt: "Find B2B SaaS teams hiring engineers on Hacker News",
-    company_name: "Verve Infrastructure",
-    website: "https://verveinfra.dev",
-    recipient_name: "David K.",
-    recipient_email: "david@verveinfra.dev",
-    recipient_role: "VP of Engineering",
-    channel: "email",
-    subject: "Hiring engineering leads @ Verve Infrastructure (Hacker News thread)",
-    body: "Hi David,\n\nSaw your posting on the Hacker News 'Who is Hiring' thread for senior distributed systems engineers.\n\nCurious if technical onboarding latency is currently a bottleneck as you scale the core team this quarter?\n\nBest regards,\nAtlas Partner",
-    status: "opened",
-    delivery_provider: "Gmail SMTP",
-    sent_at: new Date(Date.now() - 1000 * 60 * 60 * 32).toISOString(), // Yesterday
-  },
-  {
-    id: "outreach-seed-04",
-    campaign_prompt: "Target founders with manual client onboarding friction",
-    company_name: "Beacon Ventures Advisory",
-    website: "https://beaconadvisory.io",
-    recipient_name: "Arthur Pendelton",
-    recipient_email: "arthur@beaconadvisory.io",
-    recipient_role: "Managing Director",
-    channel: "email",
-    subject: "Operational friction in B2B pipeline intake",
-    body: "Hi Arthur,\n\nNoticed Beacon Advisory's cross-border advisory work. Quick question on how your team prevents deal briefs and client diligence from getting fragmented across Slack and CRM tabs?\n\nHappy to share how other partners automated this.\n\nBest,\nAtlas Partner",
-    status: "sent",
-    delivery_provider: "Gmail SMTP",
-    sent_at: new Date(Date.now() - 1000 * 60 * 60 * 50).toISOString(),
-  },
-];
-
 export function getStoredOutreachRecords(): OutreachRecord[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_OUTREACH_RECORDS));
-      return SEED_OUTREACH_RECORDS;
+      return [];
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : SEED_OUTREACH_RECORDS;
+    if (!Array.isArray(parsed)) return [];
+
+    // Filter out any legacy fake seed records (outreach-seed-*)
+    const clean = parsed.filter((r) => !r.id?.startsWith("outreach-seed-"));
+    if (clean.length !== parsed.length) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
+    }
+    return clean;
   } catch (err) {
     console.warn("[OutreachStore] Failed to read from localStorage:", err);
-    return SEED_OUTREACH_RECORDS;
+    return [];
   }
 }
 
@@ -179,5 +120,29 @@ export function updateOutreachStatus(
   } catch (err) {
     console.error("[OutreachStore] Failed to update outreach status:", err);
     return null;
+  }
+}
+
+export function deleteOutreachRecord(id: string): boolean {
+  try {
+    const existing = getStoredOutreachRecords();
+    const updated = existing.filter((r) => r.id !== id);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    window.dispatchEvent(new CustomEvent("atlas_outreach_updated", { detail: { id, deleted: true } }));
+    return true;
+  } catch (err) {
+    console.error("[OutreachStore] Failed to delete outreach record:", err);
+    return false;
+  }
+}
+
+export function clearAllOutreachRecords(): boolean {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    window.dispatchEvent(new CustomEvent("atlas_outreach_updated", { detail: { cleared: true } }));
+    return true;
+  } catch (err) {
+    console.error("[OutreachStore] Failed to clear outreach records:", err);
+    return false;
   }
 }
