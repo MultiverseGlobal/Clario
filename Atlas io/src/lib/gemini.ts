@@ -6,13 +6,17 @@ export function getApiKey(): string {
   if (typeof import.meta !== "undefined" && import.meta.env?.VITE_GEMINI_API_KEY) {
     return import.meta.env.VITE_GEMINI_API_KEY;
   }
-  // Fallback dummy key to prevent GitHub secret scanning errors
   return "";
 }
 
 export async function callGeminiJSON(prompt: string): Promise<any> {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    throw new Error("[Gemini] No VITE_GEMINI_API_KEY configured in environment.");
+  }
+
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${getApiKey()}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -38,6 +42,8 @@ export async function decomposePromptWithGemini(
   maxHeadcount: number, 
   regions: string[]
 ) {
+  if (!getApiKey()) return null;
+
   const sysPrompt = `You are an expert B2B sales strategist and campaign architect.
 Decompose the following user intent into structured campaign parameters.
 User Intent: "${prompt}"
@@ -68,6 +74,8 @@ export async function discoverLeadsWithGemini(
   regions: string[],
   hypothesis?: string
 ) {
+  if (!getApiKey()) return null;
+
   const sysPrompt = `You are a B2B lead generation researcher.
 Generate 5 highly realistic, specific company profiles that match this target audience. Use real-world companies if they fit perfectly, otherwise create highly plausible realistic synthesized profiles.
 
@@ -109,6 +117,8 @@ export async function draftOutreachWithGemini(
   lead: any,
   hypothesis: string
 ) {
+  if (!getApiKey()) return null;
+
   const sysPrompt = `You are a master cold email copywriter. Write a hyper-personalized, short, punchy cold email and LinkedIn DM for this prospect.
 DO NOT use placeholders like [Your Name]. Be conversational and direct.
 

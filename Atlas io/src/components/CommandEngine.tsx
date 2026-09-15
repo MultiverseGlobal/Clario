@@ -45,6 +45,7 @@ export function CommandEngine({
   const [inputPrompt, setInputPrompt] = useState("");
   const [selectedLeadModal, setSelectedLeadModal] = useState<DiscoveredLead | null>(null);
   const [tempIcp, setTempIcp] = useState<{
+    channel?: "hn" | "yc" | "clutch" | "starter_story";
     industry: string;
     keyword: string;
     hypothesis: string;
@@ -53,7 +54,7 @@ export function CommandEngine({
     max_headcount?: number;
     regions?: string[];
     decision_maker_titles?: string[];
-  }>({ industry: "", keyword: "", hypothesis: "", targetCount: 15, min_headcount: 5, max_headcount: 30, regions: ["US", "UK"], decision_maker_titles: ["Founder", "CEO"] });
+  }>({ channel: "clutch", industry: "", keyword: "", hypothesis: "", targetCount: 15, min_headcount: 5, max_headcount: 30, regions: ["US", "UK"], decision_maker_titles: ["Founder", "CEO"] });
   const inputRef = useRef<HTMLInputElement>(null);
 
   // ── Dynamic & Searchable ICP Suggestions Drawer State ───────────────────
@@ -99,6 +100,7 @@ export function CommandEngine({
       const strategy = await decomposeCampaignPrompt(prompt);
 
       setTempIcp({
+        channel: strategy.channel,
         industry: strategy.industry,
         keyword: strategy.keyword,
         hypothesis: strategy.hypothesis,
@@ -133,9 +135,12 @@ export function CommandEngine({
   };
 
   const handleApproveIcp = async () => {
+    const targetChannel = tempIcp.channel || campaignState.channel || "clutch";
+
     onStateChange((prev) => ({
       ...prev,
       status: "discovering",
+      channel: targetChannel,
       keyword: tempIcp.keyword,
       industry: tempIcp.industry,
       hypothesis: tempIcp.hypothesis,
@@ -147,11 +152,11 @@ export function CommandEngine({
     }));
 
     try {
-      toast(`Scanning ${campaignState.channel?.toUpperCase()} & directories for ${tempIcp.keyword} (${tempIcp.min_headcount || 5}-${tempIcp.max_headcount || 30} staff)...`, {
+      toast(`Scanning ${targetChannel.toUpperCase()} & directories for ${tempIcp.keyword} (${tempIcp.min_headcount || 5}-${tempIcp.max_headcount || 30} staff)...`, {
         icon: <Radar className="h-4 w-4 text-sky-500" />,
       });
       const foundLeads = await discoverCampaignLeads(
-        campaignState.channel!, 
+        targetChannel, 
         tempIcp.keyword, 
         tempIcp.industry,
         {
@@ -457,11 +462,11 @@ export function CommandEngine({
                   className="relative h-12 w-full rounded-xl flex items-center justify-between px-4 border bg-muted border-border"
                 >
                   <div className="flex items-center gap-2.5 font-mono text-[11px] text-foreground">
-                    <span className="h-1.5 w-1.5 rounded-full bg-foreground animate-pulse" />
-                    <span className="font-semibold uppercase tracking-wider">{campaignState.channel?.toUpperCase() || "YC / DIRECT"}</span>
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="font-semibold uppercase tracking-wider">{(tempIcp.channel || campaignState.channel || "CLUTCH").toUpperCase()} DIRECTORY</span>
                   </div>
                   <span className="text-[10px] font-mono text-muted-foreground uppercase truncate max-w-[140px]">
-                    {campaignState.keyword || "Active Channel"}
+                    {tempIcp.keyword || campaignState.keyword || "Active Channel"}
                   </span>
                 </div>
 
@@ -479,17 +484,35 @@ export function CommandEngine({
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-1">
+                          <label className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Discovery Channel</label>
+                          <select
+                            value={tempIcp.channel || campaignState.channel || "clutch"}
+                            onChange={(e) => {
+                              const ch = e.target.value as "clutch" | "yc" | "starter_story" | "hn";
+                              setTempIcp(prev => ({ ...prev, channel: ch }));
+                              onStateChange(prev => ({ ...prev, channel: ch }));
+                            }}
+                            disabled={campaignState.status === "discovering"}
+                            className="w-full rounded-md border p-1.5 bg-background border-border text-[11px] font-semibold text-foreground focus:border-foreground transition-colors disabled:opacity-50 cursor-pointer"
+                          >
+                            <option value="clutch">Clutch (Agencies)</option>
+                            <option value="yc">YC (Tech & AI)</option>
+                            <option value="starter_story">Starter Story (Bootstrapped)</option>
+                            <option value="hn">Hacker News (Jobs)</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
                           <label className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Headcount Bound</label>
                           <div className={`rounded-md border p-1.5 bg-background border-border text-[11px] font-semibold text-emerald-500 flex items-center justify-between ${campaignState.status === "discovering" ? "opacity-50" : ""}`}>
                             <span>{tempIcp.min_headcount || 5}–{tempIcp.max_headcount || 30} staff</span>
                             <span className="text-[9px] bg-emerald-500/10 text-emerald-600 px-1 rounded font-bold">Strict</span>
                           </div>
                         </div>
-                        <div className="space-y-1">
-                          <label className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Target Regions</label>
-                          <div className={`rounded-md border p-1.5 bg-background border-border text-[11px] font-semibold text-sky-500 truncate ${campaignState.status === "discovering" ? "opacity-50" : ""}`} title={(tempIcp.regions || ["US", "UK"]).join(", ")}>
-                            {(tempIcp.regions || ["US", "UK"]).join(", ")}
-                          </div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Target Regions</label>
+                        <div className={`rounded-md border p-1.5 bg-background border-border text-[11px] font-semibold text-sky-500 truncate ${campaignState.status === "discovering" ? "opacity-50" : ""}`} title={(tempIcp.regions || ["US", "UK"]).join(", ")}>
+                          {(tempIcp.regions || ["US", "UK"]).join(", ")}
                         </div>
                       </div>
                       <div className="space-y-1">
