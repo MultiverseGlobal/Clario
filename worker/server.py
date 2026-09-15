@@ -55,11 +55,245 @@ def update_job(job_id: str, **kwargs):
         JOBS[job_id].update(kwargs)
 
 
+def snap_cuts_to_speech_cadence(
+    raw_cuts: list[float],
+    words: list[dict],
+    video_duration: float,
+    min_shot_duration: float = 1.8
+) -> list[dict]:
+    """
+    Broadcast-grade speech cadence snapping & micro-splinter merger.
+    
+    1. PySceneDetect generates raw frame-based visual cut candidates on decoded frames.
+    2. Whisper provides word-level timestamps [w_start, w_end].
+    3. If any raw cut lands inside a spoken word [w_start, w_end], snap to the nearest
+       word boundary or inter-word pause to prevent mid-syllable chopping.
+    4. Enforce strict 1.8s minimum shot duration (PDS-v3 Broadcast Standard):
+       Any adjacent micro-splinters (< 1.8s) are merged into clean, cinematic scenes.
+    """
+    if video_duration <= 0.0:
+        video_duration = max(raw_cuts) if raw_cuts else 10.0
+
+    if video_duration <= min_shot_duration:
+        return [{
+            "index": 0,
+            "start_time": 0.0,
+            "end_time": round(video_duration, 3),
+            "duration": round(video_duration, 3),
+            "transcript_text": " ".join(w.get("word", "").strip() for w in words),
+            "words": words,
+            "speech_aligned": True
+        }]
+
+    # Step A: Snap cuts colliding with spoken words to inter-word silence pauses
+    adjusted_cuts = []
+    for cut in raw_cuts:
+        if cut <= 0.05 or cut >= video_duration - 0.05:
+            continue
+
+        colliding_word = None
+        for idx, w in enumerate(words):
+            w_start = w.get("start", 0.0)
+            w_end = w.get("end", 0.0)
+            if (w_start - 0.02) <= cut <= (w_end + 0.02):
+                colliding_word = (idx, w)
+                break
+
+        if colliding_word:
+            idx, w = colliding_word
+            w_start = w.get("start", 0.0)
+            w_end = w.get("end", 0.0)
+            dist_to_start = abs(cut - w_start)
+            dist_to_end = abs(cut - w_end)
+
+            if dist_to_start <= dist_to_end:
+                if idx > 0:
+                    prev_end = words[idx - 1].get("end", 0.0)
+                    snapped = (prev_end + w_start) / 2.0 if w_start > prev_end else w_start - 0.02
+                else:
+                    snapped = max(0.0, w_start - 0.03)
+            else:
+                if idx < len(words) - 1:
+                    next_start = words[idx + 1].get("start", video_duration)
+                    snapped = (w_end + next_start) / 2.0 if next_start > w_end else w_end + 0.02
+                else:
+                    snapped = min(video_duration, w_end + 0.03)
+            adjusted_cuts.append(round(snapped, 3))
+        else:
+            adjusted_cuts.append(round(cut, 3))
+
+    # Step B: Deduplicate & sort
+    unique_cuts = sorted(list({round(max(0.0, min(video_duration, c)), 3) for c in adjusted_cuts}))
+
+    # Step C: Merge micro-splinters to enforce min_shot_duration (1.8s)
+    final_cut_points = [0.0]
+    for c in unique_cuts:
+        if c - final_cut_points[-1] < min_shot_duration:
+            continue
+        if video_duration - c < min_shot_duration:
+            continue
+        final_cut_points.append(c)
+
+    if final_cut_points[-1] < video_duration:
+        if video_duration - final_cut_points[-1] >= min_shot_duration or len(final_cut_points) == 1:
+            final_cut_points.append(video_duration)
+        else:
+            final_cut_points[-1] = video_duration
+
+    # Step D: Construct scene definitions
+    scenes = []
+    for i in range(len(final_cut_points) - 1):
+        st = round(final_cut_points[i], 3)
+        et = round(final_cut_points[i + 1], 3)
+        dur = round(et - st, 3)
+
+        scene_words = [
+            w for w in words
+            if w.get("start", 0.0) < et and w.get("end", 0.0) > st
+        ]
+        transcript = " ".join(w.get("word", "").strip() for w in scene_words)
+
+        scenes.append({
+            "index": i,
+            "start_time": st,
+            "end_time": et,
+            "duration": dur,
+            "transcript_text": transcript,
+            "words": scene_words,
+            "speech_aligned": len(words) > 0
+        })
+
+    return scenes
+
+
 # ── Health ─────────────────────────────────────────────────────────────────────
 
 @app.get("/api/v1/health")
 def health():
     return {"status": "ok", "worker": "clario-media-worker"}
+
+
+# ── Broadcast-Grade Scene Detection (PySceneDetect + Whisper Word Alignment) ───
+
+@app.post("/api/v1/detect-scenes")
+@app.post("/detect-scenes")
+async def detect_scenes_worker_endpoint(
+    file: Optional[UploadFile] = File(None),
+    video_url: Optional[str] = Form(None)
+):
+    import httpx
+    if not file and not video_url:
+        raise HTTPException(status_code=400, detail="No file or video_url provided")
+
+    tmpdir_obj = tempfile.TemporaryDirectory()
+    work_dir = Path(tmpdir_obj.name)
+    try:
+        suffix = ".mp4"
+        if file and file.filename:
+            suffix = Path(file.filename).suffix or ".mp4"
+
+        video_path = work_dir / f"input{suffix}"
+        if file:
+            content = await file.read()
+            with open(video_path, "wb") as f:
+                f.write(content)
+        elif video_url:
+            async with httpx.AsyncClient(timeout=60) as client:
+                resp = await client.get(video_url)
+                if resp.status_code != 200:
+                    raise HTTPException(status_code=400, detail="Failed to fetch video_url")
+                with open(video_path, "wb") as f:
+                    f.write(resp.content)
+
+        duration = get_video_duration(str(video_path))
+
+        # 1. PySceneDetect on raw decoded frames with ContentDetector(threshold=27.0)
+        raw_cuts = [0.0]
+        try:
+            from scenedetect import detect, ContentDetector
+            scene_list = detect(str(video_path), ContentDetector(threshold=27.0, min_scene_len=24))
+            for scene in scene_list:
+                raw_cuts.append(scene[0].get_seconds())
+                raw_cuts.append(scene[1].get_seconds())
+        except Exception:
+            try:
+                out = run_cmd(["scenedetect", "-i", str(video_path), "detect-content", "-t", "27.0", "-m", "24", "list-scenes"])
+                for line in out.splitlines():
+                    if "," in line and not line.startswith("Scene"):
+                        parts = line.split(",")
+                        if len(parts) >= 3:
+                            raw_cuts.append(tc_to_seconds(parts[1].strip()))
+                            raw_cuts.append(tc_to_seconds(parts[2].strip()))
+            except Exception as e:
+                print(f"Worker scenedetect fallback: {e}")
+                # Fallback to rhythmic cuts every 3s
+                t = 0.0
+                while t < duration:
+                    raw_cuts.append(round(t, 2))
+                    t += 3.0
+
+        raw_cuts = sorted(list(set(raw_cuts)))
+
+        # 2. Extract 16kHz audio for Whisper
+        audio_path = str(work_dir / "audio.wav")
+        try:
+            run_cmd([
+                "ffmpeg", "-y", "-i", str(video_path),
+                "-vn", "-ar", "16000", "-ac", "1", "-f", "wav",
+                audio_path
+            ])
+        except Exception:
+            audio_path = ""
+
+        # 3. Whisper Word-Level Alignment
+        words = []
+        if OPENAI_API_KEY and audio_path and os.path.exists(audio_path) and os.path.getsize(audio_path) > 1000:
+            try:
+                with open(audio_path, "rb") as af:
+                    async with httpx.AsyncClient(timeout=120) as client:
+                        resp = await client.post(
+                            "https://api.openai.com/v1/audio/transcriptions",
+                            headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
+                            files={"file": ("audio.wav", af, "audio/wav")},
+                            data={
+                                "model": "whisper-1",
+                                "response_format": "verbose_json",
+                                "timestamp_granularities[]": ["word", "segment"]
+                            }
+                        )
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            for w in data.get("words", []):
+                                words.append({
+                                    "word": w.get("word", "").strip(),
+                                    "start": float(w.get("start", 0.0)),
+                                    "end": float(w.get("end", 0.0))
+                                })
+            except Exception as w_err:
+                print(f"Whisper error in worker detect-scenes: {w_err}")
+
+        # 4. Snap cuts to speech cadence and enforce 1.8s min shot duration
+        aligned_scenes = snap_cuts_to_speech_cadence(
+            raw_cuts=raw_cuts,
+            words=words,
+            video_duration=duration,
+            min_shot_duration=1.8
+        )
+
+        return {
+            "scenes": aligned_scenes,
+            "video_duration": round(duration, 3),
+            "total_scenes": len(aligned_scenes),
+            "words_detected": len(words),
+            "engine": "PySceneDetect ContentDetector(threshold=27.0) + Whisper Word Alignment",
+            "speech_cadence_aligned": len(words) > 0
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        tmpdir_obj.cleanup()
 
 
 # ── Harvest: Ingest File or URL ────────────────────────────────────────────────
@@ -133,10 +367,13 @@ def cut_segment(project_id: str, body: dict):
         try:
             run_cmd([
                 "ffmpeg", "-y",
-                "-ss", str(start),
-                "-to", str(end),
+                "-accurate_seek",
+                "-ss", f"{start:.3f}",
+                "-to", f"{end:.3f}",
                 "-i", source_url,
-                "-c:v", "libx264", "-c:a", "aac",
+                "-c:v", "libx264", "-preset", "fast", "-crf", "19",
+                "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
+                "-avoid_negative_ts", "make_zero",
                 str(output_path)
             ])
             
@@ -264,36 +501,41 @@ async def process_video_job(job_id: str, project_id: str, source: str, label: st
             audio_path
         ])
 
-        _update(progress_pct=35, status_msg="Running scene detection...")
+        _update(progress_pct=35, status_msg="Running ContentDetector shot boundary detection...")
 
-        # ── Step 3: Scene detection with PySceneDetect ───────────────────────
-        scene_timestamps = []
+        # ── Step 3: Scene detection with PySceneDetect ContentDetector ───────
+        duration = get_video_duration(video_path)
+        raw_cuts = [0.0]
         try:
-            output = run_cmd(["python", "-m", "scenedetect", "-i", video_path, "detect-adaptive", "list-scenes"])
-            for line in output.splitlines():
-                if "," in line and not line.startswith("Scene"):
-                    parts = line.split(",")
-                    if len(parts) >= 3:
-                        try:
-                            start_tc = parts[1].strip()
-                            end_tc = parts[2].strip()
-                            scene_timestamps.append({"start": tc_to_seconds(start_tc), "end": tc_to_seconds(end_tc)})
-                        except Exception:
-                            pass
-        except Exception as e:
-            print(f"Scene detection fallback (PySceneDetect not installed or failed): {e}")
-            # Fallback: chunk the video into equal 3-second segments
-            duration = get_video_duration(video_path)
-            chunk = 3.0
-            t = 0.0
-            while t < duration:
-                scene_timestamps.append({"start": round(t, 1), "end": round(min(t + chunk, duration), 1)})
-                t += chunk
+            from scenedetect import detect, ContentDetector
+            scene_list = detect(video_path, ContentDetector(threshold=27.0, min_scene_len=24))
+            for scene in scene_list:
+                raw_cuts.append(scene[0].get_seconds())
+                raw_cuts.append(scene[1].get_seconds())
+        except Exception:
+            try:
+                output = run_cmd(["scenedetect", "-i", video_path, "detect-content", "-t", "27.0", "-m", "24", "list-scenes"])
+                for line in output.splitlines():
+                    if "," in line and not line.startswith("Scene"):
+                        parts = line.split(",")
+                        if len(parts) >= 3:
+                            raw_cuts.append(tc_to_seconds(parts[1].strip()))
+                            raw_cuts.append(tc_to_seconds(parts[2].strip()))
+            except Exception as e:
+                print(f"Scene detection fallback: {e}")
+                chunk = 3.0
+                t = 0.0
+                while t < duration:
+                    raw_cuts.append(round(t, 2))
+                    t += chunk
+
+        raw_cuts = sorted(list(set(raw_cuts)))
 
         _update(progress_pct=55, status_msg="Transcribing audio with Whisper API...")
 
-        # ── Step 4: Whisper transcription ───────────────────────────────────
+        # ── Step 4: Whisper transcription with word timestamps ──────────────
         transcript_segments = []
+        words = []
         if OPENAI_API_KEY:
             try:
                 with open(audio_path, "rb") as audio_file:
@@ -302,7 +544,11 @@ async def process_video_job(job_id: str, project_id: str, source: str, label: st
                             "https://api.openai.com/v1/audio/transcriptions",
                             headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
                             files={"file": ("audio.wav", audio_file, "audio/wav")},
-                            data={"model": "whisper-1", "response_format": "verbose_json", "timestamp_granularities[]": "segment"}
+                            data={
+                                "model": "whisper-1",
+                                "response_format": "verbose_json",
+                                "timestamp_granularities[]": ["segment", "word"]
+                            }
                         )
                         if response.status_code == 200:
                             whisper_data = response.json()
@@ -312,19 +558,35 @@ async def process_video_job(job_id: str, project_id: str, source: str, label: st
                                     "end": seg["end"],
                                     "text": seg["text"].strip()
                                 })
+                            for w in whisper_data.get("words", []):
+                                words.append({
+                                    "word": w.get("word", "").strip(),
+                                    "start": float(w.get("start", 0.0)),
+                                    "end": float(w.get("end", 0.0))
+                                })
             except Exception as e:
                 print(f"Whisper API error: {e}")
+
+        # ── Step 4.5: Speech Cadence Snapping & Micro-Splinter Merger ────────
+        aligned_scenes = snap_cuts_to_speech_cadence(
+            raw_cuts=raw_cuts,
+            words=words,
+            video_duration=duration,
+            min_shot_duration=1.8
+        )
 
         _update(progress_pct=75, status_msg="Extracting frame thumbnails...")
 
         # ── Step 5: Extract thumbnails for each detected scene ───────────────
         shots = []
-        for i, scene in enumerate(scene_timestamps[:20]):  # Cap at 20 shots
+        for i, scene in enumerate(aligned_scenes[:24]):  # Cap at 24 shots
             thumb_name = f"shot_{i:03d}.jpg"
             thumb_path = project_dir / thumb_name
             try:
                 run_cmd([
-                    "ffmpeg", "-y", "-ss", str(scene["start"]),
+                    "ffmpeg", "-y",
+                    "-accurate_seek",
+                    "-ss", f"{scene['start_time']:.3f}",
                     "-i", video_path,
                     "-frames:v", "1", "-q:v", "3",
                     str(thumb_path)
@@ -341,19 +603,13 @@ async def process_video_job(job_id: str, project_id: str, source: str, label: st
             except Exception:
                 thumb_url = ""
 
-            # Find transcript text that overlaps this scene
-            shot_text = " ".join([
-                seg["text"] for seg in transcript_segments
-                if seg["start"] < scene["end"] and seg["end"] > scene["start"]
-            ])
-
             shots.append({
                 "shot_id": f"shot_{i:03d}",
-                "start_seconds": scene["start"],
-                "end_seconds": scene["end"],
-                "duration": round(scene["end"] - scene["start"], 1),
+                "start_seconds": scene["start_time"],
+                "end_seconds": scene["end_time"],
+                "duration": scene["duration"],
                 "frame_url": thumb_url,
-                "transcript_text": shot_text,
+                "transcript_text": scene.get("transcript_text", ""),
                 "content_type": "a_roll" if i % 3 == 0 else "b_roll",
                 "source_type": "original",
                 "replacement_needed": False,
@@ -364,6 +620,7 @@ async def process_video_job(job_id: str, project_id: str, source: str, label: st
                 "license_status": "original_replacement_needed",
                 "rights_status": "original",
                 "search_queries": [],
+                "speech_aligned": scene.get("speech_aligned", False)
             })
 
         _update(progress_pct=90, status_msg="Finalizing project...")

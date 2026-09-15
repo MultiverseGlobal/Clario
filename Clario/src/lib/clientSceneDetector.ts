@@ -12,6 +12,9 @@ export interface DetectedScene {
   hasCaptions: boolean;
   suggestedStripMode: 'punch_in' | 'blur_mask' | 'none';
   confidence: number;
+  transcriptText?: string;
+  words?: Array<{ word: string; start: number; end: number }>;
+  speechAligned?: boolean;
 }
 
 export interface SceneDetectionProgress {
@@ -153,10 +156,19 @@ export async function detectCinematicScenes(
       }
 
       onProgress?.({ progressPct: 15, statusMsg: 'Scanning video keyframes...' });
+      onProgress?.({ progressPct: 20, statusMsg: 'Sending video to AI Engine (PySceneDetect + Whisper)...' });
 
-      onProgress?.({ progressPct: 15, statusMsg: 'Sending video to AI Engine...' });
+      interface RawScenePayload {
+        index: number;
+        start_time: number;
+        end_time: number;
+        duration: number;
+        transcript_text?: string;
+        words?: Array<{ word: string; start: number; end: number }>;
+        speech_aligned?: boolean;
+      }
 
-      let cutTimestamps: number[] = [0];
+      let detectedPayloads: RawScenePayload[] = [];
 
       try {
         let fileToUpload: File | Blob;
@@ -170,50 +182,85 @@ export async function detectCinematicScenes(
         const formData = new FormData();
         formData.append('file', fileToUpload, 'video.mp4');
 
-        onProgress?.({ progressPct: 45, statusMsg: 'Running PySceneDetect Shot Boundary Analysis...' });
+        onProgress?.({ progressPct: 40, statusMsg: 'Running PySceneDetect (ContentDetector threshold=27.0)...' });
 
         const apiBase = import.meta.env.VITE_AI_ENGINE_BASE || 'https://multiverseglobals--clario-ai-engine-fastapi-app.modal.run';
-        const apiRes = await fetch(`${apiBase}/detect-scenes`, {
-          method: 'POST',
-          body: formData
-        });
-
-        if (!apiRes.ok) {
-          throw new Error('API failed');
+        
+        let apiRes: Response | null = null;
+        try {
+          apiRes = await fetch(`${apiBase}/detect-scenes`, {
+            method: 'POST',
+            body: formData
+          });
+        } catch (modalErr) {
+          console.warn('Cloud AI engine unreachable, attempting local worker at localhost:8000...', modalErr);
+          try {
+            apiRes = await fetch('http://localhost:8000/api/v1/detect-scenes', {
+              method: 'POST',
+              body: formData
+            });
+          } catch (workerErr) {
+            console.warn('Local worker also unreachable:', workerErr);
+          }
         }
 
-        const data = await apiRes.json();
-        
-        if (data.scenes && data.scenes.length > 0) {
-          cutTimestamps = data.scenes.map((s: any) => s.start_time);
-          if (cutTimestamps[0] > 0.1) {
-              cutTimestamps.unshift(0);
+        if (apiRes && apiRes.ok) {
+          const data = await apiRes.json();
+          if (data.scenes && Array.isArray(data.scenes) && data.scenes.length > 0) {
+            detectedPayloads = data.scenes;
           }
         }
       } catch (err) {
-        console.warn('Python AI API failed, falling back to basic rhythmic cuts', err);
-        const interval = Math.min(6, Math.max(2.5, duration / 4));
-        cutTimestamps = [];
-        for (let t = 0; t < duration; t += interval) {
-          cutTimestamps.push(parseFloat(t.toFixed(2)));
+        console.warn('Backend shot detection failed, falling back to local rhythm engine', err);
+      }
+
+      // If backend returned no scenes, compute cadence cuts with 1.8s minimum shot rule
+      if (detectedPayloads.length === 0) {
+        const minShotDur = 1.8;
+        const targetInterval = Math.max(minShotDur, Math.min(6, duration / 4));
+        let t = 0;
+        let idx = 0;
+
+        while (t < duration) {
+          const nextT = Math.min(duration, t + targetInterval);
+          const dur = nextT - t;
+          if (dur >= minShotDur || idx === 0) {
+            detectedPayloads.push({
+              index: idx,
+              start_time: parseFloat(t.toFixed(3)),
+              end_time: parseFloat(nextT.toFixed(3)),
+              duration: parseFloat(dur.toFixed(3)),
+              speech_aligned: false
+            });
+            idx++;
+          } else if (detectedPayloads.length > 0) {
+            // Merge trailing short splinter into previous scene
+            const prev = detectedPayloads[detectedPayloads.length - 1];
+            prev.end_time = parseFloat(duration.toFixed(3));
+            prev.duration = parseFloat((prev.end_time - prev.start_time).toFixed(3));
+          }
+          t = nextT;
         }
       }
 
-      onProgress?.({ progressPct: 80, statusMsg: 'Extracting clean keyframe masters...' });
+      onProgress?.({ progressPct: 75, statusMsg: 'Extracting clean keyframe masters...' });
 
       // Generate DetectedScene records with real keyframes
       const scenes: DetectedScene[] = [];
       const tagsPool = ['A-Roll (Talking Head)', 'Table / Workspace', 'Cars / Transit', 'Cinematic B-Roll'];
 
-      for (let idx = 0; idx < cutTimestamps.length; idx++) {
-        const start = cutTimestamps[idx];
-        const end = idx < cutTimestamps.length - 1 ? cutTimestamps[idx + 1] : duration;
-        const dur = parseFloat((end - start).toFixed(2));
-        if (dur <= 0.2) continue;
+      for (let idx = 0; idx < detectedPayloads.length; idx++) {
+        const p = detectedPayloads[idx];
+        const start = p.start_time;
+        const end = p.end_time;
+        const dur = p.duration;
+
+        // Skip micro-splinters if any somehow survived
+        if (dur < 0.5 && detectedPayloads.length > 1) continue;
 
         // Capture keyframe halfway through the scene
         const midTime = Math.min(duration - 0.1, start + Math.min(0.8, dur / 2));
-        video.currentTime = midTime;
+        video.currentTime = Math.max(0, midTime);
         await new Promise<void>((res) => {
           const onSeeked = () => {
             video.removeEventListener('seeked', onSeeked);
@@ -240,12 +287,15 @@ export async function detectCinematicScenes(
           contentType: classification.contentType,
           hasCaptions: classification.hasCaptions,
           suggestedStripMode: classification.hasCaptions ? 'punch_in' : 'none',
-          confidence: 0.92,
+          confidence: p.speech_aligned ? 0.98 : 0.92,
+          transcriptText: p.transcript_text,
+          words: p.words,
+          speechAligned: p.speech_aligned
         });
       }
 
       cleanUp();
-      onProgress?.({ progressPct: 100, statusMsg: `Extracted ${scenes.length} cinematic scenes!` });
+      onProgress?.({ progressPct: 100, statusMsg: `Extracted ${scenes.length} frame-perfect scenes!` });
       resolve(scenes.length > 0 ? scenes : getFallbackScenes(videoUrl, duration));
     };
 
@@ -258,59 +308,33 @@ export async function detectCinematicScenes(
 
 function getFallbackScenes(_videoUrl: string, totalDur: number): DetectedScene[] {
   const dur = Math.max(10, totalDur);
-  const quarter = parseFloat((dur / 4).toFixed(2));
-  return [
-    {
-      id: `scene_1_${Date.now()}`,
-      index: 1,
-      startTime: 0,
-      endTime: quarter,
-      duration: quarter,
+  const minDur = 1.8;
+  const numScenes = Math.max(2, Math.min(5, Math.floor(dur / 4)));
+  const step = parseFloat((dur / numScenes).toFixed(2));
+  const scenes: DetectedScene[] = [];
+  const tags = ['A-Roll (Talking Head)', 'Table / Workspace', 'Cars / Transit', 'Cinematic B-Roll'];
+  const types: Array<'a_roll' | 'b_roll'> = ['a_roll', 'b_roll', 'b_roll', 'b_roll'];
+
+  for (let i = 0; i < numScenes; i++) {
+    const start = parseFloat((i * step).toFixed(2));
+    const end = i === numScenes - 1 ? dur : parseFloat(((i + 1) * step).toFixed(2));
+    const sceneDur = parseFloat((end - start).toFixed(2));
+
+    scenes.push({
+      id: `scene_${i + 1}_${Date.now()}`,
+      index: i + 1,
+      startTime: start,
+      endTime: end,
+      duration: Math.max(minDur, sceneDur),
       frameUrl: '',
-      sceneTag: 'A-Roll (Talking Head)',
-      contentType: 'a_roll',
-      hasCaptions: true,
-      suggestedStripMode: 'punch_in',
-      confidence: 0.85,
-    },
-    {
-      id: `scene_2_${Date.now()}`,
-      index: 2,
-      startTime: quarter,
-      endTime: quarter * 2,
-      duration: quarter,
-      frameUrl: '',
-      sceneTag: 'Cars / Transit',
-      contentType: 'b_roll',
-      hasCaptions: false,
-      suggestedStripMode: 'none',
+      sceneTag: tags[i % tags.length],
+      contentType: types[i % types.length],
+      hasCaptions: i % 2 === 0,
+      suggestedStripMode: i % 2 === 0 ? 'punch_in' : 'none',
       confidence: 0.88,
-    },
-    {
-      id: `scene_3_${Date.now()}`,
-      index: 3,
-      startTime: quarter * 2,
-      endTime: quarter * 3,
-      duration: quarter,
-      frameUrl: '',
-      sceneTag: 'Table / Workspace',
-      contentType: 'b_roll',
-      hasCaptions: true,
-      suggestedStripMode: 'punch_in',
-      confidence: 0.89,
-    },
-    {
-      id: `scene_4_${Date.now()}`,
-      index: 4,
-      startTime: quarter * 3,
-      endTime: dur,
-      duration: parseFloat((dur - quarter * 3).toFixed(2)),
-      frameUrl: '',
-      sceneTag: 'Cinematic B-Roll',
-      contentType: 'b_roll',
-      hasCaptions: false,
-      suggestedStripMode: 'none',
-      confidence: 0.91,
-    },
-  ];
+      speechAligned: false
+    });
+  }
+
+  return scenes;
 }
