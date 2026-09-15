@@ -190,6 +190,7 @@ export default function HqShell() {
               { id: "newlead",  label: "New Lead",       description: "Add to pipeline",       accent: "currentColor", shortcut: "⌘N", action: () => setNewLeadOpen(true) },
               { id: "vault",    label: "The Vault",      description: "Browse resources and tools", action: () => setVaultOpen(true) },
               { id: "chat",     label: "Atlas AI Chat",  description: "Talk to Atlas",         action: () => setChatOpen(true) },
+              { id: "outreach", label: "Outreach Tracker", description: "Audit dispatched emails, delivery, and replies", accent: "currentColor", action: () => navigate("/hq/outreach") },
               { id: "engine",   label: "Intelligence Radar", description: "Discover leads and run outreach", accent: "currentColor", action: () => navigate("/hq/radar") },
               { id: "briefing", label: "Daily Briefing", description: "Review today's top 3 qualified opportunities", shortcut: "G B", action: () => navigate("/briefing") },
               { id: "objectives",label: "Define Hunt",   description: "Declare commercial intent & lock search thesis", shortcut: "G O", action: () => navigate("/objectives") },

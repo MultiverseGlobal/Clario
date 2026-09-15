@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { CommandEngine } from "@/components/CommandEngine";
 import { InterventionDrawer } from "@/components/InterventionDrawer";
@@ -10,6 +11,7 @@ import {
   dispatchOutreach,
   generateLeadOutreach,
 } from "@/services/campaignEngine";
+import { recordOutreachDispatch } from "@/services/outreachStore";
 import { useTheme } from "@/hooks/useTheme";
 import { soundManager } from "@/lib/audioFeedback";
 import { toast } from "sonner";
@@ -31,6 +33,7 @@ const INITIAL_STATE: CampaignState = {
 };
 
 export default function CommandFeed() {
+  const navigate = useNavigate();
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
@@ -68,8 +71,29 @@ export default function CommandFeed() {
 
         if (result.success) {
           soundManager.playSuccess();
+
+          // Permanently record dispatched outreach in the Ledger
+          recordOutreachDispatch({
+            campaign_prompt: campaignState.prompt,
+            company_name: leadToProcess.company,
+            website: leadToProcess.website,
+            recipient_name: leadToProcess.founder?.name || "Decision Maker",
+            recipient_email: recipientEmail,
+            recipient_role: leadToProcess.founder?.role || "Founder / Executive",
+            channel: "email",
+            subject: draft.subject,
+            body: draft.body,
+            status: "delivered",
+            delivery_provider: result.resendId ? "Resend" : "Gmail SMTP",
+            resend_id: result.resendId,
+          });
+
           toast.success(result.message, {
             icon: <CheckCircle2 className="h-4 w-4 text-emerald-500" />,
+            action: {
+              label: "Track Outreach",
+              onClick: () => navigate("/hq/outreach"),
+            },
           });
 
           const nextIndex = campaignState.activeLeadIndex + 1;

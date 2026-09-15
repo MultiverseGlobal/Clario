@@ -158,12 +158,19 @@ export default function App() {
   return (
     <AuthGate>
       <AppShell
-      currentPhase={currentPhase}
-      onNavigatePhase={handleNavigatePhase}
-      onOpenApiKeyModal={() => setShowApiKeyModal(true)}
-      hasApiKey={Boolean(getApiKey())}
-      hasActiveProject={Boolean(currentProject)}
-    >
+        currentPhase={currentPhase}
+        onNavigatePhase={handleNavigatePhase}
+        onOpenApiKeyModal={() => setShowApiKeyModal(true)}
+        hasApiKey={Boolean(getApiKey())}
+        hasActiveProject={Boolean(currentProject)}
+        projectName={currentProject?.name}
+        onRenameProject={async (newName) => {
+          if (!currentProject) return;
+          const updated = { ...currentProject, name: newName, updatedAt: Date.now() };
+          setCurrentProject(updated);
+          await saveProject(updated);
+        }}
+      >
       {/* ── Brand Kit Drawer / Modal ───────────────────────────────────────── */}
 
       {/* ── API Key Modal ──────────────────────────────────────────────────── */}

@@ -5,7 +5,7 @@ import { useTheme } from "@/hooks/useTheme";
 import {
   Sun, Moon, Plus, Command,
   Coffee, Target, Gauge, Settings, BarChart, Users,
-  Compass, Handshake, Film, User, Bot
+  Compass, Handshake, Film, User, Bot, Send
 } from "lucide-react";
 import { AtlasIcon } from "@/components/atlas/EcosystemIcons";
 import {
@@ -20,6 +20,7 @@ const ROUTES: Record<string, { label: string; icon: React.ElementType }> = {
   "/":            { label: "Command",         icon: Command },
   "/briefing":    { label: "Briefing",        icon: Coffee },
   "/hq/radar":   { label: "Radar",           icon: Gauge },
+  "/hq/outreach": { label: "Outreach",        icon: Send },
   "/hq/report":   { label: "Report",          icon: BarChart },
   "/hq/settings": { label: "Settings",        icon: Settings },
 };

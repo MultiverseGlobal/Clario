@@ -93,6 +93,13 @@ export function AtlasCommandPalette({
 
           <CommandGroup heading="Workspace Navigation" className="text-[var(--pds-text-muted)] font-mono text-[10px] uppercase tracking-wider px-2">
             <CommandItem
+              onSelect={() => runCommand(() => navigate("/hq/outreach"))}
+              className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-[var(--pds-surface-2)] rounded-xl text-xs text-[var(--pds-text-primary)] transition-colors"
+            >
+              <Send className="h-3.5 w-3.5 text-emerald-500" />
+              <span>Outreach Tracker & Ledger</span>
+            </CommandItem>
+            <CommandItem
               onSelect={() => runCommand(() => navigate("/hq/engine"))}
               className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-[var(--pds-surface-2)] rounded-xl text-xs text-[var(--pds-text-primary)] transition-colors"
             >

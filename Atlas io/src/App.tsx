@@ -23,6 +23,7 @@ const HqProposal = React.lazy(() => import("./pages/hq/HqProposal"));
 const DailyBriefing = React.lazy(() => import("./pages/hq/DailyBriefing"));
 const CommandFeed = React.lazy(() => import("./pages/CommandFeed"));
 const HqSettings = React.lazy(() => import("./pages/hq/HqSettings"));
+const HqOutreach = React.lazy(() => import("./pages/hq/HqOutreach"));
 
 const HqDashboard = React.lazy(() => import("./pages/hq/HqDashboard"));
 const HqPartnerships = React.lazy(() => import("./pages/hq/HqPartnerships"));
@@ -57,6 +58,7 @@ const App = () => (
                   <Route path="/" element={<CommandFeed />} />
                   <Route path="/briefing" element={<DailyBriefing />} />
                   <Route path="/objectives" element={<ObjectivesStudio />} />
+                  <Route path="/outreach" element={<HqOutreach />} />
                   <Route path="/workspace" element={<CommandFeed />} />
                   <Route path="/command" element={<CommandFeed />} />
                   <Route path="/engine" element={<CommandFeed />} />
@@ -65,6 +67,7 @@ const App = () => (
                   <Route path="/hq">
                     <Route index element={<Navigate to="/hq/radar" replace />} />
                     <Route path="radar" element={<HqRadar />} />
+                    <Route path="outreach" element={<HqOutreach />} />
                     <Route path="engine" element={<CommandFeed />} />
                     <Route path="command" element={<CommandFeed />} />
                     <Route path="dashboard" element={<HqDashboard />} />

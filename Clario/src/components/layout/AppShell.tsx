@@ -23,6 +23,8 @@ interface AppShellProps {
   onOpenApiKeyModal: () => void;
   hasApiKey: boolean;
   hasActiveProject?: boolean;
+  projectName?: string;
+  onRenameProject?: (name: string) => void;
 }
 
 export function AppShell({
@@ -32,6 +34,8 @@ export function AppShell({
   onOpenApiKeyModal,
   hasApiKey,
   hasActiveProject,
+  projectName,
+  onRenameProject,
 }: AppShellProps) {
   const [theme, setTheme] = useState<'light' | 'dark'>(() =>
     document.documentElement.classList.contains('dark') ? 'dark' : 'light'
@@ -55,7 +59,7 @@ export function AppShell({
       {/* ── Ambient Glow (Atlas Light Mesh) ── */}
       <div className="fixed inset-0 clario-ambient-glow clario-animate-breathe pointer-events-none z-0" />
 
-      {/* ── Top Floating Navigation Dock ── */}
+      {/* ── Top Unified Studio Header ── */}
       <FloatingNav
         currentPhase={currentPhase}
         hasApiKey={hasApiKey}
@@ -64,10 +68,12 @@ export function AppShell({
         onNavigatePhase={onNavigatePhase}
         onOpenApiKeyModal={onOpenApiKeyModal}
         hasActiveProject={hasActiveProject}
+        projectName={projectName}
+        onRenameProject={onRenameProject}
       />
 
       {/* ── Main Workspace Body ──────────────────────────────────────────────── */}
-      <main className="flex-1 flex flex-col min-w-0 z-10 relative pt-20">
+      <main className="flex-1 flex flex-col min-w-0 z-10 relative pt-12">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentPhase}

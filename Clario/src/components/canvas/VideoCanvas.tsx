@@ -56,6 +56,66 @@ export function VideoCanvas({
   const [videoError, setVideoError] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
+  const [showSafeZones, setShowSafeZones] = useState(false);
+  const [showInspector, setShowInspector] = useState(true);
+
+  // Auto-open inspector when an item is selected
+  useEffect(() => {
+    if (selectedItemId) setShowInspector(true);
+  }, [selectedItemId]);
+
+  const handleUpdateBeatType = (id: string, newBeat: string) => {
+    const updated = trackItems.map(item => item.id === id ? { ...item, beatType: newBeat as any } : item);
+    onChange(updated);
+  };
+
+  const handleUpdateDopamineScore = (id: string, delta: number) => {
+    const updated = trackItems.map(item => {
+      if (item.id === id) {
+        const currentScore = item.dopamineScore ?? 7.0;
+        const newScore = Math.max(1, Math.min(10, parseFloat((currentScore + delta).toFixed(1))));
+        return { ...item, dopamineScore: newScore };
+      }
+      return item;
+    });
+    onChange(updated);
+  };
+
+  const handleAdjustItemInPoint = (id: string, delta: number) => {
+    const updated = trackItems.map(item => {
+      if (item.id === id) {
+        const newIn = Math.max(0, parseFloat(((item.inPoint || 0) + delta).toFixed(1)));
+        return { ...item, inPoint: newIn, outPoint: newIn + item.duration };
+      }
+      return item;
+    });
+    onChange(updated);
+  };
+
+  const handleAdjustItemDuration = (id: string, delta: number) => {
+    const item = trackItems.find(i => i.id === id);
+    if (!item) return;
+    const newDur = Math.max(0.5, parseFloat((item.duration + delta).toFixed(1)));
+    const updated = trackItems.map(i => {
+      if (i.id === id) {
+        return { ...i, duration: newDur, outPoint: (i.inPoint || 0) + newDur };
+      }
+      return i;
+    });
+    let offset = 0;
+    const retimed = updated.map(i => {
+      const res = { ...i, startTime: offset };
+      offset += i.duration;
+      return res;
+    });
+    onChange(retimed);
+  };
+
+  const handleStepFrame = (forward: boolean) => {
+    const delta = forward ? 0.1 : -0.1;
+    const newTime = Math.max(0, Math.min(effectiveDuration, currentTime + delta));
+    onSeek(parseFloat(newTime.toFixed(1)));
+  };
 
   const rulerRef = useRef<HTMLDivElement>(null);
   const videoElemRef = useRef<HTMLVideoElement | null>(null);
@@ -255,31 +315,59 @@ export function VideoCanvas({
       
       // Recalculate start times and enforce intelligent pacing
       let offset = 0;
-      const reassembled = newVideoSequence.map((item) => {
+      let offset = 0;
+      const reassembled: VideoTrackItem[] = [];
+      let pendingMerge: VideoTrackItem | null = null;
+      let pendingDur = 0;
+
+      for (let i = 0; i < newVideoSequence.length; i++) {
+        const item = newVideoSequence[i];
         let idealDur = item.duration;
         if (isSalesOutreach) {
-          // B2B Sales Pacing: Natural conversational delivery so prospects absorb the pitch
-          if (item.beatType === 'hook') idealDur = Math.max(item.duration, 4.0);
-          else if (item.beatType === 'problem') idealDur = Math.max(item.duration, 5.5);
-          else if (item.beatType === 'cta') idealDur = Math.max(item.duration, 4.0);
-          else idealDur = item.duration;
+          if (item.beatType === 'hook') idealDur = Math.max(idealDur, 4.0);
+          else if (item.beatType === 'problem') idealDur = Math.max(idealDur, 5.5);
+          else if (item.beatType === 'cta') idealDur = Math.max(idealDur, 4.0);
         } else {
-          // TikTok pacing rules: rapid dopamine cuts
-          if (item.beatType === 'hook') idealDur = Math.min(item.duration, 1.5);
-          else if (item.isBroll || item.beatType === 'b_roll') idealDur = Math.min(item.duration, 1.2);
-          else idealDur = Math.min(item.duration, 2.5);
+          if (item.beatType === 'hook') idealDur = Math.max(idealDur, 2.0);
+          else if (item.isBroll || item.beatType === 'b_roll') idealDur = Math.max(idealDur, 1.8);
+          else idealDur = Math.max(idealDur, 1.8);
         }
-        
-        const updated: VideoTrackItem = {
-          ...item,
-          startTime: offset,
-          duration: idealDur,
-          inPoint: item.inPoint || 0,
-          outPoint: (item.inPoint || 0) + idealDur,
-        };
-        offset += idealDur;
-        return updated;
-      });
+
+        if (pendingMerge) {
+          pendingDur += idealDur;
+          pendingMerge.scriptText = `${pendingMerge.scriptText} ${item.scriptText || ''}`.trim();
+          if (pendingDur >= 1.8) {
+            pendingMerge.duration = pendingDur;
+            pendingMerge.outPoint = (pendingMerge.inPoint || 0) + pendingDur;
+            pendingMerge.startTime = offset;
+            reassembled.push(pendingMerge);
+            offset += pendingDur;
+            pendingMerge = null;
+            pendingDur = 0;
+          }
+        } else {
+          if (idealDur < 1.8 && i !== newVideoSequence.length - 1) {
+            pendingMerge = { ...item };
+            pendingDur = idealDur;
+          } else {
+            idealDur = Math.max(idealDur, 1.8);
+            reassembled.push({
+              ...item,
+              startTime: offset,
+              duration: idealDur,
+              inPoint: item.inPoint || 0,
+              outPoint: (item.inPoint || 0) + idealDur,
+            });
+            offset += idealDur;
+          }
+        }
+      }
+      if (pendingMerge) {
+         pendingMerge.duration = Math.max(pendingDur, 1.8);
+         pendingMerge.outPoint = (pendingMerge.inPoint || 0) + pendingMerge.duration;
+         pendingMerge.startTime = offset;
+         reassembled.push(pendingMerge);
+      }
 
       onChange([...reassembled, ...audioTracks]);
       setIsReassembling(false);
@@ -548,7 +636,9 @@ export function VideoCanvas({
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", background: "var(--base)" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", background: "#08090C" }}>
+      {/* Left Column: Video + Timeline */}
+      <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
 
       {/* ── Center Stage: Clean Canvas Viewport ────────────────────────────── */}
       <div 
@@ -722,24 +812,7 @@ export function VideoCanvas({
               </div>
             )}
 
-            {/* Status Pill */}
-            <div style={{
-              position: "absolute", bottom: 10, left: 12,
-              background: "rgba(0, 0, 0, 0.7)", backdropFilter: "blur(6px)",
-              padding: "4px 10px", borderRadius: 6,
-              fontSize: 10, fontFamily: "Space Mono, monospace", color: "#fff",
-              display: "flex", alignItems: "center", gap: 8,
-            }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: isPlaying ? "var(--emerald)" : "var(--accent)" }} />
-              {projectName && <span style={{ fontWeight: 700, color: "rgba(255,255,255,0.8)" }}>{projectName} ·</span>}
-              <span>{formatTime(currentTime)} / {formatTime(effectiveDuration)}</span>
-              {activeItem && (
-                <span style={{ color: BEAT_COLORS[activeItem.beatType || "beat"]?.badge || "#4E6CF2", fontWeight: 700 }}>
-                  [{activeItem.beatType?.toUpperCase() || "BEAT"}]
-                </span>
-              )}
-            </div>
-          </div>
+            
         ) : (
           <div style={{ 
             textAlign: "center", 
@@ -747,7 +820,7 @@ export function VideoCanvas({
             maxWidth: 440,
             padding: 32,
             borderRadius: 20,
-            background: "var(--surface)",
+            background: "#08090C",
             border: "1px dashed var(--border)",
             boxShadow: "var(--shadow-md)"
           }}>
@@ -794,7 +867,7 @@ export function VideoCanvas({
       {/* ── Timeline Section: Streamlined Magnetic Track ─────────────────── */}
       <div style={{
         height: 240,
-        background: "var(--panel)",
+        background: "#0E1015",
         borderTop: "1px solid var(--border)",
         display: "flex",
         flexDirection: "column",
@@ -808,7 +881,7 @@ export function VideoCanvas({
           alignItems: "center",
           padding: "0 16px",
           gap: 12,
-          background: "var(--surface)",
+          background: "#08090C",
         }}>
           {/* Play/Pause */}
           <button
@@ -1002,7 +1075,7 @@ export function VideoCanvas({
                 style={{
                   height: 46, width: 76, borderRadius: 6, overflow: "hidden",
                   border: `1.5px solid ${clip.id === selectedItem.assetId ? "var(--accent)" : "var(--border)"}`,
-                  background: "var(--surface)", cursor: "pointer", flexShrink: 0, position: "relative",
+                  background: "#08090C", cursor: "pointer", flexShrink: 0, position: "relative",
                   padding: 0,
                 }}
                 title={`Swap to ${clip.label} (${clip.duration.toFixed(1)}s)`}
@@ -1025,7 +1098,7 @@ export function VideoCanvas({
         {/* Timeline Tracks */}
         <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
           {/* Track Header Labels Column */}
-          <div style={{ width: 84, flexShrink: 0, borderRight: "1px solid var(--border)", background: "var(--surface)", display: "flex", flexDirection: "column" }}>
+          <div style={{ width: 84, flexShrink: 0, borderRight: "1px solid var(--border)", background: "#08090C", display: "flex", flexDirection: "column" }}>
             <div style={{ height: 24, borderBottom: "1px solid var(--border)" }} />
             {/* Track 1: Video Scenes */}
             <div style={{ height: 72, borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", padding: "0 8px", gap: 4 }}>
@@ -1067,7 +1140,7 @@ export function VideoCanvas({
                 ref={rulerRef}
                 onClick={handleRulerClick}
                 style={{
-                  height: 24, background: "var(--surface)", borderBottom: "1px solid var(--border)",
+                  height: 24, background: "#08090C", borderBottom: "1px solid var(--border)",
                   cursor: "pointer", position: "relative", overflow: "hidden",
                 }}
               >
@@ -1159,12 +1232,12 @@ export function VideoCanvas({
                         </div>
 
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", zIndex: 2, whiteSpace: "nowrap", overflow: "hidden" }}>
-                          <span style={{ fontSize: 7.5, color: "var(--text-muted)", background: "var(--surface)", padding: "1px 4px", borderRadius: 3, flexShrink: 0 }}>
+                          <span style={{ fontSize: 7.5, color: "var(--text-muted)", background: "#08090C", padding: "1px 4px", borderRadius: 3, flexShrink: 0 }}>
                             {item.isBroll ? "⚡ B-Roll" : "📹 A-Roll"}
                           </span>
                           {isSelected && (
                             <div style={{ display: "flex", gap: 2, marginLeft: 4, flexShrink: 0 }}>
-                              <button onClick={e => { e.stopPropagation(); duplicateItem(item.id); }} style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text-secondary)", borderRadius: 3, padding: "1px 4px", cursor: "pointer", fontSize: 8 }}>⧉</button>
+                              <button onClick={e => { e.stopPropagation(); duplicateItem(item.id); }} style={{ background: "#08090C", border: "1px solid var(--border)", color: "var(--text-secondary)", borderRadius: 3, padding: "1px 4px", cursor: "pointer", fontSize: 8 }}>⧉</button>
                               <button onClick={e => { e.stopPropagation(); removeItem(item.id); }} style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "var(--rose)", borderRadius: 3, padding: "1px 4px", cursor: "pointer", fontSize: 8 }}>×</button>
                             </div>
                           )}
@@ -1294,6 +1367,49 @@ export function VideoCanvas({
         </div>
       </div>
 
-    </div>
+          </div>
+      {/* Right Column: Inspector */}
+      {selectedItemId && (
+        <div style={{ width: 340, background: "#0A0B0E", borderLeft: "1px solid rgba(255,255,255,0.08)", display: "flex", flexDirection: "column", color: "#fff", zIndex: 50 }}>
+          <div style={{ padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.08)", fontSize: 13, fontWeight: 600, letterSpacing: "0.05em", color: "rgba(255,255,255,0.5)" }}>
+            CLIP INSPECTOR
+          </div>
+          <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 24 }}>
+            {(() => {
+              const clip = trackItems.find(i => i.id === selectedItemId);
+              if (!clip) return null;
+              return (
+                <>
+                  <div>
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 6, textTransform: "uppercase" }}>Label</div>
+                    <div style={{ fontSize: 15, fontWeight: 600 }}>{clip.label || "Scene"}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 6, textTransform: "uppercase" }}>Dopamine Score</div>
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", background: "rgba(251,191,36,0.1)", color: "#FBBF24", borderRadius: 6, fontSize: 13, fontWeight: 700 }}>
+                      ⚡ {clip.dopamineScore || 0}/10
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 6, textTransform: "uppercase" }}>Beat Type</div>
+                    <div style={{ display: "inline-flex", padding: "4px 10px", background: "rgba(255,255,255,0.1)", borderRadius: 6, fontSize: 12, fontWeight: 600, textTransform: "uppercase" }}>
+                      [{clip.beatType || "B-ROLL"}]
+                    </div>
+                  </div>
+                  {clip.scriptText && (
+                    <div>
+                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 6, textTransform: "uppercase" }}>Transcript</div>
+                      <div style={{ fontSize: 13, lineHeight: 1.6, color: "rgba(255,255,255,0.8)", fontStyle: "italic", background: "rgba(0,0,0,0.3)", padding: 12, borderRadius: 8 }}>
+                        "{clip.scriptText}"
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+</div>
   );
 }
