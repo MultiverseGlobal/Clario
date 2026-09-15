@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { 
   X, ExternalLink, Copy, Check, Mail, Calendar, 
   DollarSign, CheckCircle2, ShieldCheck, AlertCircle, 
@@ -231,9 +232,9 @@ export function OpportunityDossierDrawer({
   const isContacted = opportunity?.pipeline_stage === "contacted" || outreach?.status === "manually_sent";
   const isWon = opportunity?.pipeline_stage === "closed_won";
 
-  return (
+  return typeof document !== "undefined" ? createPortal(
     <div 
-      className="fixed inset-0 z-50 flex justify-end bg-black/70 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-[999] flex justify-end bg-black/60 dark:bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
       onClick={(e) => {
         if (e.target === e.currentTarget && !showDealModal) {
           onClose();
@@ -246,7 +247,7 @@ export function OpportunityDossierDrawer({
         aria-modal="true"
         aria-labelledby="dossier-title"
         tabIndex={-1}
-        className="w-full max-w-5xl bg-[var(--pds-canvas)] border-l border-[var(--pds-border-mid)] shadow-2xl h-full flex flex-col overflow-hidden animate-in slide-in-from-right duration-300 outline-none"
+        className="w-full max-w-5xl bg-white dark:bg-[#0c0d12] border-l border-border shadow-2xl h-full flex flex-col overflow-hidden animate-in slide-in-from-right duration-300 outline-none"
         style={{ color: "var(--pds-text-primary)" }}
       >
         {/* ── Dossier Header (Surface 03) ──────────────────────────────── */}
@@ -608,6 +609,7 @@ export function OpportunityDossierDrawer({
           </div>
         )}
       </div>
-    </div>
-  );
+    </div>,
+    document.body
+  ) : null;
 }

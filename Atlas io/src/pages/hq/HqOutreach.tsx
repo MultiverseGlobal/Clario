@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -552,28 +553,29 @@ export default function HqOutreach() {
       </div>
 
       {/* ── Slide-Over Email / DM Inspector Drawer (Fixed z-index to sit ABOVE FloatingNav) ── */}
-      <AnimatePresence>
-        {selectedRecord && (
-          <>
-            {/* Backdrop: z-[90] ensures it's above FloatingNav (z-50) */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedRecord(null)}
-              className="fixed inset-0 z-[90] bg-background/70 backdrop-blur-sm"
-            />
+      {typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {selectedRecord && (
+            <>
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setSelectedRecord(null)}
+                className="fixed inset-0 z-[998] bg-black/60 dark:bg-black/80 backdrop-blur-md"
+              />
 
-            {/* Drawer: z-[100] with solid opaque background */}
-            <motion.div
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "spring", damping: 30, stiffness: 300 }}
-              className="fixed top-0 right-0 bottom-0 w-full max-w-xl z-[100] bg-card border-l border-border shadow-2xl flex flex-col overflow-hidden text-left"
-            >
-              {/* Drawer Header */}
-              <div className="p-5 border-b border-border flex items-center justify-between bg-muted/30">
+              {/* Drawer: z-[999] with solid opaque background */}
+              <motion.div
+                initial={{ x: "100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "100%" }}
+                transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                className="fixed top-0 right-0 bottom-0 w-full max-w-xl z-[999] bg-white dark:bg-[#0c0d12] border-l border-border shadow-2xl flex flex-col overflow-hidden text-left"
+              >
+                {/* Drawer Header */}
+                <div className="p-5 border-b border-border flex items-center justify-between bg-slate-50 dark:bg-[#12141d]">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-xl bg-muted border border-border flex items-center justify-center font-bold text-xs uppercase text-foreground">
                     {selectedRecord.company_name.slice(0, 2)}
@@ -763,159 +765,164 @@ export default function HqOutreach() {
             </motion.div>
           </>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body
+    )}
 
-      {/* ── Manual Outreach Logger Modal ────────────────────────────────────── */}
-      <AnimatePresence>
-        {isLogModalOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsLogModalOpen(false)}
-              className="fixed inset-0 z-[90] bg-background/70 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="fixed inset-0 m-auto max-w-lg max-h-[85vh] w-full z-[100] bg-card border border-border rounded-2xl shadow-2xl p-6 flex flex-col overflow-hidden"
-            >
-              <div className="flex items-center justify-between pb-4 border-b border-border">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-                    <Plus className="w-4 h-4 text-emerald-500" />
+      {/* ── Manual Outreach Logger Modal (Portaled to document.body) ───────── */}
+      {typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {isLogModalOpen && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsLogModalOpen(false)}
+                className="fixed inset-0 z-[998] bg-black/60 dark:bg-black/80 backdrop-blur-md"
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                className="fixed inset-0 m-auto max-w-lg max-h-[85vh] w-full z-[999] bg-white dark:bg-[#0c0d12] border border-border shadow-2xl p-6 flex flex-col overflow-hidden"
+              >
+                <div className="flex items-center justify-between pb-4 border-b border-border">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                      <Plus className="w-4 h-4 text-emerald-500" />
+                    </div>
+                    <h3 className="font-bold text-foreground text-base font-sans">Log Outreach Manually</h3>
                   </div>
-                  <h3 className="font-bold text-foreground text-base font-sans">Log Outreach Manually</h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsLogModalOpen(false)}
-                  className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <form onSubmit={handleManualSubmit} className="flex-1 overflow-y-auto py-4 space-y-3 font-mono text-xs">
-                <div>
-                  <label className="block text-[11px] text-muted-foreground uppercase font-semibold mb-1">Company Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formCompany}
-                    onChange={(e) => setFormCompany(e.target.value)}
-                    placeholder="e.g. Acme Corp"
-                    className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] text-muted-foreground uppercase font-semibold mb-1">Recipient Name</label>
-                    <input
-                      type="text"
-                      value={formRecipient}
-                      onChange={(e) => setFormRecipient(e.target.value)}
-                      placeholder="e.g. Jane Doe"
-                      className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] text-muted-foreground uppercase font-semibold mb-1">Recipient Role</label>
-                    <input
-                      type="text"
-                      value={formRole}
-                      onChange={(e) => setFormRole(e.target.value)}
-                      placeholder="e.g. Founder & CEO"
-                      className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] text-muted-foreground uppercase font-semibold mb-1">Recipient Email *</label>
-                  <input
-                    type="email"
-                    required
-                    value={formEmail}
-                    onChange={(e) => setFormEmail(e.target.value)}
-                    placeholder="jane@acme.com"
-                    className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] text-muted-foreground uppercase font-semibold mb-1">Channel</label>
-                    <select
-                      value={formChannel}
-                      onChange={(e) => setFormChannel(e.target.value as any)}
-                      className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground focus:outline-none focus:border-foreground/40 cursor-pointer"
-                    >
-                      <option value="email">Email</option>
-                      <option value="linkedin">LinkedIn</option>
-                      <option value="clario_video">Clario Video</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[11px] text-muted-foreground uppercase font-semibold mb-1">Initial Status</label>
-                    <select
-                      value={formStatus}
-                      onChange={(e) => setFormStatus(e.target.value as any)}
-                      className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground focus:outline-none focus:border-foreground/40 cursor-pointer"
-                    >
-                      <option value="sent">Sent</option>
-                      <option value="delivered">Delivered</option>
-                      <option value="replied">Replied</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] text-muted-foreground uppercase font-semibold mb-1">Subject *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formSubject}
-                    onChange={(e) => setFormSubject(e.target.value)}
-                    placeholder="Quick question on outbound tooling"
-                    className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] text-muted-foreground uppercase font-semibold mb-1">Message Body</label>
-                  <textarea
-                    rows={4}
-                    value={formBody}
-                    onChange={(e) => setFormBody(e.target.value)}
-                    placeholder="Paste the outreach text sent to the recipient..."
-                    className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 font-sans"
-                  />
-                </div>
-
-                <div className="pt-3 flex items-center justify-end gap-2 border-t border-border">
                   <button
                     type="button"
                     onClick={() => setIsLogModalOpen(false)}
-                    className="px-4 py-2 rounded-xl bg-muted text-muted-foreground hover:text-foreground text-xs font-semibold cursor-pointer"
+                    className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer"
                   >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2 rounded-xl bg-foreground text-background text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer"
-                  >
-                    Save to Ledger
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
-              </form>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+
+                <form onSubmit={handleManualSubmit} className="flex-1 overflow-y-auto py-4 space-y-3 font-mono text-xs">
+                  <div>
+                    <label className="block text-[11px] text-muted-foreground uppercase font-semibold mb-1">Company Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={formCompany}
+                      onChange={(e) => setFormCompany(e.target.value)}
+                      placeholder="e.g. Acme Corp"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#151722] border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] text-muted-foreground uppercase font-semibold mb-1">Recipient Name</label>
+                      <input
+                        type="text"
+                        value={formRecipient}
+                        onChange={(e) => setFormRecipient(e.target.value)}
+                        placeholder="e.g. Jane Doe"
+                        className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#151722] border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] text-muted-foreground uppercase font-semibold mb-1">Recipient Role</label>
+                      <input
+                        type="text"
+                        value={formRole}
+                        onChange={(e) => setFormRole(e.target.value)}
+                        placeholder="e.g. Founder & CEO"
+                        className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#151722] border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] text-muted-foreground uppercase font-semibold mb-1">Recipient Email *</label>
+                    <input
+                      type="email"
+                      required
+                      value={formEmail}
+                      onChange={(e) => setFormEmail(e.target.value)}
+                      placeholder="jane@acme.com"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#151722] border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] text-muted-foreground uppercase font-semibold mb-1">Channel</label>
+                      <select
+                        value={formChannel}
+                        onChange={(e) => setFormChannel(e.target.value as any)}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#151722] border border-border text-foreground focus:outline-none focus:border-foreground/40 cursor-pointer"
+                      >
+                        <option value="email">Email</option>
+                        <option value="linkedin">LinkedIn</option>
+                        <option value="clario_video">Clario Video</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] text-muted-foreground uppercase font-semibold mb-1">Initial Status</label>
+                      <select
+                        value={formStatus}
+                        onChange={(e) => setFormStatus(e.target.value as any)}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#151722] border border-border text-foreground focus:outline-none focus:border-foreground/40 cursor-pointer"
+                      >
+                        <option value="sent">Sent</option>
+                        <option value="delivered">Delivered</option>
+                        <option value="replied">Replied</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] text-muted-foreground uppercase font-semibold mb-1">Subject *</label>
+                    <input
+                      type="text"
+                      required
+                      value={formSubject}
+                      onChange={(e) => setFormSubject(e.target.value)}
+                      placeholder="Quick question on outbound tooling"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#151722] border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] text-muted-foreground uppercase font-semibold mb-1">Message Body</label>
+                    <textarea
+                      rows={4}
+                      value={formBody}
+                      onChange={(e) => setFormBody(e.target.value)}
+                      placeholder="Paste the outreach text sent to the recipient..."
+                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#151722] border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 font-sans"
+                    />
+                  </div>
+
+                  <div className="pt-3 flex items-center justify-end gap-2 border-t border-border">
+                    <button
+                      type="button"
+                      onClick={() => setIsLogModalOpen(false)}
+                      className="px-4 py-2 rounded-xl bg-muted text-muted-foreground hover:text-foreground text-xs font-semibold cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2 rounded-xl bg-foreground text-background text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer"
+                    >
+                      Save to Ledger
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }

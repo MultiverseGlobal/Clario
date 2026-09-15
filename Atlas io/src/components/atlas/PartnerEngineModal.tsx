@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { Loader2, Users, Search, Handshake, ExternalLink, ArrowRight, CheckCircle2, ChevronRight, X, Building2, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,9 +66,9 @@ export function PartnerEngineModal({ isOpen, onClose, onSelectPartner }: Partner
     ? partners
     : partners.filter(p => p.serviceCategory.toLowerCase().includes(categoryFilter.toLowerCase()));
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="relative w-full max-w-3xl rounded-xl border border-border/60 bg-[#0F1117] p-6 shadow-2xl text-foreground max-h-[90vh] overflow-y-auto">
+  return typeof document !== "undefined" ? createPortal(
+    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
+      <div className="relative w-full max-w-3xl rounded-2xl border border-border bg-[#0F1117] p-6 shadow-2xl text-foreground max-h-[90vh] overflow-y-auto">
         <button
           onClick={onClose}
           className="absolute right-4 top-4 text-muted-foreground hover:text-foreground transition-colors"
@@ -190,6 +191,7 @@ export function PartnerEngineModal({ isOpen, onClose, onSelectPartner }: Partner
           </Button>
         </div>
       </div>
-    </div>
-  );
+    </div>,
+    document.body
+  ) : null;
 }

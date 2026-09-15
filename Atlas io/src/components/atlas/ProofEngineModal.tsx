@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { Loader2, Zap, Copy, Check, Video, FileText, ArrowRight, ShieldCheck, X, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -73,9 +74,9 @@ export function ProofEngineModal({
     setTimeout(() => setCopiedSection(null), 2000);
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="relative w-full max-w-2xl rounded-xl border border-border/60 bg-[#0F1117] p-6 shadow-2xl text-foreground max-h-[90vh] overflow-y-auto">
+  return typeof document !== "undefined" ? createPortal(
+    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
+      <div className="relative w-full max-w-2xl rounded-2xl border border-border bg-[#0F1117] p-6 shadow-2xl text-foreground max-h-[90vh] overflow-y-auto">
         <button
           onClick={onClose}
           className="absolute right-4 top-4 text-muted-foreground hover:text-foreground transition-colors"
@@ -213,6 +214,7 @@ n${proof.loomScript.hook}\n\n[DIAGNOSIS]\n${proof.loomScript.diagnosis}\n\n[PROO
           </div>
         )}
       </div>
-    </div>
-  );
+    </div>,
+    document.body
+  ) : null;
 }

@@ -1,15 +1,22 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
+import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   FileText, Loader2, RefreshCw, ChevronLeft, ChevronRight,
   TrendingUp, MessageSquare, DollarSign, AlertCircle, Zap,
-  Calendar, ArrowRight
+  Calendar, ArrowRight, CheckCircle2, Copy, Check, Sparkles,
+  Share2, Compass, Clock, Target, ShieldAlert, ListChecks,
+  Activity, ArrowUpRight, CheckSquare, Square
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { format, startOfWeek, endOfWeek, subWeeks, addWeeks } from "date-fns";
+import { format, startOfWeek, endOfWeek } from "date-fns";
 import { invokeSourcingMachine } from "@/lib/sourcingMachineProxy";
+import { soundManager } from "@/lib/audioFeedback";
+import { getStoredOutreachRecords } from "@/services/outreachStore";
 
 interface WeeklyReport {
   id: string;
@@ -40,13 +47,31 @@ function formatMoney(n: number) {
 
 const GOAL = 10000;
 
+interface TelemetryStage {
+  id: number;
+  label: string;
+  detail: string;
+}
+
+const TELEMETRY_STAGES: TelemetryStage[] = [
+  { id: 1, label: "Auditing Deals & Pipeline Velocity", detail: "Querying active revenue summary, win/loss ratios, and pipeline aging..." },
+  { id: 2, label: "Analyzing Outreach & Conversion Cadence", detail: "Correlating multi-channel dispatches with positive response velocity..." },
+  { id: 3, label: "Detecting Pipeline Friction & Stalled Revenue", detail: "Scanning for accounts with zero momentum (>5 days inactive)..." },
+  { id: 4, label: "Synthesizing The Single Weekly Move", detail: "Executing AI reasoning to lock your primary strategic directive..." },
+];
+
 export default function HqReport() {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const [reports, setReports] = useState<WeeklyReport[]>([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [telemetryStage, setTelemetryStage] = useState<number>(1);
+  const [telemetryPercent, setTelemetryPercent] = useState<number>(0);
+  const [copiedMemo, setCopiedMemo] = useState(false);
+  const [checkedPriorities, setCheckedPriorities] = useState<Record<string, boolean>>({});
 
   const loadReports = useCallback(async () => {
     if (!user) return;
@@ -57,17 +82,19 @@ export default function HqReport() {
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
-      
+
       if (error) throw error;
-      
-      if (data) {
-        setReports(data.map((r: any) => ({
-          id: r.id,
-          week_start: r.week_start,
-          week_end: r.week_end,
-          generated_at: r.created_at,
-          content: r.content
-        })));
+
+      if (data && data.length > 0) {
+        setReports(
+          data.map((r: any) => ({
+            id: r.id,
+            week_start: r.week_start,
+            week_end: r.week_end,
+            generated_at: r.created_at,
+            content: r.content,
+          }))
+        );
       }
     } catch (err: any) {
       toast.error("Failed to load reports: " + err.message);
@@ -76,18 +103,59 @@ export default function HqReport() {
     }
   }, [user]);
 
-  useEffect(() => { loadReports(); }, [loadReports]);
+  useEffect(() => {
+    loadReports();
+  }, [loadReports]);
+
+  const report = reports[currentIdx];
+
+  // Load checked priority states from localStorage
+  useEffect(() => {
+    if (!report?.id) return;
+    try {
+      const saved = localStorage.getItem(`atlas_report_priorities_${report.id}`);
+      if (saved) {
+        setCheckedPriorities(JSON.parse(saved));
+      } else {
+        setCheckedPriorities({});
+      }
+    } catch {
+      setCheckedPriorities({});
+    }
+  }, [report?.id]);
+
+  const togglePriority = (idx: number) => {
+    soundManager.playClick();
+    if (!report?.id) return;
+    const key = `p_${idx}`;
+    const updated = { ...checkedPriorities, [key]: !checkedPriorities[key] };
+    setCheckedPriorities(updated);
+    try {
+      localStorage.setItem(`atlas_report_priorities_${report.id}`, JSON.stringify(updated));
+    } catch (err) {
+      console.warn("Could not save priority state:", err);
+    }
+  };
+
+  const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
   const generateReport = async () => {
     if (!user) return;
     setGenerating(true);
+    setTelemetryStage(1);
+    setTelemetryPercent(15);
+    soundManager.playClick();
+
     try {
       const now = new Date();
       const weekStart = startOfWeek(now, { weekStartsOn: 1 });
       const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-      // Fetch all necessary data
+      await delay(450);
+      setTelemetryStage(2);
+      setTelemetryPercent(45);
+
+      // Fetch Supabase data in parallel
       const [revRes, outRes, dealRes, oppRes] = await Promise.all([
         supabase.from("atlas_revenue_summary").select("*").eq("user_id", user.id).maybeSingle(),
         supabase.from("atlas_outreach").select("status, created_at").eq("user_id", user.id),
@@ -100,11 +168,25 @@ export default function HqReport() {
       const deals = (dealRes.data ?? []) as any[];
       const opps = (oppRes.data ?? []) as any[];
 
-      // Filter outreach
+      // Merge with localStorage dispatched outreach if Supabase is sparse
+      const localDispatched = getStoredOutreachRecords();
+
       const weeklyOutreach = outData.filter((o: any) => new Date(o.created_at) >= weekStart);
       const activeOutreach = weeklyOutreach.length > 0 ? weeklyOutreach : outData;
-      const outreach_sent = activeOutreach.filter((o: any) => o.status !== "draft").length;
-      const replies = activeOutreach.filter((o: any) => ["replied", "booked"].includes(o.status)).length;
+
+      let outreach_sent = activeOutreach.filter((o: any) => o.status !== "draft").length;
+      if (outreach_sent === 0 && localDispatched.length > 0) {
+        outreach_sent = localDispatched.length;
+      }
+
+      let replies = activeOutreach.filter((o: any) => ["replied", "booked"].includes(o.status)).length;
+      if (replies === 0 && localDispatched.some((l) => l.status === "replied")) {
+        replies = localDispatched.filter((l) => l.status === "replied").length;
+      }
+
+      await delay(400);
+      setTelemetryStage(3);
+      setTelemetryPercent(70);
 
       const wonDeals = deals.filter((d) => d.stage === "won");
       const lostDeals = deals.filter((d) => d.stage === "lost");
@@ -139,9 +221,13 @@ export default function HqReport() {
         })),
       ]
         .filter((d) => d.daysSince >= 5 && Boolean(d.company || d.company_name))
-        .slice(0, 3);
+        .slice(0, 4);
 
-      // Generate AI narrative for the key sections
+      await delay(450);
+      setTelemetryStage(4);
+      setTelemetryPercent(92);
+
+      // Generate strategic narrative
       let aiContent: { whats_working: string; whats_not: string; the_decision: string } = {
         whats_working: "",
         whats_not: "",
@@ -149,7 +235,7 @@ export default function HqReport() {
       };
 
       try {
-        const { data: aiData } = await invokeSourcingMachine( {
+        const { data: aiData } = await invokeSourcingMachine({
           body: {
             action: "generate-report",
             report_data: {
@@ -182,7 +268,6 @@ export default function HqReport() {
             generateDecision(outreach_sent, stalledDeals, [...activeDeals, ...activeOpps], pct);
         }
       } catch {
-        // Fall back to rule-based insights
         aiContent.whats_working = generateWorkingInsight(outreach_sent, replies, replyRate, totalDealsWon);
         aiContent.whats_not = generateNotWorkingInsight(stalledDeals.length, outreach_sent, replyRate);
         aiContent.the_decision = generateDecision(outreach_sent, stalledDeals, [...activeDeals, ...activeOpps], pct);
@@ -196,8 +281,13 @@ export default function HqReport() {
         outreach_sent,
         replies,
         advanced: [],
-        stalled: stalledDeals.map((d) => ({ company: d.company || d.company_name || "Stalled Account", days: d.daysSince || 5 })),
-        lost_deals: lostDeals.slice(0, 3).map((d) => ({ company: d.company_name || "Closed Account", reason: d.lost_reason || "Unspecified" })),
+        stalled: stalledDeals.map((d) => ({
+          company: d.company || d.company_name || "Stalled Account",
+          days: d.daysSince || 5,
+        })),
+        lost_deals: lostDeals
+          .slice(0, 3)
+          .map((d) => ({ company: d.company_name || "Closed Account", reason: d.lost_reason || "Unspecified" })),
         whats_working: aiContent.whats_working,
         whats_not: aiContent.whats_not,
         next_week_priorities: generatePriorities(stalledDeals, outreach_sent, [...activeDeals, ...activeOpps], pct),
@@ -210,14 +300,17 @@ export default function HqReport() {
           user_id: user.id,
           week_start: weekStart.toISOString(),
           week_end: weekEnd.toISOString(),
-          content: reportContent
+          content: reportContent,
         })
         .select()
         .single();
-        
+
       if (insertError) throw insertError;
 
-      const report: WeeklyReport = {
+      setTelemetryPercent(100);
+      await delay(300);
+
+      const newRep: WeeklyReport = {
         id: insertedReport.id,
         week_start: insertedReport.week_start,
         week_end: insertedReport.week_end,
@@ -225,9 +318,10 @@ export default function HqReport() {
         content: insertedReport.content as any,
       };
 
-      setReports((prev) => [report, ...prev]);
+      setReports((prev) => [newRep, ...prev]);
       setCurrentIdx(0);
-      toast.success("Weekly report generated and saved");
+      soundManager.playSuccess();
+      toast.success("Executive Founder Report generated and saved");
     } catch (err: any) {
       toast.error("Report generation failed: " + err.message);
     } finally {
@@ -236,242 +330,636 @@ export default function HqReport() {
   };
 
   function generateWorkingInsight(sent: number, replies: number, rate: number, won: number): string {
-    if (won > 0) return `You closed ${won} deal${won > 1 ? "s" : ""} this period — that's evidence the process works. Double down on what you did to close them.`;
-    if (rate > 20) return `${rate}% reply rate — above average for cold outreach. The positioning is working. Send more.`;
-    if (sent > 10 && rate > 0) return `${replies} repl${replies === 1 ? "y" : "ies"} from ${sent} messages sent. It's working — not every message converts, that's expected.`;
-    if (sent > 0) return `You're in motion — ${sent} message${sent > 1 ? "s" : ""} sent this week. That's the only stat that actually matters right now.`;
-    return "The week is blank. No outreach recorded. The system can only show you what's working when you work it.";
+    if (won > 0)
+      return `You closed ${won} deal${won > 1 ? "s" : ""} this period — that's empirical proof your value proposition converts. Double down on the exact channel and script angle that secured them.`;
+    if (rate >= 15)
+      return `${rate}% reply rate — outperforming the industry standard of 8–12%. Your targeting thesis and hook resonance are validated. Prioritize outbound volume.`;
+    if (sent > 8 && rate > 0)
+      return `${replies} positive response${replies === 1 ? "" : "s"} logged from ${sent} dispatched messages. Momentum is compounding. Keep cadence active.`;
+    if (sent > 0)
+      return `Outbound engine is active with ${sent} message${sent > 1 ? "s" : ""} sent. Market feedback loops are now open.`;
+    return "Outbound engine is currently quiet. Log touches or launch a campaign to populate diagnostic feedback.";
   }
 
   function generateNotWorkingInsight(stalled: number, sent: number, rate: number): string {
-    if (sent === 0) return "Nothing went out this week. Zero outreach means zero data. That's the only real problem right now.";
-    if (stalled > 2) return `${stalled} deals have gone quiet for 5+ days. Stalled pipeline is not revenue — it's a to-do list that isn't getting done.`;
-    if (rate === 0 && sent > 5) return "0% reply rate after multiple messages. The list or the message needs to change — probably the list.";
-    return "No critical blockers detected. The constraint right now is volume, not quality.";
+    if (sent === 0)
+      return "Zero outbound dispatches recorded this week. Pipeline velocity cannot compound without active touches.";
+    if (stalled >= 2)
+      return `${stalled} high-potential accounts have sat dormant for 5+ days without follow-up. Stalled deals are perishable assets.`;
+    if (rate === 0 && sent > 5)
+      return "0% response rate across recent touches. Consider sharpening the acute pain hook or shifting the ICP role focus.";
+    return "No structural roadblocks detected. The primary growth lever remains daily dispatch cadence.";
   }
 
   function generateDecision(sent: number, stalled: any[], active: any[], pct: number): string {
     if (stalled.length > 0) {
       const topStall = stalled[0];
-      const targetName = topStall.company || topStall.company_name || topStall.name || "top stalled prospect";
+      const targetName = topStall.company || topStall.company_name || topStall.name || "top account";
       const days = topStall.daysSince || topStall.days || 5;
-      return `Follow up with ${targetName} — it's been ${days} days. One message could reopen this. If no reply in 3 more days, close it and move on.`;
+      return `Nudge ${targetName} immediately — quiet for ${days} days. Deploy a 90-second teardown or diagnostic proof asset to reignite decision momentum.`;
     }
-    if (sent < 5) return "Send 10 outreach messages before the end of the week. Nothing else matters more than this right now.";
-    if (pct >= 80) return `You're ${pct}% of the way to your £10,000 goal. One deal closes it. Focus exclusively on the most likely deal to close this week.`;
-    if (active.length === 0) return "No active deals in the pipeline. Add 10 leads, research 5, and contact 3 before the week ends.";
-    return `Pipeline has ${active.length} active deals. Pick the most likely to close and make it your only focus until it's decided.`;
+    if (sent < 10)
+      return "Dispatch 10 personalized ICP messages before Friday. Outbound volume is the sole constraint on closing your £10k goal.";
+    if (pct >= 70)
+      return `You are at ${pct}% of your monthly target. Focus 100% of executive bandwidth on closing the single largest active opportunity in pipeline.`;
+    if (active.length === 0)
+      return "Pipeline is dry. Launch a new 15-target campaign in Radar and secure 2 exploratory calls before the week concludes.";
+    return `Pipeline holds ${active.length} active opportunities. Pick the single deal with the highest conviction and drive it to decision.`;
   }
 
   function generatePriorities(stalled: any[], sent: number, active: any[], pct: number): string[] {
     const p: string[] = [];
     if (stalled.length > 0) {
-      const validNames = stalled
-        .map((d) => d.company || d.company_name || d.name)
-        .filter(Boolean);
+      const validNames = stalled.map((d) => d.company || d.company_name || d.name).filter(Boolean);
       if (validNames.length > 0) {
-        p.push(`Follow up with ${validNames.join(", ")} — all stalled 5+ days`);
+        p.push(`Re-engage stalled accounts: ${validNames.slice(0, 2).join(", ")} (dormant 5+ days)`);
       }
     }
-    if (sent < 10) p.push("Send at least 10 outreach messages this week");
-    if (active.length < 5) p.push("Add 5 new leads to the pipeline");
-    if (pct < 50) p.push("Research 5 companies and generate personalized outreach for each");
-    p.push("Log every interaction — your memory is not a system");
+    if (sent < 10) p.push("Dispatch at least 10 personalized messages through Outreach Tracker");
+    if (active.length < 5) p.push("Source 5 new high-intent ICP targets using Atlas Radar");
+    if (pct < 50) p.push("Review daily 10:00 AM briefing and triage top 3 qualified leads");
+    p.push("Log every offline response and call touchpoint to preserve accurate telemetry");
     return p.slice(0, 5);
   }
 
-  const report = reports[currentIdx];
+  // Health Score Calculation (0 - 100)
+  const healthScore = useMemo(() => {
+    if (!report) return 0;
+    const { outreach_sent, replies, stalled, revenue_this_month } = report.content;
+    let score = 0;
+    // Volume: up to 30 pts
+    score += Math.min(30, Math.round((outreach_sent / 10) * 30));
+    // Replies: up to 30 pts
+    if (replies > 0) score += 30;
+    else if (outreach_sent > 0) score += 15;
+    // Revenue goal pacing: up to 25 pts
+    const revRatio = Math.min(1, revenue_this_month / GOAL);
+    score += Math.round(revRatio * 25);
+    // Hygiene: up to 15 pts
+    const stalledCount = (stalled || []).length;
+    score += Math.max(0, 15 - stalledCount * 4);
+
+    return Math.min(100, Math.max(15, score));
+  }, [report]);
+
+  const copyExecutiveBriefing = () => {
+    if (!report) return;
+    soundManager.playClick();
+    const memo = `### 📊 ATLAS WEEKLY FOUNDER REPORT
+**Period:** Week of ${format(new Date(report.week_start), "d MMM")} – ${format(new Date(report.week_end), "d MMM yyyy")}
+**Atlas Pipeline Health Score:** ${healthScore}/100
+
+---
+### 🎯 THE SINGLE MOVE
+${report.content.the_decision}
+
+---
+### 💰 REVENUE & VELOCITY
+- **Closed This Month:** ${formatMoney(report.content.revenue_this_month)} (${Math.round((report.content.revenue_this_month / GOAL) * 100)}% of £10k goal)
+- **Weighted Pipeline:** ${formatMoney(report.content.pipeline_weighted)}
+- **Deals Won / Lost:** ${report.content.deals_won} won · ${report.content.deals_lost} lost
+
+---
+### ✉️ OUTBOUND METRICS
+- **Sent This Week:** ${report.content.outreach_sent}
+- **Replies:** ${report.content.replies}
+- **Reply Rate:** ${report.content.outreach_sent > 0 ? Math.round((report.content.replies / report.content.outreach_sent) * 100) + "%" : "—"}
+
+---
+### ⚡ KEY TACTICAL PRIORITIES
+${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).join("\n")}
+
+---
+*Generated autonomously via Atlas Commercial Operating System*`;
+
+    navigator.clipboard.writeText(memo);
+    setCopiedMemo(true);
+    toast.success("Executive briefing copied to clipboard for Slack / Investors!");
+    setTimeout(() => setCopiedMemo(false), 2500);
+  };
+
+  const copyNudge = (company: string) => {
+    soundManager.playClick();
+    const text = `Hi, following up on our note from last week. Wanted to share a 90-second diagnostic teardown on how we streamlined this exact bottleneck for peers in your space — would a quick link be useful?`;
+    navigator.clipboard.writeText(text);
+    toast.success(`Nudge template for ${company} copied to clipboard!`);
+  };
 
   return (
-    <div className="text-foreground">
-      {/* Header */}
-      <div className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur-sm px-6 py-3">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-sm font-semibold">Weekly Founder Report</h1>
-            <p className="text-xs text-muted-foreground font-mono">Evidence-backed. One decision per week.</p>
+    <div className="min-h-screen text-foreground pb-20">
+      {/* ── Top Executive Control Bar ── */}
+      <div className="sticky top-0 z-30 border-b border-border/70 bg-background/90 backdrop-blur-md px-6 py-3.5">
+        <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded-xl bg-foreground/5 border border-border flex items-center justify-center text-foreground">
+              <Compass className="h-4 w-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-sm font-bold font-sans tracking-tight text-foreground">
+                  Weekly Founder Report
+                </h1>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-semibold">
+                  Autonomous Audit
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground font-mono">
+                Evidence-backed commercial telemetry · One clear decision per week
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="flex items-center gap-2.5">
             {reports.length > 1 && (
-              <div className="flex items-center gap-1">
-                <Button variant="outline" size="sm" onClick={() => setCurrentIdx((i) => Math.min(i + 1, reports.length - 1))} disabled={currentIdx >= reports.length - 1} className="h-7 w-7 p-0 border-border/60">
+              <div className="flex items-center gap-1 bg-muted/40 p-0.5 rounded-xl border border-border/60">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    soundManager.playClick();
+                    setCurrentIdx((i) => Math.min(i + 1, reports.length - 1));
+                  }}
+                  disabled={currentIdx >= reports.length - 1}
+                  className="h-7 w-7 p-0 rounded-lg hover:bg-muted cursor-pointer"
+                >
                   <ChevronLeft className="h-3.5 w-3.5" />
                 </Button>
-                <span className="text-xs text-muted-foreground font-mono px-1">{currentIdx + 1}/{reports.length}</span>
-                <Button variant="outline" size="sm" onClick={() => setCurrentIdx((i) => Math.max(i - 1, 0))} disabled={currentIdx <= 0} className="h-7 w-7 p-0 border-border/60">
+                <span className="text-xs text-muted-foreground font-mono px-2">
+                  {currentIdx + 1} of {reports.length}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    soundManager.playClick();
+                    setCurrentIdx((i) => Math.max(i - 1, 0));
+                  }}
+                  disabled={currentIdx <= 0}
+                  className="h-7 w-7 p-0 rounded-lg hover:bg-muted cursor-pointer"
+                >
                   <ChevronRight className="h-3.5 w-3.5" />
                 </Button>
               </div>
             )}
+
+            {report && (
+              <button
+                type="button"
+                onClick={copyExecutiveBriefing}
+                className="h-8 px-3 rounded-xl border border-border/80 bg-card hover:bg-muted text-foreground text-xs font-mono flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+              >
+                {copiedMemo ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                <span>{copiedMemo ? "Copied" : "Export Briefing"}</span>
+              </button>
+            )}
+
             <Button
               size="sm"
               onClick={generateReport}
               disabled={generating}
-              className="h-8 bg-primary text-primary-foreground hover:bg-primary/90 gap-1.5 text-xs"
+              className="h-8 px-3.5 rounded-xl bg-foreground text-background hover:bg-foreground/90 gap-1.5 text-xs font-semibold font-mono cursor-pointer shadow-sm"
             >
-              {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-              {generating ? "Generating..." : "Generate Report"}
+              {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 text-emerald-400" />}
+              <span>{generating ? "Auditing Pipeline..." : report ? "Recalibrate Report" : "Generate Report"}</span>
             </Button>
           </div>
         </div>
       </div>
 
-      <div className="p-6 max-w-3xl mx-auto space-y-6">
+      {/* ── Main Report Content ── */}
+      <div className="max-w-5xl mx-auto px-6 pt-6 space-y-6">
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <div className="flex flex-col items-center justify-center py-28 space-y-3">
+            <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
+            <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider">
+              Retrieving founder audits...
+            </span>
           </div>
         ) : !report ? (
-          <div className="rounded-xl border border-dashed border-border/60 p-16 text-center">
-            <FileText className="h-14 w-14 mx-auto mb-4 opacity-20" />
-            <h3 className="text-sm font-semibold mb-1">No report yet</h3>
-            <p className="text-xs text-muted-foreground mb-6 max-w-xs mx-auto">
-              Generate your first weekly report. It pulls live data from your pipeline and outreach to give you one clear decision.
-            </p>
+          /* Empty State */
+          <div className="rounded-3xl border border-dashed border-border/80 bg-white dark:bg-[#0c0d12] p-16 text-center shadow-sm max-w-2xl mx-auto space-y-5">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto text-emerald-500">
+              <Sparkles className="h-7 w-7" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-foreground">No Founder Report Generated Yet</h2>
+              <p className="text-xs text-muted-foreground font-mono mt-1.5 max-w-md mx-auto leading-relaxed">
+                Atlas audits your live pipeline deals, outreach conversion cadence, and stalled revenue to formulate ONE authoritative decision each week.
+              </p>
+            </div>
             <Button
               onClick={generateReport}
               disabled={generating}
-              className="bg-primary text-primary-foreground gap-2"
+              className="h-10 px-6 rounded-2xl bg-foreground text-background hover:bg-foreground/90 gap-2 font-semibold text-xs font-mono cursor-pointer shadow-md"
             >
-              {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
-              {generating ? "Generating..." : "Generate First Report"}
+              <Zap className="h-4 w-4 text-emerald-400" />
+              Generate First Weekly Report
             </Button>
           </div>
         ) : (
-          <div className="space-y-5">
-            {/* Report header */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-bold">
-                  Week of {format(new Date(report.week_start), "d MMM")} – {format(new Date(report.week_end), "d MMM yyyy")}
-                </h2>
-                <p className="text-xs text-muted-foreground font-mono mt-0.5">Generated {format(new Date(report.generated_at), "d MMM · HH:mm")}</p>
-              </div>
-              <div className="flex items-center gap-1">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-              </div>
-            </div>
-
-            {/* Revenue section */}
-            <div className="rounded-xl border border-border/60 bg-card p-5 space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-border/40">
-                <DollarSign className="h-4 w-4 text-emerald-400" />
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Revenue</h3>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                  { label: "This month", value: formatMoney(report.content.revenue_this_month), color: "text-emerald-400" },
-                  { label: "Pipeline (weighted)", value: formatMoney(report.content.pipeline_weighted), color: "text-primary" },
-                  { label: "Deals won", value: report.content.deals_won, color: "text-emerald-400" },
-                  { label: "Deals lost", value: report.content.deals_lost, color: "text-red-400" },
-                ].map((s) => (
-                  <div key={s.label} className="rounded-lg bg-muted/20 border border-border/30 p-3">
-                    <div className={`text-lg font-bold font-mono ${s.color}`}>{s.value}</div>
-                    <div className="text-[11px] text-muted-foreground mt-0.5">{s.label}</div>
-                  </div>
-                ))}
-              </div>
-              {/* Goal progress */}
-              <div className="space-y-1.5">
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Monthly goal: {formatMoney(GOAL)}</span>
-                  <span className="font-mono">{Math.round((report.content.revenue_this_month / GOAL) * 100)}%</span>
+          <div className="space-y-6">
+            {/* ── Report Metadata & Executive Header ── */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-border/40">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-muted/60 border border-border flex items-center justify-center text-foreground font-mono text-xs font-bold">
+                  W{format(new Date(report.week_start), "w")}
                 </div>
-                <div className="h-1.5 bg-muted/40 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full"
-                    style={{ width: `${Math.min(100, Math.round((report.content.revenue_this_month / GOAL) * 100))}%` }}
-                  />
+                <div>
+                  <h2 className="text-base font-bold font-sans text-foreground">
+                    Week of {format(new Date(report.week_start), "d MMM")} – {format(new Date(report.week_end), "d MMM yyyy")}
+                  </h2>
+                  <p className="text-[11px] font-mono text-muted-foreground flex items-center gap-2">
+                    <span>Generated {format(new Date(report.generated_at), "PP · HH:mm")}</span>
+                    <span>•</span>
+                    <span className="text-emerald-500">Autonomous Evidence Check Complete</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Health Score Pill */}
+              <div className="flex items-center gap-3 bg-white dark:bg-[#0f1118] border border-border/80 px-4 py-2 rounded-2xl shadow-xs">
+                <div className="flex flex-col items-end">
+                  <span className="text-[10px] font-mono uppercase text-muted-foreground">Atlas Pipeline Health</span>
+                  <span className="text-xs font-mono font-bold text-foreground">
+                    {healthScore >= 75 ? "High Momentum" : healthScore >= 50 ? "Active Traction" : "Ignition Phase"}
+                  </span>
+                </div>
+                <div className="h-8 w-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center font-mono font-bold text-emerald-500 text-xs">
+                  {healthScore}
                 </div>
               </div>
             </div>
 
-            {/* Outreach section */}
-            <div className="rounded-xl border border-border/60 bg-card p-5 space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-border/40">
-                <MessageSquare className="h-4 w-4 text-primary" />
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Outreach</h3>
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  { label: "Sent this week", value: report.content.outreach_sent, color: "text-foreground" },
-                  { label: "Replies", value: report.content.replies, color: report.content.replies > 0 ? "text-emerald-400" : "text-muted-foreground" },
-                  {
-                    label: "Reply rate",
-                    value: report.content.outreach_sent > 0
-                      ? `${Math.round((report.content.replies / report.content.outreach_sent) * 100)}%`
-                      : "—",
-                    color: "text-primary"
-                  },
-                ].map((s) => (
-                  <div key={s.label} className="rounded-lg bg-muted/20 border border-border/30 p-3">
-                    <div className={`text-xl font-bold font-mono ${s.color}`}>{s.value}</div>
-                    <div className="text-[11px] text-muted-foreground mt-0.5">{s.label}</div>
+            {/* ── The Single Move (Spotlight Banner) ── */}
+            <div className="rounded-3xl border border-foreground/15 bg-gradient-to-br from-foreground/5 via-foreground/[0.02] to-transparent p-6 shadow-sm relative overflow-hidden">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-emerald-500">
+                      The Single Weekly Move · Tactical North Star
+                    </span>
                   </div>
-                ))}
+                  <p className="text-base sm:text-lg font-semibold text-foreground leading-relaxed font-sans">
+                    {report.content.the_decision}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate("/hq/outreach")}
+                  className="shrink-0 h-9 px-3.5 rounded-xl bg-foreground text-background text-xs font-mono font-semibold flex items-center gap-1.5 hover:opacity-90 transition-all cursor-pointer shadow-xs"
+                >
+                  <span>Execute Move</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
               </div>
             </div>
 
-            {/* Stalled deals */}
+            {/* ── Core Telemetry: Revenue & Outreach Grid ── */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Revenue & Pipeline Card */}
+              <div className="rounded-3xl border border-border bg-white dark:bg-[#0c0d12] p-6 shadow-xs space-y-5">
+                <div className="flex items-center justify-between pb-3 border-b border-border/50">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500">
+                      <DollarSign className="h-4 w-4" />
+                    </div>
+                    <h3 className="text-xs font-bold uppercase font-mono tracking-wider text-foreground">
+                      Financial Pacing
+                    </h3>
+                  </div>
+                  <span className="text-[11px] font-mono text-muted-foreground">
+                    Target: {formatMoney(GOAL)} / mo
+                  </span>
+                </div>
+
+                {/* Metric Tiles */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-[#13151f] border border-border/60">
+                    <span className="text-[10px] font-mono text-muted-foreground uppercase">This Month Closed</span>
+                    <div className="text-xl font-bold font-mono text-emerald-500 mt-1">
+                      {formatMoney(report.content.revenue_this_month)}
+                    </div>
+                  </div>
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-[#13151f] border border-border/60">
+                    <span className="text-[10px] font-mono text-muted-foreground uppercase">Weighted Pipeline</span>
+                    <div className="text-xl font-bold font-mono text-foreground mt-1">
+                      {formatMoney(report.content.pipeline_weighted)}
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-[#13151f] border border-border/60 flex items-center justify-between">
+                    <span className="text-[10px] font-mono text-muted-foreground uppercase">Deals Won</span>
+                    <span className="text-sm font-bold font-mono text-emerald-500">{report.content.deals_won}</span>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-[#13151f] border border-border/60 flex items-center justify-between">
+                    <span className="text-[10px] font-mono text-muted-foreground uppercase">Deals Lost</span>
+                    <span className="text-sm font-bold font-mono text-rose-500">{report.content.deals_lost}</span>
+                  </div>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex justify-between text-xs font-mono">
+                    <span className="text-muted-foreground">Monthly Goal Coverage</span>
+                    <span className="font-bold text-foreground">
+                      {Math.min(100, Math.round((report.content.revenue_this_month / GOAL) * 100))}%
+                    </span>
+                  </div>
+                  <div className="h-2 bg-muted/60 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-500 rounded-full transition-all duration-700 ease-out"
+                      style={{
+                        width: `${Math.max(4, Math.min(100, Math.round((report.content.revenue_this_month / GOAL) * 100)))}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Outreach Velocity Card */}
+              <div className="rounded-3xl border border-border bg-white dark:bg-[#0c0d12] p-6 shadow-xs space-y-5">
+                <div className="flex items-center justify-between pb-3 border-b border-border/50">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-500">
+                      <MessageSquare className="h-4 w-4" />
+                    </div>
+                    <h3 className="text-xs font-bold uppercase font-mono tracking-wider text-foreground">
+                      Outbound Velocity
+                    </h3>
+                  </div>
+                  <span className="text-[10px] font-mono text-muted-foreground">
+                    Benchmark: 12–18% Reply
+                  </span>
+                </div>
+
+                {/* Metric Tiles */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-[#13151f] border border-border/60 text-center">
+                    <span className="text-[10px] font-mono text-muted-foreground uppercase block">Sent This Week</span>
+                    <div className="text-2xl font-bold font-mono text-foreground mt-1">
+                      {report.content.outreach_sent}
+                    </div>
+                  </div>
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-[#13151f] border border-border/60 text-center">
+                    <span className="text-[10px] font-mono text-muted-foreground uppercase block">Replies</span>
+                    <div className="text-2xl font-bold font-mono text-emerald-500 mt-1">
+                      {report.content.replies}
+                    </div>
+                  </div>
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-[#13151f] border border-border/60 text-center">
+                    <span className="text-[10px] font-mono text-muted-foreground uppercase block">Reply Rate</span>
+                    <div className="text-2xl font-bold font-mono text-sky-500 mt-1">
+                      {report.content.outreach_sent > 0
+                        ? `${Math.round((report.content.replies / report.content.outreach_sent) * 100)}%`
+                        : "—"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Conversion Guidance */}
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-[#13151f] border border-border/40 text-xs font-mono space-y-1">
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <Activity className="h-3.5 w-3.5 text-emerald-500" />
+                    <span>Outreach Cadence Status:</span>
+                    <span className="font-bold text-foreground">
+                      {report.content.outreach_sent >= 10
+                        ? "Optimal Pace"
+                        : report.content.outreach_sent > 0
+                        ? "In Motion"
+                        : "Awaiting Dispatch"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Higher reply rates correlate with acute 3-minute video proofs and 1-sentence diagnostic questions.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Stalled Deals Action Matrix ── */}
             {(report.content?.stalled || []).length > 0 && (
-              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-5 space-y-3">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-amber-400" />
-                  <h3 className="text-xs font-semibold text-amber-400 uppercase tracking-wider">Stalled Deals</h3>
+              <div className="rounded-3xl border border-amber-500/30 bg-amber-500/5 p-6 space-y-4 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert className="h-4 w-4 text-amber-500" />
+                    <h3 className="text-xs font-bold text-amber-500 uppercase font-mono tracking-wider">
+                      Stalled Accounts · Direct Intervention Required
+                    </h3>
+                  </div>
+                  <span className="text-[10px] font-mono text-amber-500/80">
+                    {report.content.stalled.length} deal{report.content.stalled.length > 1 ? "s" : ""} quiet &gt;5 days
+                  </span>
                 </div>
-                <div className="space-y-1.5">
-                  {(report.content?.stalled || []).map((d, i) => (
-                    <div key={i} className="flex items-center justify-between text-sm">
-                      <span>{d.company}</span>
-                      <span className="text-xs font-mono text-amber-400">{d.days} days no movement</span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {report.content.stalled.map((d, i) => (
+                    <div
+                      key={i}
+                      className="p-4 rounded-2xl bg-white dark:bg-[#0c0d12] border border-amber-500/20 flex items-center justify-between gap-3 shadow-xs"
+                    >
+                      <div className="min-w-0">
+                        <span className="font-bold text-xs text-foreground truncate block font-sans">
+                          {d.company}
+                        </span>
+                        <span className="text-[10px] font-mono text-amber-500 font-semibold">
+                          {d.days} days with zero movement
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => copyNudge(d.company)}
+                        className="h-8 px-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 text-[11px] font-mono font-semibold transition-colors cursor-pointer shrink-0"
+                      >
+                        Copy Nudge
+                      </button>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* What's working */}
-            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-5 space-y-2">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-emerald-400" />
-                <h3 className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">What's Working</h3>
+            {/* ── Qualitative Strategic Diagnosis ── */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* What's Working */}
+              <div className="rounded-3xl border border-emerald-500/30 bg-emerald-500/5 p-6 space-y-3 shadow-xs">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-emerald-500" />
+                  <h3 className="text-xs font-bold text-emerald-500 uppercase font-mono tracking-wider">
+                    What's Working (Traction Signals)
+                  </h3>
+                </div>
+                <p className="text-xs text-foreground/90 leading-relaxed font-sans font-medium">
+                  {report.content.whats_working}
+                </p>
               </div>
-              <p className="text-sm">{report.content.whats_working}</p>
+
+              {/* What's Dragging */}
+              <div className="rounded-3xl border border-rose-500/30 bg-rose-500/5 p-6 space-y-3 shadow-xs">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-rose-500" />
+                  <h3 className="text-xs font-bold text-rose-500 uppercase font-mono tracking-wider">
+                    What's Dragging (Pipeline Friction)
+                  </h3>
+                </div>
+                <p className="text-xs text-foreground/90 leading-relaxed font-sans font-medium">
+                  {report.content.whats_not}
+                </p>
+              </div>
             </div>
 
-            {/* What's not */}
-            <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-5 space-y-2">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-red-400" />
-                <h3 className="text-xs font-semibold text-red-400 uppercase tracking-wider">What's Not</h3>
+            {/* ── Checkable Weekly Tactical Priorities ── */}
+            <div className="rounded-3xl border border-border bg-white dark:bg-[#0c0d12] p-6 space-y-4 shadow-xs">
+              <div className="flex items-center justify-between pb-3 border-b border-border/50">
+                <div className="flex items-center gap-2">
+                  <ListChecks className="h-4 w-4 text-foreground" />
+                  <h3 className="text-xs font-bold uppercase font-mono tracking-wider text-foreground">
+                    Next Week Tactical Priorities
+                  </h3>
+                </div>
+                <span className="text-[10px] font-mono text-muted-foreground">
+                  Interactive Founder Checklist
+                </span>
               </div>
-              <p className="text-sm">{report.content.whats_not}</p>
-            </div>
 
-            {/* Next week priorities */}
-            <div className="rounded-xl border border-border/60 bg-card p-5 space-y-3">
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Next Week Priorities</h3>
-              <ol className="space-y-2">
-                {(report.content?.next_week_priorities || []).map((p, i) => (
-                  <li key={i} className="flex items-start gap-2.5 text-sm">
-                    <span className="text-primary font-mono font-bold text-xs mt-0.5 shrink-0">{i + 1}.</span>
-                    <span>{p}</span>
-                  </li>
-                ))}
-              </ol>
-            </div>
-
-            {/* The Decision */}
-            <div className="rounded-xl border border-primary/30 bg-primary/5 p-5 space-y-2">
-              <div className="flex items-center gap-2">
-                <Zap className="h-4 w-4 text-primary" />
-                <h3 className="text-xs font-semibold text-primary uppercase tracking-wider">The Decision</h3>
+              <div className="space-y-2.5">
+                {(report.content?.next_week_priorities || []).map((priority, i) => {
+                  const isChecked = Boolean(checkedPriorities[`p_${i}`]);
+                  return (
+                    <div
+                      key={i}
+                      onClick={() => togglePriority(i)}
+                      className={`flex items-start gap-3 p-3 rounded-2xl border transition-all cursor-pointer select-none ${
+                        isChecked
+                          ? "bg-muted/40 border-border/40 opacity-60"
+                          : "bg-slate-50 dark:bg-[#13151f] border-border/60 hover:border-foreground/30"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        className="mt-0.5 text-foreground hover:text-emerald-500 transition-colors cursor-pointer"
+                      >
+                        {isChecked ? (
+                          <CheckSquare className="h-4 w-4 text-emerald-500" />
+                        ) : (
+                          <Square className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </button>
+                      <span
+                        className={`text-xs font-sans font-medium leading-relaxed ${
+                          isChecked ? "line-through text-muted-foreground" : "text-foreground"
+                        }`}
+                      >
+                        {priority}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
-              <p className="text-sm font-medium">{report.content.the_decision}</p>
             </div>
           </div>
         )}
       </div>
+
+      {/* ── Live AI Generation Telemetry Modal (Portaled) ── */}
+      {typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {generating && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[998] bg-black/70 dark:bg-black/85 backdrop-blur-md"
+              />
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 12 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 12 }}
+                className="fixed inset-0 m-auto max-w-lg h-fit max-h-[85vh] w-full z-[999] bg-white dark:bg-[#0c0d12] border border-border shadow-2xl rounded-3xl p-6 flex flex-col space-y-5"
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between pb-3 border-b border-border">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500">
+                      <Sparkles className="h-4 w-4 animate-spin" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-sm font-sans text-foreground">
+                        Synthesizing Founder Audit
+                      </h3>
+                      <p className="text-[10px] font-mono text-muted-foreground">
+                        Atlas Autonomous Commercial Intelligence
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-mono font-bold text-emerald-500">
+                    {telemetryPercent}%
+                  </span>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="w-full bg-muted/60 h-2 rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full bg-emerald-500 rounded-full"
+                    animate={{ width: `${telemetryPercent}%` }}
+                    transition={{ duration: 0.3 }}
+                  />
+                </div>
+
+                {/* Stages Checklist */}
+                <div className="space-y-3 py-1 font-mono text-xs">
+                  {TELEMETRY_STAGES.map((stage) => {
+                    const isDone = telemetryStage > stage.id;
+                    const isCurrent = telemetryStage === stage.id;
+                    return (
+                      <div
+                        key={stage.id}
+                        className={`flex items-start gap-3 p-3 rounded-2xl border transition-colors ${
+                          isCurrent
+                            ? "bg-emerald-500/5 border-emerald-500/30 text-foreground"
+                            : isDone
+                            ? "bg-muted/20 border-border/40 text-muted-foreground"
+                            : "opacity-40 border-transparent text-muted-foreground"
+                        }`}
+                      >
+                        <div className="mt-0.5">
+                          {isDone ? (
+                            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                          ) : isCurrent ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-emerald-500" />
+                          ) : (
+                            <div className="h-4 w-4 rounded-full border border-border" />
+                          )}
+                        </div>
+                        <div className="space-y-0.5 min-w-0">
+                          <span className={`font-semibold block ${isCurrent ? "text-foreground" : ""}`}>
+                            {stage.label}
+                          </span>
+                          <span className="text-[10px] opacity-75 block truncate">
+                            {stage.detail}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Terminal Footer */}
+                <div className="pt-2 border-t border-border flex items-center justify-between text-[10px] font-mono text-muted-foreground">
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Live telemetry link established
+                  </span>
+                  <span>Atlas v5.2</span>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }

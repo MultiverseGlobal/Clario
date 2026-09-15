@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, MouseEvent } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Sparkles, ArrowRight, Activity, Users, Send, RotateCcw, 
@@ -779,25 +780,26 @@ export function CommandEngine({
       </AnimatePresence>
 
       {/* ── Slide-Over ICP Suggestions & Market Signals Drawer ── */}
-      <AnimatePresence>
-        {isIcpDrawerOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsIcpDrawerOpen(false)}
-              className="fixed inset-0 z-[70] bg-background/60 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "spring", damping: 28, stiffness: 280 }}
-              className="fixed top-0 right-0 bottom-0 w-full max-w-lg z-[80] bg-card border-l border-border/80 shadow-2xl flex flex-col overflow-hidden text-left"
-            >
-              {/* Drawer Header */}
-              <div className="p-5 border-b border-border/60 flex items-center justify-between bg-muted/20">
+      {typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {isIcpDrawerOpen && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setIsIcpDrawerOpen(false)}
+                className="fixed inset-0 z-[998] bg-black/60 dark:bg-black/80 backdrop-blur-md"
+              />
+              <motion.div
+                initial={{ x: "100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "100%" }}
+                transition={{ type: "spring", damping: 28, stiffness: 280 }}
+                className="fixed top-0 right-0 bottom-0 w-full max-w-lg z-[999] bg-white dark:bg-[#0c0d12] border-l border-border shadow-2xl flex flex-col overflow-hidden text-left"
+              >
+                {/* Drawer Header */}
+                <div className="p-5 border-b border-border/80 flex items-center justify-between bg-muted/40 dark:bg-[#12141d]">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
                     <Sparkles className="w-4 h-4 text-emerald-500" />
@@ -830,7 +832,7 @@ export function CommandEngine({
               </div>
 
               {/* Search Bar */}
-              <div className="p-4 border-b border-border/40 bg-card">
+              <div className="p-4 border-b border-border/50 bg-slate-50 dark:bg-[#0f1118]">
                 <div className="relative flex items-center w-full">
                   <Search className="absolute left-3 w-3.5 h-3.5 text-muted-foreground" />
                   <input
@@ -838,7 +840,7 @@ export function CommandEngine({
                     value={icpSearch}
                     onChange={(e) => setIcpSearch(e.target.value)}
                     placeholder="Search targets by keyword, industry, or signal..."
-                    className="w-full pl-8 pr-8 py-2 text-xs font-mono rounded-xl bg-background border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 shadow-sm"
+                    className="w-full pl-8 pr-8 py-2 text-xs font-mono rounded-xl bg-white dark:bg-[#151722] border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 shadow-sm"
                   />
                   {icpSearch && (
                     <button
@@ -877,7 +879,7 @@ export function CommandEngine({
               </div>
 
               {/* Presets List */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
+              <div className="flex-1 overflow-y-auto p-4 space-y-2.5 bg-slate-100/50 dark:bg-[#0c0d12]">
                 {visibleSuggestions.length === 0 ? (
                   <div className="py-12 text-center text-xs font-mono text-muted-foreground">
                     No target presets match "{icpSearch}". Try another term.
@@ -892,7 +894,7 @@ export function CommandEngine({
                         setInputPrompt(preset.query);
                         executePrompt(preset.query);
                       }}
-                      className="group p-3.5 rounded-2xl border border-border/60 bg-card hover:bg-muted/40 hover:border-foreground/30 transition-all cursor-pointer shadow-sm hover:shadow-md"
+                      className="group p-3.5 rounded-2xl border border-border/70 bg-white dark:bg-[#141622] hover:bg-slate-50 dark:hover:bg-[#181b2a] hover:border-foreground/30 transition-all cursor-pointer shadow-sm hover:shadow-md"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-2">
@@ -927,7 +929,9 @@ export function CommandEngine({
             </motion.div>
           </>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body
+    )}
     </div>
   );
 }

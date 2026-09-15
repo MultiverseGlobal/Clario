@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   AlertCircle, X, ChevronRight, Mail, MessageSquare, RefreshCw, 
@@ -101,7 +102,7 @@ export function InterventionDrawer({
     );
   };
 
-  return (
+  return typeof document !== "undefined" ? createPortal(
     <AnimatePresence>
       {isOpen && (
         <>
@@ -110,7 +111,7 @@ export function InterventionDrawer({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[90] bg-black/40 backdrop-blur-[3px] dark:bg-black/60"
+            className="fixed inset-0 z-[998] bg-black/60 backdrop-blur-md dark:bg-black/80"
             onClick={onClose}
           />
 
@@ -120,10 +121,10 @@ export function InterventionDrawer({
             animate={{ y: 0, opacity: 1, scale: 1 }}
             exit={{ y: 50, opacity: 0, scale: 0.95 }}
             transition={{ type: "spring", stiffness: 280, damping: 28, mass: 1 }}
-            className={`fixed inset-0 m-auto z-[100] w-full max-w-xl h-fit max-h-[85vh] rounded-3xl border backdrop-blur-2xl flex flex-col shadow-2xl overflow-hidden ${
+            className={`fixed inset-0 m-auto z-[999] w-full max-w-xl h-fit max-h-[85vh] rounded-3xl border flex flex-col shadow-2xl overflow-hidden ${
               isDark
-                ? "bg-neutral-950/95 text-white"
-                : "bg-white/95 text-neutral-900"
+                ? "bg-[#0c0d12] text-white"
+                : "bg-white text-neutral-900"
             } ${
               isDispatching ? "border-emerald-500/50 shadow-[0_30px_80px_-20px_rgba(16,185,129,0.25)]" : (isDark ? "border-white/10 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.8)]" : "border-neutral-200 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.15)]")
             } transition-colors duration-300`}
@@ -425,6 +426,7 @@ export function InterventionDrawer({
           </motion.div>
         </>
       )}
-    </AnimatePresence>
-  );
+    </AnimatePresence>,
+    document.body
+  ) : null;
 }

@@ -84,13 +84,13 @@ export function NewLeadModal({ open, onClose }: { open: boolean; onClose: () => 
   return createPortal(
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
+        <div className="fixed inset-0 z-[999] flex items-center justify-center pointer-events-none">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-background/80 backdrop-blur-sm pointer-events-auto"
+            className="absolute inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-md pointer-events-auto"
           />
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -98,7 +98,7 @@ export function NewLeadModal({ open, onClose }: { open: boolean; onClose: () => 
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             className="relative z-10 w-full max-w-md p-6 pointer-events-auto"
           >
-            <div className="bg-card border border-border/60 rounded-2xl shadow-xl overflow-hidden">
+            <div className="bg-white dark:bg-[#0c0d12] border border-border rounded-2xl shadow-2xl overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-border/60">
                 <div className="flex items-center gap-2">
                   <div className="h-8 w-8 rounded-lg bg-foreground/5 border border-border flex items-center justify-center">
@@ -124,7 +124,7 @@ export function NewLeadModal({ open, onClose }: { open: boolean; onClose: () => 
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
                     placeholder="https://linkedin.com/company/acme or /in/john-doe"
-                    className="h-10 bg-background border-border/60 focus:border-foreground/50 text-foreground"
+                    className="h-10 bg-slate-50 dark:bg-[#151722] border-border/80 focus:border-foreground/50 text-foreground"
                     required
                     autoFocus
                   />
