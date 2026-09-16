@@ -32,17 +32,30 @@ export function InterventionDrawer({
   isDispatching = false,
   isDark = true,
 }: InterventionDrawerProps) {
-  const [channel, setChannel] = useState<"email" | "linkedin">("email");
+  const [channel, setChannel] = useState<"email" | "linkedin" | "clario_script">("email");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [recipientEmail, setRecipientEmail] = useState("");
   const [isCopied, setIsCopied] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [allowUnverifiedEmail, setAllowUnverifiedEmail] = useState(false);
+
+  const emailAllowed = lead?.contact ? lead.contact.send_email_allowed : true;
 
   useEffect(() => {
     if (draft && isOpen) {
       setSubject(draft.subject || "");
-      const fullText = channel === "email" ? draft.body : (draft.linkedin_dm || draft.body);
+      // If email is gated, default to linkedin
+      const activeChannel = !emailAllowed && channel === "email" ? "linkedin" : channel;
+      if (!emailAllowed && channel === "email") {
+        setChannel("linkedin");
+      }
+
+      const fullText = activeChannel === "email" 
+        ? draft.body 
+        : activeChannel === "linkedin" 
+        ? (draft.linkedin_dm || draft.body) 
+        : (draft.loom_script || "");
       
       setBody(fullText);
       setIsStreaming(false);
@@ -50,12 +63,18 @@ export function InterventionDrawer({
     if (lead?.founder?.email) {
       setRecipientEmail(lead.founder.email);
     }
-  }, [draft, lead, channel, isOpen]);
+  }, [draft, lead, channel, isOpen, emailAllowed]);
 
   const completeStreamingImmediately = () => {
     if (isStreaming && draft) {
       setIsStreaming(false);
-      setBody(channel === "email" ? draft.body : (draft.linkedin_dm || draft.body));
+      setBody(
+        channel === "email" 
+          ? draft.body 
+          : channel === "linkedin" 
+          ? (draft.linkedin_dm || draft.body) 
+          : (draft.loom_script || "")
+      );
     }
   };
 
@@ -73,13 +92,19 @@ export function InterventionDrawer({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, subject, body, recipientEmail]);
+  }, [isOpen, subject, body, recipientEmail, channel, emailAllowed, allowUnverifiedEmail]);
 
-  const handleChannelSwitch = (newChannel: "email" | "linkedin") => {
+  const handleChannelSwitch = (newChannel: "email" | "linkedin" | "clario_script") => {
     soundManager.playClick();
     setChannel(newChannel);
     if (draft) {
-      setBody(newChannel === "email" ? draft.body : (draft.linkedin_dm || draft.body));
+      setBody(
+        newChannel === "email" 
+          ? draft.body 
+          : newChannel === "linkedin" 
+          ? (draft.linkedin_dm || draft.body) 
+          : (draft.loom_script || "")
+      );
     }
   };
 
@@ -205,6 +230,32 @@ export function InterventionDrawer({
                 </div>
               )}
 
+              {/* Human Reviewer Summary (Stage 2 Intelligence) */}
+              {draft?.human_summary && (
+                <div className={`rounded-2xl border p-3.5 space-y-1.5 ${
+                  isDark ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : "border-emerald-300 bg-emerald-50 text-emerald-900"
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-[10px] uppercase font-bold tracking-wider flex items-center gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5 text-emerald-500" />
+                      Executive Reviewer Summary
+                    </span>
+                    {draft.outreach_readiness && (
+                      <span className={`text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded-full ${
+                        draft.outreach_readiness === "READY"
+                          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                          : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                      }`}>
+                        {draft.outreach_readiness}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs font-sans leading-relaxed">
+                    {draft.human_summary}
+                  </p>
+                </div>
+              )}
+
               {/* Channel Selector */}
               <div className="flex items-center justify-between">
                 <span className={`text-xs font-mono uppercase tracking-wider font-semibold ${
@@ -245,8 +296,60 @@ export function InterventionDrawer({
                     <MessageSquare className="h-3 w-3" />
                     LinkedIn
                   </button>
+                  <button
+                    onClick={() => handleChannelSwitch("clario_script")}
+                    className={`flex items-center gap-1.5 px-3 py-1 text-[11px] rounded uppercase tracking-wider transition-all cursor-pointer ${
+                      channel === "clario_script"
+                        ? isDark
+                          ? "bg-indigo-400 text-black font-bold shadow-sm"
+                          : "bg-indigo-600 text-white font-bold shadow-sm"
+                        : isDark
+                        ? "text-white/50 hover:text-white"
+                        : "text-neutral-500 hover:text-neutral-900"
+                    }`}
+                  >
+                    <Sparkles className="h-3 w-3 text-indigo-400" />
+                    Clario Video
+                  </button>
                 </div>
               </div>
+
+              {/* Email Gating Alert */}
+              {channel === "email" && !emailAllowed && (
+                <div className="p-3.5 rounded-2xl border border-amber-500/30 bg-amber-500/10 text-amber-500 text-xs flex items-start gap-2.5">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div className="space-y-1.5">
+                    <span className="font-bold block uppercase font-mono text-[10px] tracking-wider">Email Gated · Address Unverified</span>
+                    <p className="text-[11px] leading-relaxed text-amber-600 dark:text-amber-400">
+                      Atlas hard-gates outbound emails when email authenticity is unverified, protecting your domain from bounce penalties. Send via LinkedIn DM instead, or manually verify before dispatch.
+                    </p>
+                    <label className="flex items-center gap-2 pt-1 cursor-pointer font-mono text-[10px] text-foreground">
+                      <input 
+                        type="checkbox" 
+                        checked={allowUnverifiedEmail} 
+                        onChange={(e) => setAllowUnverifiedEmail(e.target.checked)} 
+                        className="rounded border-amber-500"
+                      />
+                      <span>Acknowledge unverified address & override sending gate</span>
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* Clario Video Protocol Explanation */}
+              {channel === "clario_script" && (
+                <div className={`p-3.5 rounded-2xl border text-xs leading-relaxed space-y-1 ${
+                  isDark ? "border-indigo-500/30 bg-indigo-500/10 text-indigo-300" : "border-indigo-200 bg-indigo-50 text-indigo-900"
+                }`}>
+                  <div className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wider">
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Clario 60–90s Spoken Workflow Protocol</span>
+                  </div>
+                  <p className="text-[11px]">
+                    Spoken script for {lead?.company}. Focuses on showing the actual workflow resolution rather than pitching. Embed URL token <code className="font-mono text-[10px] bg-black/20 px-1 py-0.5 rounded">{"{{CLARIO_VIDEO_URL}}"}</code> is embedded in the outbound email copy.
+                  </p>
+                </div>
+              )}
 
               {/* Recipient Address */}
               {channel === "email" && (
@@ -299,7 +402,7 @@ export function InterventionDrawer({
                       isDark ? "text-white/40" : "text-neutral-400"
                     }`}>
                       <Sparkles className="h-3.5 w-3.5 text-emerald-500" />
-                      Personalized Pitch Copy
+                      {channel === "clario_script" ? "Clario Spoken Demo Script" : "Personalized Pitch Copy"}
                     </label>
                     {isStreaming && (
                       <span className="flex items-center gap-1 text-[10px] font-mono text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
@@ -353,16 +456,36 @@ export function InterventionDrawer({
                   )}
                 </div>
 
-                {/* Synthesis Telemetry Bar */}
+                {/* Synthesis Telemetry Bar with Live Word Counter */}
                 <div className={`flex items-center justify-between text-[10px] font-mono px-1 ${
                   isDark ? "text-white/35" : "text-neutral-400"
                 }`}>
-                  <span>Atlas Cognitive Engine</span>
-                  <span className="flex items-center gap-2">
-                    <span>{Math.round(body.length / 4)} tokens</span>
+                  <span>Atlas Cognitive Engine v3</span>
+                  <div className="flex items-center gap-2">
+                    {channel === "email" ? (
+                      <span className={`px-1.5 py-0.5 rounded font-bold ${
+                        body.trim().split(/\s+/).filter(Boolean).length <= 130 
+                          ? "bg-emerald-500/10 text-emerald-400" 
+                          : "bg-rose-500/20 text-rose-400"
+                      }`}>
+                        {body.trim().split(/\s+/).filter(Boolean).length} / 130 words cap
+                      </span>
+                    ) : channel === "linkedin" ? (
+                      <span className={`px-1.5 py-0.5 rounded font-bold ${
+                        body.trim().split(/\s+/).filter(Boolean).length <= 60 
+                          ? "bg-emerald-500/10 text-emerald-400" 
+                          : "bg-rose-500/20 text-rose-400"
+                      }`}>
+                        {body.trim().split(/\s+/).filter(Boolean).length} / 60 words cap
+                      </span>
+                    ) : (
+                      <span className="text-indigo-400 font-bold">
+                        ~{Math.round(body.trim().split(/\s+/).filter(Boolean).length / 2.2)}s spoken video script
+                      </span>
+                    )}
                     <span>•</span>
                     <span className="text-emerald-500">Resend Relay Ready</span>
-                  </span>
+                  </div>
                 </div>
               </div>
 
@@ -397,21 +520,39 @@ export function InterventionDrawer({
 
             {/* Footer Actions */}
             <div className={`border-t p-4 space-y-2 ${isDark ? "border-white/10 bg-neutral-950/95" : "border-neutral-200 bg-white/95"}`}>
-              <button
-                onClick={handleApprove}
-                disabled={isDispatching || isStreaming || !body}
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-foreground px-4 py-3 text-xs font-semibold text-background hover:bg-foreground/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed group cursor-pointer"
-              >
-                {isDispatching ? (
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                )}
-                {isDispatching ? "Dispatching..." : "Approve & Dispatch Outreach"}
-                <span className="ml-2 rounded border border-background/20 bg-background/10 px-1.5 py-0.5 text-[10px] font-mono opacity-80">
-                  ⌘↵
-                </span>
-              </button>
+              {channel === "email" && !emailAllowed && !allowUnverifiedEmail ? (
+                <button
+                  disabled={true}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-amber-500/20 border border-amber-500/30 px-4 py-3 text-xs font-semibold text-amber-400 cursor-not-allowed"
+                >
+                  <AlertCircle className="h-4 w-4 text-amber-400" />
+                  Email Gated · Send via LinkedIn DM or Check Override
+                </button>
+              ) : channel === "clario_script" ? (
+                <button
+                  onClick={handleCopy}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-500 px-4 py-3 text-xs font-semibold text-white hover:bg-indigo-600 transition-colors cursor-pointer shadow-md"
+                >
+                  <Check className="h-4 w-4" />
+                  {isCopied ? "Copied Clario Walkthrough Script!" : "Copy Clario Walkthrough Script"}
+                </button>
+              ) : (
+                <button
+                  onClick={handleApprove}
+                  disabled={isDispatching || isStreaming || !body}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-foreground px-4 py-3 text-xs font-semibold text-background hover:bg-foreground/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed group cursor-pointer"
+                >
+                  {isDispatching ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                  )}
+                  {isDispatching ? "Dispatching..." : `Approve & Dispatch via ${channel.toUpperCase()}`}
+                  <span className="ml-2 rounded border border-background/20 bg-background/10 px-1.5 py-0.5 text-[10px] font-mono opacity-80">
+                    ⌘↵
+                  </span>
+                </button>
+              )}
               
               <button
                 onClick={onSkip}

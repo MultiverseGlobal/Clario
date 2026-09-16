@@ -59,5 +59,48 @@ describe("Campaign Engine Lead Discovery & Decomposition Verification", () => {
     expect(draft.body).toContain("Clay Global");
     expect(draft.body).toContain("Anton");
     expect(draft.linkedin_dm).toBeTruthy();
+    expect(draft.human_summary).toBeTruthy();
+    expect(draft.loom_script).toBeTruthy();
+    expect(draft.word_count).toBeLessThanOrEqual(130);
+    expect(draft.linkedin_word_count).toBeLessThanOrEqual(60);
+  });
+
+  it("strictly excludes out-of-scale enterprise agencies (e.g. Huge Inc) for boutique 10-50 headcount ICP", async () => {
+    const leads = await discoverCampaignLeads(
+      "clutch",
+      "Digital Agencies",
+      "Marketing & Advertising",
+      {
+        min_headcount: 10,
+        max_headcount: 50,
+        regions: ["US"],
+      }
+    );
+
+    const hugeMatch = leads.find((l) => l.company.toLowerCase().includes("huge"));
+    expect(hugeMatch).toBeUndefined();
+
+    // Verify all returned leads have valid v3 qualification and domain deduplication
+    const domains = new Set<string>();
+    for (const lead of leads) {
+      const d = lead.website.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+      expect(domains.has(d)).toBe(false);
+      domains.add(d);
+
+      expect(lead.qualification).toBeDefined();
+      expect(lead.qualification?.status).toBe("QUALIFIED");
+      expect(lead.contact).toBeDefined();
+      expect(lead.recon).toBeDefined();
+    }
+  });
+
+  it("decomposes unstructured brief and outputs plain_english_summary restatement", async () => {
+    const brief = "find me small marketing agencies in Nigeria and Kenya, I do AI automation for agencies";
+    const strategy = await decomposeCampaignPrompt(brief);
+
+    expect(strategy.plain_english_summary).toBeTruthy();
+    expect(strategy.industry).toBe("Marketing & Advertising");
+    expect(strategy.targetCount).toBe(10);
+    expect(strategy.channel).toBe("clutch");
   });
 });

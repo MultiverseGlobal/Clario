@@ -54,7 +54,8 @@ export function CommandEngine({
     max_headcount?: number;
     regions?: string[];
     decision_maker_titles?: string[];
-  }>({ channel: "clutch", industry: "", keyword: "", hypothesis: "", targetCount: 15, min_headcount: 5, max_headcount: 30, regions: ["US", "UK"], decision_maker_titles: ["Founder", "CEO"] });
+    plain_english_summary?: string;
+  }>({ channel: "clutch", industry: "", keyword: "", hypothesis: "", targetCount: 10, min_headcount: 5, max_headcount: 30, regions: ["US", "UK"], decision_maker_titles: ["Founder", "CEO"] });
   const inputRef = useRef<HTMLInputElement>(null);
 
   // ── Dynamic & Searchable ICP Suggestions Drawer State ───────────────────
@@ -109,6 +110,7 @@ export function CommandEngine({
         max_headcount: strategy.max_headcount,
         regions: strategy.regions,
         decision_maker_titles: strategy.decision_maker_titles,
+        plain_english_summary: strategy.plain_english_summary,
       });
 
       onStateChange((prev) => ({
@@ -123,6 +125,7 @@ export function CommandEngine({
         max_headcount: strategy.max_headcount,
         regions: strategy.regions,
         decision_maker_titles: strategy.decision_maker_titles,
+        plain_english_summary: strategy.plain_english_summary,
       }));
     } catch (err: any) {
       toast.error(err.message || "Failed to decompose intent.");
@@ -474,6 +477,15 @@ export function CommandEngine({
                 {campaignState.status === "reviewing_icp" || (campaignState.status === "discovering" && campaignState.leads.length === 0 && !campaignState.error) ? (
                   <div className="flex flex-col text-left text-xs font-mono text-foreground">
                     <div className="space-y-3 pr-1 pb-2">
+                      {tempIcp.plain_english_summary && (
+                        <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-sans leading-relaxed">
+                          <div className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wider mb-1">
+                            <Brain className="w-3.5 h-3.5 text-emerald-500" />
+                            <span>Stage 0: Intake Restatement</span>
+                          </div>
+                          <p>{tempIcp.plain_english_summary}</p>
+                        </div>
+                      )}
                       <div className="space-y-1">
                         <label className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Target Keyword</label>
                         <input 
@@ -727,10 +739,39 @@ export function CommandEngine({
                     {selectedLeadModal.website}
                   </a>
                 </div>
-                <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                  {selectedLeadModal.icp_score}% FIT
-                </span>
+                <div className="flex items-center gap-2">
+                  {selectedLeadModal.qualification?.status && (
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase ${
+                      selectedLeadModal.qualification.status === "QUALIFIED" 
+                        ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" 
+                        : "bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                    }`}>
+                      {selectedLeadModal.qualification.status}
+                    </span>
+                  )}
+                  <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                    {selectedLeadModal.icp_score}% FIT
+                  </span>
+                </div>
               </div>
+
+              {/* ICP Fit Badges */}
+              {selectedLeadModal.qualification?.icp_fit && (
+                <div className="mt-3 grid grid-cols-3 gap-1.5 text-[9px] font-mono">
+                  <div className="p-1.5 rounded-lg border border-border/60 bg-muted/40 text-center">
+                    <span className="text-muted-foreground block text-[8px] uppercase">Industry</span>
+                    <span className="text-emerald-500 font-bold">{selectedLeadModal.qualification.icp_fit.industry.status}</span>
+                  </div>
+                  <div className="p-1.5 rounded-lg border border-border/60 bg-muted/40 text-center">
+                    <span className="text-muted-foreground block text-[8px] uppercase">Headcount</span>
+                    <span className="text-emerald-500 font-bold">{selectedLeadModal.qualification.icp_fit.headcount.status}</span>
+                  </div>
+                  <div className="p-1.5 rounded-lg border border-border/60 bg-muted/40 text-center">
+                    <span className="text-muted-foreground block text-[8px] uppercase">Geography</span>
+                    <span className="text-emerald-500 font-bold">{selectedLeadModal.qualification.icp_fit.geography.status}</span>
+                  </div>
+                </div>
+              )}
 
               <div className="mt-4 space-y-3 text-xs">
                 <div>
@@ -738,16 +779,34 @@ export function CommandEngine({
                     Founder / Decision Maker
                   </span>
                   <p className="font-medium mt-0.5">{selectedLeadModal.founder?.name} ({selectedLeadModal.founder?.role})</p>
-                  <p className={`font-mono mt-0.5 ${isDark ? "text-white/60" : "text-neutral-600"}`}>
-                    {selectedLeadModal.founder?.email}
-                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`font-mono text-[11px] ${isDark ? "text-white/70" : "text-neutral-600"}`}>
+                      {selectedLeadModal.founder?.email}
+                    </span>
+                    {selectedLeadModal.contact && (
+                      <span className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-semibold ${
+                        selectedLeadModal.contact.send_email_allowed 
+                          ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" 
+                          : "bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                      }`}>
+                        {selectedLeadModal.contact.send_email_allowed ? "Email Verified (Send Allowed)" : "Unverified (Gated)"}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div>
-                  <span className={`block uppercase font-mono text-[10px] ${isDark ? "text-white/40" : "text-neutral-400"}`}>
-                    Thesis & Identified Bottleneck
-                  </span>
-                  <p className="mt-0.5 leading-relaxed">{selectedLeadModal.bottleneck || selectedLeadModal.founder_thesis}</p>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className={`block uppercase font-mono text-[10px] ${isDark ? "text-white/40" : "text-neutral-400"}`}>
+                      Identified Operational Bottleneck
+                    </span>
+                    {selectedLeadModal.recon?.problem_confidence && (
+                      <span className="text-[9px] font-mono text-emerald-500 bg-emerald-500/10 px-1.5 py-0.2 rounded font-bold uppercase">
+                        {selectedLeadModal.recon.problem_confidence}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 leading-relaxed font-sans">{selectedLeadModal.bottleneck || selectedLeadModal.founder_thesis}</p>
                 </div>
 
                 {selectedLeadModal.evidence && selectedLeadModal.evidence.length > 0 && (
