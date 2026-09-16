@@ -373,8 +373,15 @@ export default function App() {
               const previewUrl = URL.createObjectURL(recordedBlob);
               const isSales = recordedCategory === 'sales';
 
-              // Run client-side cinematic scene detection on the recorded studio blob
-              const detected = await detectCinematicScenes(previewUrl);
+              // Run server-side scene detection on the recorded studio blob
+              let scenes: Awaited<ReturnType<typeof detectCinematicScenes>>['scenes'] = [];
+              try {
+                const result = await detectCinematicScenes(recordedBlob, () => {});
+                scenes = result.scenes;
+              } catch (err) {
+                console.warn('Scene detection failed on recorded blob, using single track:', err);
+              }
+              const detected = scenes;
               const trackItems = (detected || []).map((s, idx) => ({
                 id: `track_${s.id}_${idx}`,
                 title: `${s.sceneTag} (${s.startTime.toFixed(1)}s)`,

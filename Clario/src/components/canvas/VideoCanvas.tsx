@@ -265,6 +265,11 @@ export function VideoCanvas({
   // ── "Try Again & Make Better" Dopamine Re-Assembly ─────────────────────────
   const handleReassembleDopamine = () => {
     if (trackItems.length === 0) return;
+    if (!isSalesOutreach) {
+      alert("Clean Shots mode enforces strict preservation. Scene order and duration cannot be altered automatically.");
+      return;
+    }
+    
     setIsReassembling(true);
 
     setTimeout(() => {
@@ -899,34 +904,33 @@ export function VideoCanvas({
 
           <div style={{ width: 1, height: 16, background: "var(--border)" }} />
 
-          {/* Engine Mode Indicator Badge */}
+          {/* Mode Indicator Badge */}
           <div style={{
             display: "flex", alignItems: "center", gap: 5,
             padding: "3px 8px", borderRadius: 6,
-            background: isSalesOutreach ? "rgba(245,158,11,0.12)" : "rgba(168,85,247,0.12)",
-            border: `1px solid ${isSalesOutreach ? "rgba(245,158,11,0.3)" : "rgba(168,85,247,0.3)"}`,
-            color: isSalesOutreach ? "#FBBF24" : "#C084FC",
+            background: isSalesOutreach ? "rgba(12,15,29,1)" : "rgba(12,15,29,1)",
+            border: "1px solid var(--border)",
+            color: "var(--text-primary)",
             fontSize: 10, fontFamily: "Space Mono, monospace", fontWeight: 700,
             textTransform: "uppercase", letterSpacing: "0.04em"
           }}>
-            <span>{isSalesOutreach ? "🎯 Sales Outbound Arc" : "⚡ Viral Dopamine Arc"}</span>
+            <span>{isSalesOutreach ? "Loom Pitch" : "Clean Shots"}</span>
           </div>
 
-          {/* AI Re-Assemble / Try Again Action */}
+          {/* Action Button */}
           <button
             onClick={handleReassembleDopamine}
             disabled={isReassembling || trackItems.length === 0}
             style={{
               display: "flex", alignItems: "center", gap: 6,
               padding: "4px 12px", borderRadius: 7,
-              background: isSalesOutreach ? "rgba(245,158,11,0.15)" : "var(--emerald-dim)",
-              border: `1px solid ${isSalesOutreach ? "rgba(245,158,11,0.35)" : "rgba(16,185,129,0.3)"}`,
-              color: isSalesOutreach ? "#FBBF24" : "var(--emerald)", fontSize: 11, fontWeight: 600,
+              background: "var(--surface-2)",
+              border: "1px solid var(--border)",
+              color: "var(--text-primary)", fontSize: 11, fontWeight: 600,
               cursor: isReassembling || trackItems.length === 0 ? "default" : "pointer",
             }}
-            title={isSalesOutreach ? "Re-orders narrative for high B2B sales conversion (Hook -> Problem -> Proof -> CTA)" : "Automatically re-times and swaps clips for high engagement flow"}
           >
-            {isReassembling ? "⚡ Re-Cutting Narrative…" : isSalesOutreach ? "✦ Optimize Sales Arc" : "✦ Auto Re-Cut"}
+            {isReassembling ? "Processing..." : isSalesOutreach ? "Generate Pitch Edit" : "Detect Scenes"}
           </button>
 
           {/* Swap Footage Drawer Trigger */}
@@ -961,7 +965,7 @@ export function VideoCanvas({
             💬 Captions {showCaptionsOverlay ? "ON" : "OFF"}
           </button>
 
-          {/* Caption Stripping Mode (Punch-In Crop / Studio Matte / Off) */}
+          {/* Caption Stripping Mode */}
           <button
             onClick={() => setCaptionStripMode(m => m === "none" ? "punch_in" : m === "punch_in" ? "blur_mask" : "none")}
             style={{
@@ -972,14 +976,14 @@ export function VideoCanvas({
               color: captionStripMode !== "none" ? "#F43F5E" : "var(--text-muted)", fontSize: 11, fontWeight: 600,
               cursor: "pointer",
             }}
-            title="Strip burnt-in pixel captions: Punch-in zoom crop (cuts lower 22% subtitle zone) or studio blur matte"
+            title="Remove captions: Crop, AI Inpaint, or Keep Original"
           >
-            {captionStripMode === "punch_in" ? "✂️ Strip (Punch-In)" : captionStripMode === "blur_mask" ? "🌫️ Strip (Matte)" : "🚫 Strip Off"}
+            {captionStripMode === "punch_in" ? "✂️ Crop Caption Area" : captionStripMode === "blur_mask" ? "✨ AI Inpaint Burned-In Captions" : "Preserve Original"}
           </button>
 
           <div style={{ width: 1, height: 16, background: "var(--border)" }} />
 
-          {/* Save Asset Pack to Reference Library */}
+          {/* Save Selected Scenes */}
           {onSaveAssetPack && (
             <button
               onClick={() => {
@@ -992,13 +996,13 @@ export function VideoCanvas({
                 color: "var(--text-primary)", fontSize: 11, fontWeight: 600,
                 cursor: "pointer",
               }}
-              title="Saves video cuts, isolated audio, music, and keyframes into the Reference Library"
+              title="Save Selected Scenes"
             >
-              📦 Save Asset Pack to Library
+              📦 Save Selected Scenes
             </button>
           )}
 
-          {/* Make New Video Action */}
+          {/* Create From Saved Clips */}
           {onMakeNewVideo && (
             <button
               onClick={onMakeNewVideo}
@@ -1009,9 +1013,9 @@ export function VideoCanvas({
                 color: "var(--accent)", fontSize: 11, fontWeight: 600,
                 cursor: "pointer",
               }}
-              title="Use these harvested assets to create a brand new video"
+              title="Create From Saved Clips"
             >
-              🪄 Make New Video
+              🎬 Create From Saved Clips
             </button>
           )}
 
@@ -1183,10 +1187,10 @@ export function VideoCanvas({
                     return (
                       <div
                         key={item.id}
-                        draggable
-                        onDragStart={() => handleDragStart(idx)}
-                        onDragOver={e => handleDragOver(e, idx)}
-                        onDrop={() => handleDrop(idx)}
+                        draggable={isSalesOutreach}
+                        onDragStart={(e) => { if (isSalesOutreach) handleDragStart(idx); else e.preventDefault(); }}
+                        onDragOver={(e) => { if (isSalesOutreach) handleDragOver(e, idx); }}
+                        onDrop={() => { if (isSalesOutreach) handleDrop(idx); }}
                         onClick={() => onSelectItem(item.id)}
                         style={{
                           width: `${widthPct}%`,
@@ -1195,7 +1199,7 @@ export function VideoCanvas({
                           overflow: "hidden",
                           border: `1.5px solid ${isSelected ? "var(--accent)" : isDragOver ? "var(--accent-border)" : beatStyle.border}`,
                           background: beatStyle.bg,
-                          cursor: "grab",
+                          cursor: isSalesOutreach ? "grab" : "pointer",
                           position: "relative",
                           flexShrink: 0,
                           display: "flex",
@@ -1233,7 +1237,7 @@ export function VideoCanvas({
                           <span style={{ fontSize: 7.5, color: "var(--text-muted)", background: "#08090C", padding: "1px 4px", borderRadius: 3, flexShrink: 0 }}>
                             {item.isBroll ? "⚡ B-Roll" : "📹 A-Roll"}
                           </span>
-                          {isSelected && (
+                          {isSelected && isSalesOutreach && (
                             <div style={{ display: "flex", gap: 2, marginLeft: 4, flexShrink: 0 }}>
                               <button onClick={e => { e.stopPropagation(); duplicateItem(item.id); }} style={{ background: "#08090C", border: "1px solid var(--border)", color: "var(--text-secondary)", borderRadius: 3, padding: "1px 4px", cursor: "pointer", fontSize: 8 }}>⧉</button>
                               <button onClick={e => { e.stopPropagation(); removeItem(item.id); }} style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "var(--rose)", borderRadius: 3, padding: "1px 4px", cursor: "pointer", fontSize: 8 }}>×</button>
@@ -1241,7 +1245,7 @@ export function VideoCanvas({
                           )}
                         </div>
 
-                        {isSelected && (
+                        {isSelected && isSalesOutreach && (
                           <>
                             <div onMouseDown={e => startTrim(e, item.id, "left", item.duration, item.inPoint || 0)} style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 5, background: "var(--accent)", cursor: "ew-resize", zIndex: 10 }} />
                             <div onMouseDown={e => startTrim(e, item.id, "right", item.duration, item.inPoint || 0)} style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 5, background: "var(--accent)", cursor: "ew-resize", zIndex: 10 }} />

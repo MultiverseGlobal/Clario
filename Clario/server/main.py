@@ -64,7 +64,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-MEDIA_ROOT = "/tmp/clario_media"
+MEDIA_ROOT = os.path.abspath(os.path.join(tempfile.gettempdir(), "clario_media"))
 os.makedirs(MEDIA_ROOT, exist_ok=True)
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(200 * 1024 * 1024)))  # 200MB default
 
@@ -79,7 +79,13 @@ class CORSMediaStaticFiles(StaticFiles):
 
 app.mount("/media", CORSMediaStaticFiles(directory=MEDIA_ROOT), name="media")
 
+jobs_cache: dict = {}
+projects_cache: dict = {}
+
 def update_job(job_id: str, updates: dict):
+    if job_id not in jobs_cache:
+        jobs_cache[job_id] = {"id": job_id}
+    jobs_cache[job_id].update(updates)
     if not supabase: return
     try:
         updates["id"] = job_id
@@ -88,17 +94,22 @@ def update_job(job_id: str, updates: dict):
         print(f"Error updating job in Supabase: {e}")
 
 def get_job(job_id: str, user_id: str = None):
-    if not supabase: return None
+    cached = jobs_cache.get(job_id)
+    if not supabase:
+        return cached
     try:
         query = supabase.table("clario_jobs").select("*").eq("id", job_id)
         if user_id:
             query = query.eq("user_id", user_id)
         res = query.execute()
-        return res.data[0] if res.data else None
+        if res.data:
+            return res.data[0]
+        return cached
     except Exception:
-        return None
+        return cached
 
 def update_project(project_id: str, user_id: str, project_data: dict):
+    projects_cache[project_id] = project_data
     if not supabase: return
     try:
         supabase.table("clario_projects").upsert({
@@ -112,7 +123,9 @@ def update_project(project_id: str, user_id: str, project_data: dict):
         print(f"Error updating project in Supabase: {e}")
 
 def get_project(project_id: str, user_id: str = None):
-    if not supabase: return None
+    cached = projects_cache.get(project_id)
+    if not supabase:
+        return cached
     try:
         query = supabase.table("clario_projects").select("*").eq("id", project_id)
         if user_id:
@@ -120,11 +133,19 @@ def get_project(project_id: str, user_id: str = None):
         res = query.execute()
         if res.data:
             return res.data[0].get("project_data")
-        return None
+        return cached
     except Exception:
-        return None
+        return cached
 
 def upload_to_supabase(file_path: str, bucket: str, destination_path: str) -> str:
+    target_disk_path = os.path.join(MEDIA_ROOT, destination_path)
+    if os.path.abspath(file_path) != os.path.abspath(target_disk_path):
+        os.makedirs(os.path.dirname(target_disk_path), exist_ok=True)
+        try:
+            shutil.copy2(file_path, target_disk_path)
+        except Exception:
+            pass
+
     if not supabase: return f"/media/{destination_path}"
     try:
         with open(file_path, 'rb') as f:
@@ -308,7 +329,7 @@ async def process_video_harvest_job(job_id: str, project_id: str, video_path: st
             except Exception:
                 pass
             try:
-                if 'project_dir' in locals():
+                if supabase and 'project_dir' in locals():
                     shutil.rmtree(project_dir, ignore_errors=True)
             except Exception:
                 pass
@@ -925,7 +946,8 @@ async def _process_reference_ingest(
         finally:
             # Clean up the entire temporary project directory to prevent cloud disk filling
             try:
-                shutil.rmtree(project_dir, ignore_errors=True)
+                if supabase and 'project_dir' in locals():
+                    shutil.rmtree(project_dir, ignore_errors=True)
             except Exception:
                 pass
     
@@ -1258,22 +1280,83 @@ Respond ONLY with valid JSON matching this schema:
             print(f"Gemini edit directive generation error: {e}")
 
     # Heuristic fallback if Gemini is offline
+    is_clean_shots = "clean shot" in req.script_text.lower() or "auto scene detection" in req.script_text.lower()
+
     return {
-        "canvas": { "padding": 24, "border_radius": 16, "shadow_blur": 32, "background_style": "dark_mesh_gradient" },
-        "zoom_events": [
+        "canvas": { "padding": 0 if is_clean_shots else 24, "border_radius": 0 if is_clean_shots else 16, "shadow_blur": 0 if is_clean_shots else 32, "background_style": "none" if is_clean_shots else "dark_mesh_gradient" },
+        "zoom_events": [] if is_clean_shots else [
             { "timestamp": max(1.0, req.duration * 0.15), "duration": 4.0, "scale": 1.25, "focus": "center", "reason": "Initial punch-in on core demonstration" },
             { "timestamp": max(5.0, req.duration * 0.65), "duration": 3.5, "scale": 1.35, "focus": "cursor", "reason": "Detail zoom on product outcome" }
         ],
-        "silence_trims": [
-            { "start": req.duration * 0.4, "end": req.duration * 0.43 }
-        ] if req.duration > 10 else [],
-        "highlights": ["Cap.so Studio Polish", "Recordly Smooth Zoom"],
-        "pacing": "fast",
-        "summary": "Studio padded canvas with 16px rounded corners, smooth zooms, and dead-air tightening."
+        "silence_trims": [] if is_clean_shots else (
+            [ { "start": req.duration * 0.4, "end": req.duration * 0.43 } ] if req.duration > 10 else []
+        ),
+        "highlights": [] if is_clean_shots else ["Cap.so Studio Polish", "Recordly Smooth Zoom"],
+        "pacing": "original" if is_clean_shots else "fast",
+        "summary": "Original shots preserved without alterations." if is_clean_shots else "Studio padded canvas with 16px rounded corners, smooth zooms, and dead-air tightening."
     }
 
+async def process_inpaint_job(job_id: str, project_id: str, video_path: str, user_id: str):
+    async with processing_semaphore:
+        try:
+            update_job(job_id, {
+                "status": "processing",
+                "progress_pct": 10,
+                "status_msg": "Removing captions via FFmpeg (local AI mock)..."
+            })
+            
+            project_dir = os.path.join(MEDIA_ROOT, project_id)
+            safe_name = os.path.splitext(os.path.basename(video_path))[0]
+            cleaned_path = os.path.join(project_dir, f"{safe_name}_cleaned.mp4")
+            
+            from worker.ffmpeg_worker import remove_captions_ffmpeg
+            remove_captions_ffmpeg(video_path, cleaned_path, punch_in=True)
+            
+            rel_path = os.path.relpath(cleaned_path, MEDIA_ROOT).replace("\\", "/")
+            public_url = f"/media/{rel_path}"
+            
+            update_job(job_id, {
+                "status": "completed",
+                "progress_pct": 100,
+                "status_msg": "Inpainting complete.",
+                "result": {"cleaned_video": public_url}
+            })
+            
+        except Exception as e:
+            update_job(job_id, {
+                "status": "failed",
+                "status_msg": f"Inpainting failed: {str(e)}"
+            })
+
+@app.post("/api/v1/harvest/inpaint-video")
+async def inpaint_video(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    user_id: str = Depends(get_current_user_id)
+):
+    project_id = f"proj_{uuid.uuid4().hex[:10]}"
+    job_id = f"job_{uuid.uuid4().hex[:10]}"
+    project_dir = os.path.join(MEDIA_ROOT, project_id)
+    os.makedirs(project_dir, exist_ok=True)
+
+    orig_ext = os.path.splitext(file.filename or "")[1] or ".mp4"
+    safe_filename = f"reference{orig_ext}"
+    file_path = os.path.join(project_dir, safe_filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    update_job(job_id, {
+        "title": file.filename or "Video Inpaint",
+        "user_id": user_id,
+        "status": "queued",
+        "progress_pct": 0,
+        "status_msg": "Queued for AI Inpainting",
+        "input_url": file.filename
+    })
+
+    background_tasks.add_task(process_inpaint_job, job_id, project_id, file_path, user_id)
+    return {"job_id": job_id, "project_id": project_id, "status": "queued"}
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-

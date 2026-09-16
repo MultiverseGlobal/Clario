@@ -167,13 +167,13 @@ export function FloatingNav({
             }`}
           >
             <FolderKanban className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden sm:inline">Workspace</span>
+            <span className="hidden sm:inline">Projects</span>
           </button>
 
-          {/* 2. Editor Tab */}
+          {/* 2. Editor Tab — Clean Shots */}
           <button
             onClick={() => onNavigatePhase("video_canvas")}
-            title="Timeline & Canvas Editor"
+            title="Clean Shots Editor"
             className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer relative ${
               isEditorActive
                 ? "bg-foreground text-background shadow-xs font-semibold"
@@ -181,16 +181,16 @@ export function FloatingNav({
             }`}
           >
             <Film className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden sm:inline">Editor</span>
+            <span className="hidden sm:inline">Clean Shots</span>
             {hasActiveProject && !isEditorActive && (
               <span className="w-1.5 h-1.5 rounded-full bg-primary" />
             )}
           </button>
 
-          {/* 3. Studio / Recording Tab */}
+          {/* 3. Loom Pitch Studio Tab */}
           <button
             onClick={() => onNavigatePhase("studio")}
-            title="AI Director Recording Studio"
+            title="Loom Pitch Studio — Record & Edit"
             className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer relative ${
               isStudioActive
                 ? "bg-foreground text-background shadow-xs font-semibold"
@@ -198,17 +198,17 @@ export function FloatingNav({
             }`}
           >
             <Radio className="w-3.5 h-3.5 shrink-0 text-red-500" />
-            <span className="hidden sm:inline">Studio</span>
+            <span className="hidden sm:inline">Loom Pitch</span>
             <span className="relative flex h-1.5 w-1.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
             </span>
           </button>
 
-          {/* 4. Library & Vault Tab */}
+          {/* 4. Assets Vault Tab */}
           <button
             onClick={() => onNavigatePhase("reference_library")}
-            title="Asset Vault & Script Analysis"
+            title="Assets — Media Vault & Script Intelligence"
             className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer ${
               currentPhase === "reference_library"
                 ? "bg-foreground text-background shadow-xs font-semibold"
@@ -216,7 +216,7 @@ export function FloatingNav({
             }`}
           >
             <Library className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden sm:inline">Library</span>
+            <span className="hidden sm:inline">Assets</span>
           </button>
         </nav>
 

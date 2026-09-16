@@ -17,16 +17,42 @@ export async function stripCaptions(
 
   onProgress?.('Running OCR and AI Video Inpainting (this may take a while)...');
 
-  const apiBase = import.meta.env.VITE_AI_ENGINE_BASE || 'https://multiverseglobals--clario-ai-engine-fastapi-app.modal.run';
-  const response = await fetch(`${apiBase}/inpaint-video`, {
+  const response = await fetch(`/api/v1/harvest/inpaint-video`, {
     method: 'POST',
     body: formData,
   });
 
   if (!response.ok) {
-    throw new Error('Video inpainting failed on the AI Engine');
+    throw new Error('Failed to start inpainting job');
   }
 
-  const data = await response.json();
-  return data.cleaned_video;
+  const { job_id } = await response.json();
+
+  return new Promise((resolve, reject) => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const jobRes = await fetch(`/api/v1/harvest/jobs/${job_id}`);
+        if (!jobRes.ok) throw new Error('Job polling failed');
+        
+        const job = await jobRes.json();
+        
+        onProgress?.(job.status_msg || 'Inpainting in progress...');
+
+        if (job.status === 'failed' || job.status === 'cancelled' || job.status === 'expired') {
+          clearInterval(pollInterval);
+          reject(new Error(`Inpainting job failed: ${job.status_msg}`));
+        } else if (job.status === 'completed') {
+          clearInterval(pollInterval);
+          if (job.result && job.result.cleaned_video) {
+            resolve(job.result.cleaned_video);
+          } else {
+            reject(new Error('Inpainting job completed but no video URL was returned.'));
+          }
+        }
+      } catch (err) {
+        clearInterval(pollInterval);
+        reject(err);
+      }
+    }, 2000);
+  });
 }

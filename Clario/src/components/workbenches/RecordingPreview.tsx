@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Download, RotateCcw, Save, Play, Pause, ArrowLeft, 
   Wand2, Sparkles, Sliders, ZoomIn, Check, 
-  Copy, ArrowRight 
+  Copy, ArrowRight, AlertTriangle 
 } from 'lucide-react';
 import { getApiKey } from '../../lib/gemini';
 import { getApiBase } from '../../lib/apiClient';
@@ -77,9 +77,40 @@ export function RecordingPreview({
   const [objectUrl] = useState(() => URL.createObjectURL(blob));
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
+  const [durationError, setDurationError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [saved, setSaved] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+
+  const handleMetadataLoaded = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (!Number.isFinite(v.duration) || v.duration <= 0) {
+      // Chrome/Firefox WebM duration calculation fallback
+      v.currentTime = 1e101;
+      v.ontimeupdate = function () {
+        this.ontimeupdate = () => {};
+        v.currentTime = 0;
+        if (Number.isFinite(v.duration) && v.duration > 0) {
+          setDuration(v.duration);
+          setDurationError(null);
+        } else {
+          setDurationError('Unable to read video duration');
+        }
+      };
+    } else {
+      setDuration(v.duration);
+      setDurationError(null);
+    }
+  };
+
+  const handleRetryDuration = () => {
+    setDurationError(null);
+    const v = videoRef.current;
+    if (v) {
+      v.load();
+    }
+  };
 
   // Edit Directive state
   const [directiveText, setDirectiveText] = useState(
@@ -317,10 +348,47 @@ export function RecordingPreview({
                 ref={videoRef}
                 src={objectUrl}
                 className="w-full h-full object-contain bg-black"
-                onLoadedMetadata={() => setDuration(videoRef.current?.duration ?? 0)}
+                onLoadedMetadata={handleMetadataLoaded}
+                onError={() => setDurationError('Unable to read video duration')}
                 onTimeUpdate={() => setCurrentTime(videoRef.current?.currentTime ?? 0)}
                 onEnded={() => setIsPlaying(false)}
               />
+
+              {/* Unable to read video duration Error Overlay */}
+              {durationError && (
+                <div 
+                  className="absolute inset-0 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-40 cursor-default"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mb-3 shadow-lg shadow-rose-500/10">
+                    <AlertTriangle className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-semibold text-white mb-1">Unable to read video duration</h4>
+                  <p className="text-xs text-white/60 max-w-sm mb-4">
+                    The video header or duration could not be fully parsed. You can retry reading metadata, download the original media, or proceed without timeline analysis.
+                  </p>
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <button
+                      onClick={handleRetryDuration}
+                      className="px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-medium text-white transition-colors"
+                    >
+                      Retry
+                    </button>
+                    <button
+                      onClick={handleDownload}
+                      className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-white/80 transition-colors"
+                    >
+                      Download Original Media
+                    </button>
+                    <button
+                      onClick={() => setDurationError(null)}
+                      className="px-3 py-1.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-xs font-medium text-white transition-colors"
+                    >
+                      Continue Without Analysis
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Active Zoom Badge */}
               {activeZoom && (

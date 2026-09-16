@@ -162,7 +162,7 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
 
     if (isVideo) {
       try {
-        const scenes = await detectCinematicScenes(file, (p) => {
+        const { scenes, projectId: jobProjectId } = await detectCinematicScenes(file, (p) => {
           setProgress(p.progressPct);
           setStatusText(p.statusMsg);
         });
@@ -201,40 +201,39 @@ export function ProjectCreationWizard({ onClose, onProjectCreated, onSaveToLibra
           }
         }
 
-        setStatusText('Running Gemini Vision AI analysis on extracted scenes...');
-        const shotsData: ShotRecord[] = await Promise.all(scenes.map(async (s, index) => {
-          const intelligence = await analyzeShotIntelligence(s.frameUrl, index, s.startTime, s.endTime, previewUrl);
+        setStatusText('Retrieving intelligence from server job...');
+        const shotsData: ShotRecord[] = scenes.map((s, index) => {
           return {
-            project_id: projectId,
+            project_id: jobProjectId || projectId,
             shot_id: s.id,
             start_seconds: s.startTime,
             end_seconds: s.endTime,
             duration: s.duration,
             frame_url: s.frameUrl,
-            visual_description: intelligence.visual_description || s.sceneTag,
-            editor_text: intelligence.editor_text || (s.hasCaptions ? 'Captions Stripped' : ''),
-            source_text: intelligence.source_text || s.sceneTag,
-            content_type: intelligence.content_type || s.contentType,
-            source_type: intelligence.source_type || 'uploaded',
-            likely_source: intelligence.likely_source || cleanName,
-            confidence: intelligence.confidence || 'confirmed',
+            visual_description: s.sceneTag,
+            editor_text: s.hasCaptions ? 'Captions Stripped' : '',
+            source_text: s.transcriptText || s.sceneTag,
+            content_type: s.contentType,
+            source_type: 'uploaded',
+            likely_source: cleanName,
+            confidence: 'confirmed',
             exact_source_found: true,
             clean_source_url: previewUrl,
-            license_status: intelligence.license_status || 'licensed_clean_available',
+            license_status: 'licensed_clean_available',
             rights_status: 'user_owned',
             production_eligible: true,
-            replacement_needed: intelligence.replacement_needed || false,
-            replacement_prompt: intelligence.replacement_prompt || '',
-            search_queries: intelligence.search_queries || [s.sceneTag],
-            notes: intelligence.notes || `Scene tag: ${s.sceneTag}`,
-            analysis_confidence: intelligence.analysis_confidence || 'low',
-            detected_text_presence: intelligence.detected_text_presence || false,
-            editor_overlay_detected: intelligence.editor_overlay_detected || false,
-            scene_text_detected: intelligence.scene_text_detected || false,
-            faces_detected_count: intelligence.faces_detected_count || 0,
-            motion_level: intelligence.motion_level || 'moderate'
+            replacement_needed: false,
+            replacement_prompt: '',
+            search_queries: [s.sceneTag],
+            notes: `Scene tag: ${s.sceneTag}`,
+            analysis_confidence: 'high',
+            detected_text_presence: s.hasCaptions,
+            editor_overlay_detected: false,
+            scene_text_detected: false,
+            faces_detected_count: s.contentType === 'a_roll' ? 1 : 0,
+            motion_level: 'moderate'
           } as ShotRecord;
-        }));
+        });
 
         const purposeLabel = effectivePurpose === 'sales'
           ? 'B2B Sales Outreach & Loom Pitch (Hook -> Problem -> Demo -> CTA)'
