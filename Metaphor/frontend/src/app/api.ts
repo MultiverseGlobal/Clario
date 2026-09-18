@@ -36,13 +36,22 @@ async function getCachedSession(): Promise<string | null> {
   return _sessionCache.token;
 }
 
+// Silent background warm-up probe for Render free-tier cold starts
+if (typeof window !== 'undefined') {
+  try {
+    fetch("https://metaphor-backend.onrender.com/build-version", { mode: "no-cors" }).catch(() => {});
+  } catch {}
+}
+
 // Simple client-side API helper with lightweight GET caching
 export async function fetchFromMetaphor(endpoint: string, body?: any, method?: string, allowAnonymous: boolean = false, skipCache: boolean = false) {
+  // Normalize trailing slash on /graph to eliminate 307 redirect penalty
+  const cleanEndpoint = endpoint === "/graph" ? "/graph/" : endpoint;
   const reqMethod = (method || (body ? "POST" : "GET")).toUpperCase();
-  const cacheKey = `${reqMethod}:${endpoint}`;
+  const cacheKey = `${reqMethod}:${cleanEndpoint}`;
 
   // Skip caching for /authorize endpoints — stale failures would silently block the user
-  const isCacheable = reqMethod === "GET" && !endpoint.includes("/authorize") && !skipCache;
+  const isCacheable = reqMethod === "GET" && !cleanEndpoint.includes("/authorize") && !skipCache;
 
   // In-memory cache lookup for GET requests
   if (isCacheable) {
@@ -83,14 +92,14 @@ export async function fetchFromMetaphor(endpoint: string, body?: any, method?: s
 
   const backendUrl = getBackendUrl();
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15_000);
+  const timeoutId = setTimeout(() => controller.abort(), 6_000);
   
   let res: Response;
   try {
-    res = await fetch(`${backendUrl}${endpoint}`, { ...options, signal: controller.signal });
+    res = await fetch(`${backendUrl}${cleanEndpoint}`, { ...options, signal: controller.signal });
   } catch (err: any) {
     if (err.name === 'AbortError') {
-      throw new Error(`Request to ${endpoint} timed out after 15 seconds. Please try again later.`);
+      throw new Error(`Request to ${cleanEndpoint} timed out after 6 seconds. Backend may be waking up.`);
     }
     throw new Error(`Network error: ${err.message}`);
   } finally {

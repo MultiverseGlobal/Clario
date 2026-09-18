@@ -73,8 +73,21 @@ export function AmbientField({ fieldState = "idle" }: AmbientFieldProps) {
         initial={{ opacity: 0 }}
         className="absolute inset-0 flex items-center justify-center mix-blend-screen dark:mix-blend-lighten"
       >
-        <div className="w-[60vw] h-[60vw] max-w-[800px] max-h-[800px] rounded-full bg-accent/20 blur-[120px] transition-all duration-1000" />
-        <div className="absolute w-[40vw] h-[40vw] max-w-[600px] max-h-[600px] translate-x-1/4 -translate-y-1/4 rounded-full bg-indigo-500/10 blur-[100px] transition-all duration-1000" />
+        <div 
+          className="w-[60vw] h-[60vw] max-w-[800px] max-h-[800px] rounded-full transition-all duration-1000"
+          style={{
+            background: "radial-gradient(circle, var(--color-accent) 0%, rgba(79, 70, 229, 0.15) 40%, transparent 70%)",
+            opacity: 0.25,
+            willChange: "transform, opacity",
+          }}
+        />
+        <div 
+          className="absolute w-[40vw] h-[40vw] max-w-[600px] max-h-[600px] translate-x-1/4 -translate-y-1/4 rounded-full transition-all duration-1000"
+          style={{
+            background: "radial-gradient(circle, rgba(99, 102, 241, 0.2) 0%, transparent 65%)",
+            willChange: "transform, opacity",
+          }}
+        />
       </motion.div>
       
       {/* Atmosphere Mask */}

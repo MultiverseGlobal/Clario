@@ -11,7 +11,12 @@ export async function updateSession(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   );
 
-  if (hasSupabaseConfig) {
+  const allCookies = request.cookies.getAll();
+  const hasAuthCookie = allCookies.some(
+    (c) => c.name.startsWith('sb-') && (c.name.includes('-auth-token') || c.name.endsWith('-token'))
+  );
+
+  if (hasSupabaseConfig && hasAuthCookie) {
     try {
       const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -39,7 +44,7 @@ export async function updateSession(request: NextRequest) {
       console.error("Middleware auth error:", err);
       user = null;
     }
-  } else {
+  } else if (!hasSupabaseConfig) {
     // Single-tenant or sovereign environment without cloud Supabase keys
     user = { id: "sovereign_admin" };
   }

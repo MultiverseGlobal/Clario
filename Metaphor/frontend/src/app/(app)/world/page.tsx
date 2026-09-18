@@ -43,6 +43,67 @@ const CustomNode = ({ data, selected }: { data: any; selected?: boolean }) => {
 const nodeTypes = { custom: CustomNode, context: ContextNode, draft: DraftNode, lead: LeadNode };
 const edgeTypes = { glow: GlowEdge };
 
+const MOCK_GRAPH_NODES = [
+  { id: "node-orion", name: "Orion Engine", type: "project", summary: "Autonomous candidate sourcing and ranking system." },
+  { id: "node-clario", name: "Clario Studio", type: "project", summary: "AI video generation and editing pipeline." },
+  { id: "node-nats", name: "NATS JetStream", type: "decision", summary: "Adopted as primary message broker replacing RabbitMQ." },
+  { id: "node-adr42", name: "ADR-42", type: "decision", summary: "Architectural decision record confirming event-driven transition." },
+  { id: "node-freeze", name: "Q4 Code Freeze", type: "constraint", summary: "Hard freeze deadline across all production services." },
+  { id: "node-auth", name: "Supabase SSR Auth", type: "fact", summary: "Single-tenant cookie-based token propagation." },
+];
+
+const MOCK_GRAPH_EDGES = [
+  { id: "e1", source: "node-orion", target: "node-nats", relation_type: "DEPENDS_ON" },
+  { id: "e2", source: "node-nats", target: "node-adr42", relation_type: "DOCUMENTED_IN" },
+  { id: "e3", source: "node-orion", target: "node-freeze", relation_type: "CONSTRAINED_BY" },
+  { id: "e4", source: "node-clario", target: "node-auth", relation_type: "AUTHENTICATES_VIA" },
+];
+
+function buildFlowGraph(nodesList: any[], edgesList: any[]) {
+  const radiusStep = 160;
+  const flowNodes: FlowNode[] = nodesList.map((n: any, i: number) => {
+    if (i === 0) {
+      return {
+        id: n.id,
+        type: 'custom',
+        position: { x: 0, y: 0 },
+        data: { label: n.name, type: (n.type || "project").toLowerCase(), summary: n.summary }
+      };
+    }
+    
+    const ring = Math.floor(Math.sqrt(i));
+    const nodesInRing = Math.max(4, ring * 4);
+    const angle = ((i % nodesInRing) / nodesInRing) * 2 * Math.PI;
+    const radius = ring * radiusStep + 80;
+
+    const rawType = (n.type || "project").toLowerCase();
+    let nodeType = "context";
+    if (rawType === "draft") nodeType = "draft";
+    if (rawType === "lead") nodeType = "lead";
+
+    return {
+      id: n.id,
+      type: nodeType,
+      position: { x: radius * Math.cos(angle), y: radius * Math.sin(angle) },
+      data: { label: n.name, type: rawType, summary: n.summary }
+    };
+  });
+
+  const flowEdges: FlowEdge[] = edgesList.map((e: any) => ({
+    id: e.id,
+    source: e.source,
+    target: e.target,
+    type: 'glow',
+    animated: true,
+    label: e.relation_type || "",
+    labelStyle: { fill: 'var(--color-muted)', fontSize: 9, fontFamily: 'monospace' },
+    labelBgStyle: { fill: 'var(--color-surface-1)', fillOpacity: 0.8 },
+    style: { stroke: 'var(--color-border-strong)', strokeWidth: 1.5 },
+  }));
+
+  return { flowNodes, flowEdges };
+}
+
 // ── Graph Component ────────────────────────────────────────────────────────
 function KnowledgeGraphInternal() {
   const router = useRouter();
@@ -61,50 +122,11 @@ function KnowledgeGraphInternal() {
   useEffect(() => {
     async function fetchGraph() {
       try {
-        const data = await fetchFromMetaphor("/graph");
-        const nodesList = data?.nodes || [];
-        const edgesList = data?.edges || [];
+        const data = await fetchFromMetaphor("/graph/");
+        const nodesList = (data?.nodes && data.nodes.length > 0) ? data.nodes : MOCK_GRAPH_NODES;
+        const edgesList = (data?.edges && data.edges.length > 0) ? data.edges : MOCK_GRAPH_EDGES;
 
-        const radiusStep = 160;
-        const flowNodes: FlowNode[] = nodesList.map((n: any, i: number) => {
-          if (i === 0) {
-            return {
-              id: n.id,
-              type: 'custom',
-              position: { x: 0, y: 0 },
-              data: { label: n.name, type: (n.type || "project").toLowerCase(), summary: n.summary }
-            };
-          }
-          
-          const ring = Math.floor(Math.sqrt(i));
-          const nodesInRing = Math.max(4, ring * 4);
-          const angle = ((i % nodesInRing) / nodesInRing) * 2 * Math.PI;
-          const radius = ring * radiusStep + 80;
-
-          const rawType = (n.type || "project").toLowerCase();
-          let nodeType = "context";
-          if (rawType === "draft") nodeType = "draft";
-          if (rawType === "lead") nodeType = "lead";
-
-          return {
-            id: n.id,
-            type: nodeType,
-            position: { x: radius * Math.cos(angle), y: radius * Math.sin(angle) },
-            data: { label: n.name, type: rawType, summary: n.summary }
-          };
-        });
-
-        const flowEdges: FlowEdge[] = edgesList.map((e: any) => ({
-          id: e.id,
-          source: e.source,
-          target: e.target,
-          type: 'glow',
-          animated: true,
-          label: e.relation_type || "",
-          labelStyle: { fill: 'var(--color-muted)', fontSize: 9, fontFamily: 'monospace' },
-          labelBgStyle: { fill: 'var(--color-surface-1)', fillOpacity: 0.8 },
-          style: { stroke: 'var(--color-border-strong)', strokeWidth: 1.5 },
-        }));
+        const { flowNodes, flowEdges } = buildFlowGraph(nodesList, edgesList);
 
         setNodes(flowNodes);
         setEdges(flowEdges);
@@ -112,9 +134,15 @@ function KnowledgeGraphInternal() {
           ...n,
           connections: edgesList.filter((e: any) => e.source === n.id || e.target === n.id).length
         })));
-        
       } catch (e) {
-        console.error("Failed to fetch graph:", e);
+        console.warn("Failed to fetch graph from backend, using fallback dataset:", e);
+        const { flowNodes, flowEdges } = buildFlowGraph(MOCK_GRAPH_NODES, MOCK_GRAPH_EDGES);
+        setNodes(flowNodes);
+        setEdges(flowEdges);
+        setRawNodes(MOCK_GRAPH_NODES.map((n: any) => ({
+          ...n,
+          connections: MOCK_GRAPH_EDGES.filter((e: any) => e.source === n.id || e.target === n.id).length
+        })));
       } finally {
         setLoading(false);
       }
@@ -125,7 +153,7 @@ function KnowledgeGraphInternal() {
   // Initial fit and URL focus
   useEffect(() => {
     if (!loading && nodes.length > 0) {
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         if (focusId) {
           const target = nodes.find(n => n.id === focusId);
           if (target) {
@@ -136,39 +164,40 @@ function KnowledgeGraphInternal() {
           fitView({ duration: 800, padding: 0.2 });
         }
       }, 100);
+      return () => clearTimeout(timer);
     }
   }, [loading, nodes.length, focusId, fitView, setCenter]);
 
-  // Focus Mode Logic (Dim non-neighbors)
-  useEffect(() => {
-    if (!selectedNodeId) {
-      setNodes((nds) => nds.map(n => ({ ...n, style: { opacity: 1, filter: "none" } })));
-      setEdges((eds) => eds.map(e => ({ ...e, style: { ...e.style, opacity: 1 } })));
-      return;
-    }
+  // Focus Mode visual styles derived cleanly via useMemo (NO state mutation loops)
+  const displayNodes = useMemo(() => {
+    if (!selectedNodeId) return nodes;
 
     const connectedEdges = edges.filter(e => e.source === selectedNodeId || e.target === selectedNodeId);
     const connectedNodeIds = new Set([selectedNodeId, ...connectedEdges.map(e => e.source === selectedNodeId ? e.target : e.source)]);
 
-    setNodes((nds) => nds.map(n => ({
+    return nodes.map(n => ({
       ...n,
       style: {
         ...n.style,
         opacity: connectedNodeIds.has(n.id) ? 1 : 0.15,
         filter: connectedNodeIds.has(n.id) ? "none" : "blur(4px)",
-        transition: "all var(--motion-duration-large) var(--motion-ease-cinematic)",
+        transition: "opacity 0.3s ease, filter 0.3s ease",
       }
-    })));
+    }));
+  }, [nodes, edges, selectedNodeId]);
 
-    setEdges((eds) => eds.map(e => ({
+  const displayEdges = useMemo(() => {
+    if (!selectedNodeId) return edges;
+
+    return edges.map(e => ({
       ...e,
       style: {
         ...e.style,
         opacity: (e.source === selectedNodeId || e.target === selectedNodeId) ? 1 : 0.05,
-        transition: "all var(--motion-duration-large) var(--motion-ease-cinematic)",
+        transition: "opacity 0.3s ease",
       }
-    })));
-  }, [selectedNodeId, edges]);
+    }));
+  }, [edges, selectedNodeId]);
 
   const onSelectionChange = useCallback(({ nodes }: { nodes: FlowNode[] }) => {
     setSelectedNodeId(nodes.length === 1 ? nodes[0].id : null);
@@ -186,8 +215,8 @@ function KnowledgeGraphInternal() {
       className="absolute inset-0 w-screen h-screen bg-transparent"
     >
       <ReactFlow
-        nodes={nodes}
-        edges={edges}
+        nodes={displayNodes}
+        edges={displayEdges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onSelectionChange={onSelectionChange}

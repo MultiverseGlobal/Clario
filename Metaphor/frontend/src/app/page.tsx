@@ -10,13 +10,12 @@ export default function LandingPage() {
   return (
     <div className="relative min-h-screen bg-background flex flex-col font-sans text-foreground overflow-x-hidden">
       {/* ── Spatial Background ── */}
-      {/* Retained but heavily masked by porcelain/obsidian gradient to create atmosphere without noise */}
-      <div className="absolute inset-0 z-0 pointer-events-none">
-        <video 
-          src="/spatial_background_loop.webm" 
-          poster="/spatial_background.jpg"
-          autoPlay loop muted playsInline
-          className="w-full h-full object-cover opacity-[0.06] mix-blend-screen"
+      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+        <div 
+          className="absolute top-[-20%] left-1/2 -translate-x-1/2 w-[1000px] h-[600px] opacity-20 dark:opacity-15 pointer-events-none"
+          style={{
+            background: "radial-gradient(ellipse at center, var(--color-accent) 0%, rgba(99, 102, 241, 0.1) 45%, transparent 70%)",
+          }}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-background/90 via-background/95 to-background" />
       </div>
