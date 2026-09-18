@@ -12,9 +12,11 @@ type McpToken = {
   id: string;
   preview: string;
   client_id: string;
+  client_name?: string;
   scope: string;
-  created_at: string;
+  scopes?: string[];
   last_used: string | null;
+  created_at: string;
 };
 
 type AuditLog = {
@@ -34,6 +36,8 @@ export default function ApiAccessPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [revokeTarget, setRevokeTarget] = useState<McpToken | null>(null);
+  const [revoking, setRevoking] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -82,11 +86,15 @@ export default function ApiAccessPage() {
   };
 
   const handleRevokeToken = async (tokenId: string) => {
+    setRevoking(true);
     try {
       await fetchFromMetaphor(`/mcp/oauth/tokens/${tokenId}`, undefined, "DELETE");
       setTokens(prev => prev.filter(t => t.id !== tokenId));
     } catch (e) {
       console.error("Failed to revoke MCP token", e);
+    } finally {
+      setRevoking(false);
+      setRevokeTarget(null);
     }
   };
 
@@ -204,18 +212,37 @@ export default function ApiAccessPage() {
             )}
             
             {tokens.map(t => (
-              <div key={t.id} className="p-6 bg-surface-1">
-                <div className="flex items-center justify-between mb-4">
+              <div key={t.id} className="p-6 bg-surface-1 space-y-4">
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                    <Lock className="w-4 h-4 text-muted" /> Token: {t.preview}
-                    <span className="text-xs text-muted font-normal">({t.client_id})</span>
+                    <Lock className="w-4 h-4 text-muted" />
+                    <span>{t.client_name || t.client_id}</span>
+                    <span className="text-xs text-muted font-normal font-mono">{t.preview}</span>
                   </div>
                   <button
-                    onClick={() => handleRevokeToken(t.id)}
+                    onClick={() => setRevokeTarget(t)}
                     className="flex items-center gap-1 text-xs text-rose-500 hover:text-rose-600 font-medium px-3 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 transition-colors cursor-pointer"
                   >
-                    <Trash2 className="w-3.5 h-3.5" /> Revoke Immediately
+                    <Trash2 className="w-3.5 h-3.5" /> Revoke
                   </button>
+                </div>
+
+                {/* Granted Scopes */}
+                <div>
+                  <div className="text-[9px] font-mono uppercase tracking-widest text-muted mb-2">Granted Scopes</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(t.scopes ?? (t.scope ? t.scope.split(" ") : ["read:graph", "read:context"])).map((s: string) => (
+                      <span key={s} className="px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-mono text-primary">
+                        {s}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 text-xs text-muted">
+                  <span>Last used: {t.last_used ? new Date(t.last_used).toLocaleString() : "Never"}</span>
+                  <span>·</span>
+                  <span>Created: {new Date(t.created_at).toLocaleDateString()}</span>
                 </div>
 
                 <div className="relative group">
@@ -276,6 +303,38 @@ export default function ApiAccessPage() {
         </Card>
 
       </div>
+
+      {/* Revoke Confirmation Dialog */}
+      {revokeTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-surface-1 border border-border-strong rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden mx-4 animate-in zoom-in-95 duration-200">
+            <div className="p-6">
+              <div className="w-10 h-10 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mb-4">
+                <Trash2 className="w-5 h-5 text-rose-500" />
+              </div>
+              <h3 className="text-base font-semibold text-foreground mb-2">Revoke Token?</h3>
+              <p className="text-sm text-muted leading-relaxed">
+                <span className="font-mono text-foreground">{revokeTarget.client_name || revokeTarget.client_id}</span> will immediately lose access to your context graph. This cannot be undone.
+              </p>
+            </div>
+            <div className="px-6 pb-6 flex gap-3">
+              <button
+                onClick={() => setRevokeTarget(null)}
+                className="flex-1 py-2.5 text-sm font-medium text-muted hover:text-foreground bg-surface-2 border border-border-subtle rounded-xl cursor-pointer transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleRevokeToken(revokeTarget.id)}
+                disabled={revoking}
+                className="flex-1 py-2.5 text-sm font-medium text-white bg-rose-500 hover:bg-rose-600 rounded-xl cursor-pointer transition-colors disabled:opacity-50"
+              >
+                {revoking ? "Revoking..." : "Yes, Revoke"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

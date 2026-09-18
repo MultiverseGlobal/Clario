@@ -6,6 +6,8 @@ export const metadata: Metadata = {
   description: "Metaphor is the Context Operating System for intelligent applications — transforming fragmented events into a living structured knowledge graph.",
 };
 
+import { ThemeProvider } from "@/components/ThemeProvider";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -13,25 +15,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              try {
-                const stored = localStorage.getItem('metaphor_theme');
-                const effective = stored || 'dark';
-                if (!stored) localStorage.setItem('metaphor_theme', 'dark');
-                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                const resolved = effective === 'system' ? (prefersDark ? 'dark' : 'light') : effective;
-                document.documentElement.setAttribute('data-theme', resolved);
-                if (resolved === 'dark') document.documentElement.classList.add('dark');
-              } catch (e) {}
-            `,
-          }}
-        />
-      </head>
       <body className="antialiased min-h-screen">
-        {children}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

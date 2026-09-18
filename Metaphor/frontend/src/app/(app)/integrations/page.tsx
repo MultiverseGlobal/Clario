@@ -69,6 +69,7 @@ export default function IntegrationsPage() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState<Record<string, boolean>>({});
   const [apiKey, setApiKey] = useState<string>("");
+  const [showKey, setShowKey] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -196,17 +197,33 @@ export default function IntegrationsPage() {
                 {meta.description}
               </p>
               
-              <div className="pt-4 border-t border-border-subtle flex items-center justify-between text-xs text-muted">
-                <span>{item.events_processed ? `${item.events_processed.toLocaleString()} events processed` : "0 events processed"}</span>
+              <div className="pt-4 border-t border-border-subtle text-xs text-muted space-y-3">
+                <div className="flex justify-between items-center">
+                  <span>{item.events_processed ? `${item.events_processed.toLocaleString()} events processed` : "0 events processed"}</span>
+                  <div className="flex gap-2">
+                    <span className="px-2 py-0.5 rounded-full bg-surface-2 border border-border-subtle text-[10px]">Managed Local</span>
+                    <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-[10px]">Phase: Incremental</span>
+                  </div>
+                </div>
 
-                <button 
-                  onClick={() => handleSync(item.provider)}
-                  disabled={isSyncing}
-                  className="px-3 py-1 bg-surface-2 border border-border-subtle hover:border-primary rounded text-xs font-medium text-foreground disabled:opacity-50 flex items-center gap-1.5"
-                >
-                  {isSyncing && <div className="w-3 h-3 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />}
-                  {isSyncing ? "Syncing..." : "Sync Now"}
-                </button>
+                <div className="flex justify-between items-center mt-4">
+                  <div className="flex gap-2">
+                    <button className="px-3 py-1 bg-surface-2 border border-border-subtle hover:text-danger hover:border-danger/50 rounded text-xs font-medium text-foreground transition-colors">
+                      Revoke
+                    </button>
+                    <button className="px-3 py-1 bg-surface-2 border border-border-subtle hover:border-border-strong rounded text-xs font-medium text-foreground transition-colors">
+                      Reconnect
+                    </button>
+                  </div>
+                  <button 
+                    onClick={() => handleSync(item.provider)}
+                    disabled={isSyncing}
+                    className="px-3 py-1 bg-foreground border border-foreground hover:opacity-90 rounded text-xs font-medium text-background disabled:opacity-50 flex items-center gap-1.5 transition-opacity"
+                  >
+                    {isSyncing && <div className="w-3 h-3 border-2 border-background/20 border-t-background rounded-full animate-spin" />}
+                    {isSyncing ? "Syncing..." : "Resync"}
+                  </button>
+                </div>
               </div>
             </Card>
           );
@@ -229,18 +246,26 @@ export default function IntegrationsPage() {
               <label className="text-xs font-bold uppercase tracking-wider text-muted mb-2 block">Your Live Production Webhook Endpoint</label>
               <div className="flex items-center justify-between gap-3 bg-surface-1 border border-border-subtle rounded-xl p-3.5 font-mono text-xs overflow-x-auto">
                 <span className="text-foreground whitespace-nowrap">
-                  {getBackendUrl()}/webhooks/&lt;provider&gt;?api_key={<span className="text-primary font-bold">{apiKey}</span>}
+                  {getBackendUrl()}/webhooks/&lt;provider&gt;?api_key={<span className="text-primary font-bold">{showKey ? apiKey : "••••••••••••••••••••"}</span>}
                 </span>
-                <button
-                  onClick={() => {
-                    const fullUrl = `${getBackendUrl()}/webhooks/github?api_key=${apiKey}`;
-                    navigator.clipboard.writeText(fullUrl);
-                    alert("Copied live GitHub webhook URL to clipboard!");
-                  }}
-                  className="px-3 py-1.5 bg-foreground text-background hover:opacity-90 rounded-lg text-xs font-sans font-medium transition-all cursor-pointer whitespace-nowrap"
-                >
-                  Copy GitHub URL
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowKey(!showKey)}
+                    className="px-3 py-1.5 bg-surface-2 text-foreground hover:bg-surface-3 rounded-lg text-xs font-sans font-medium transition-all cursor-pointer whitespace-nowrap border border-border-subtle"
+                  >
+                    {showKey ? "Hide" : "Show"} Key
+                  </button>
+                  <button
+                    onClick={() => {
+                      const fullUrl = `${getBackendUrl()}/webhooks/github?api_key=${apiKey}`;
+                      navigator.clipboard.writeText(fullUrl);
+                      alert("Copied live GitHub webhook URL to clipboard!");
+                    }}
+                    className="px-3 py-1.5 bg-foreground text-background hover:opacity-90 rounded-lg text-xs font-sans font-medium transition-all cursor-pointer whitespace-nowrap"
+                  >
+                    Copy GitHub URL
+                  </button>
+                </div>
               </div>
             </div>
 

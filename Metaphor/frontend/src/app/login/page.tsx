@@ -11,7 +11,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isAlreadyOnboarded = typeof window !== "undefined" && (localStorage.getItem("metaphor_onboarded") === "true" || document.cookie.includes("metaphor_onboarded=true"));
-  const defaultTarget = isAlreadyOnboarded ? "/dashboard" : "/onboarding";
+  const defaultTarget = isAlreadyOnboarded ? "/explorer" : "/onboarding";
   const redirectTarget = searchParams.get("redirect") || defaultTarget;
 
   const [email, setEmail] = useState("");
@@ -69,7 +69,10 @@ function LoginForm() {
     } else {
       // Single-tenant sovereign bypass:
       document.cookie = "metaphor_unlocked=true; path=/; max-age=31536000";
+      document.cookie = "metaphor_onboarded=true; path=/; max-age=31536000";
       if (typeof window !== "undefined") {
+        localStorage.setItem("metaphor_unlocked", "true");
+        localStorage.setItem("metaphor_onboarded", "true");
         localStorage.setItem("metaphor_user_name", "Admin");
       }
       setLoading(false);
@@ -98,10 +101,10 @@ function LoginForm() {
           
           <div className="text-center space-y-1 pb-2">
             <h1 className="text-lg font-semibold tracking-tight text-foreground">
-              System Unlock
+              Sign In
             </h1>
             <p className="text-sm text-muted">
-              Master identity required.
+              Authenticate to access your workspace.
             </p>
           </div>
 
@@ -120,25 +123,6 @@ function LoginForm() {
 
           {/* Social Auth Buttons */}
           <div className="space-y-3">
-
-            {/* Primary: Continue with Pseudonyms ID */}
-            <button
-              type="button"
-              onClick={() => {
-                const returnUrl = encodeURIComponent(window.location.origin + "/auth/pseudonyms/callback");
-                window.location.href = `${process.env.NEXT_PUBLIC_PSEUDONYMS_URL || "https://pseudonyms.vercel.app"}/oauth/authorize?client_id=metaphor&redirect_uri=${returnUrl}`;
-              }}
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-3 p-3.5 rounded-xl border border-border-strong bg-foreground text-background hover:opacity-90 transition-all duration-200 cursor-pointer disabled:opacity-50 text-sm font-medium shadow-md"
-            >
-              {/* Pseudonyms ID Logo — geometric sovereign core */}
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 4"/>
-                <path d="M12 6L18 12L12 18L6 12L12 6Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <circle cx="12" cy="12" r="2" fill="currentColor"/>
-              </svg>
-              <span>Continue with Pseudonyms</span>
-            </button>
 
             <button 
               type="button"
@@ -190,7 +174,7 @@ function LoginForm() {
               disabled={loading}
               className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-foreground text-background text-sm font-medium rounded-xl hover:opacity-90 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50 shadow-md"
             >
-              <span>{loading ? "Processing..." : "Unlock System"}</span>
+              <span>{loading ? "Processing..." : "Sign In"}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>

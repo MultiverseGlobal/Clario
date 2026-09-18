@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useRef, useEffect } from "react";
 import { 
@@ -17,7 +17,7 @@ export const ECOSYSTEM_APPS = [
     name: "Pseudonyms ID",
     tagline: "Master Sovereign Account & Hub",
     url: "http://localhost:3005",
-    accentColor: "#8b5cf6",
+    accentColor: "var(--pds-accent)",
     status: "live",
     icon: Shield
   },
@@ -26,7 +26,7 @@ export const ECOSYSTEM_APPS = [
     name: "Metaphor OS",
     tagline: "Universal Context Engine",
     url: "http://localhost:3000",
-    accentColor: "#8b5cf6",
+    accentColor: "var(--pds-accent)",
     status: "current",
     icon: Network
   },
@@ -35,7 +35,7 @@ export const ECOSYSTEM_APPS = [
     name: "Atlas io",
     tagline: "Demand Generation & CRM",
     url: "http://localhost:5173",
-    accentColor: "#10b981",
+    accentColor: "var(--pds-accent)",
     status: "live",
     icon: TrendingUp
   },
@@ -44,7 +44,7 @@ export const ECOSYSTEM_APPS = [
     name: "Clario",
     tagline: "Creative Video Studio & Canvas",
     url: "http://localhost:49843",
-    accentColor: "#ec4899",
+    accentColor: "var(--pds-accent)",
     status: "live",
     icon: Sparkles
   },
@@ -53,7 +53,7 @@ export const ECOSYSTEM_APPS = [
     name: "Orion",
     tagline: "Skia Fluid Mobile Companion",
     url: "exp://localhost:8081",
-    accentColor: "#00f0ff",
+    accentColor: "var(--pds-accent)",
     status: "building",
     icon: Smartphone
   }

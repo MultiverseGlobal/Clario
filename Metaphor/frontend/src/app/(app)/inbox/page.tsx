@@ -12,6 +12,9 @@ type PendingNode = {
   type: string;
   summary: string;
   content?: string;
+  previous_summary?: string;
+  extraction_run?: string;
+  valid_time?: string;
   confidence: number;
   created_at: string;
 };
@@ -22,6 +25,9 @@ export default function InboxPage() {
   const [activeFilter, setActiveFilter] = useState<"all" | "high" | "review">("all");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [batching, setBatching] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<string>("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchInbox();
@@ -46,8 +52,7 @@ export default function InboxPage() {
   };
 
   // Optimistic UI mutation for fast 0ms feel
-  const handleAction = async (nodeId: string, action: "approve" | "reject") => {
-    const nodeObj = nodes.find(n => n.id === nodeId);
+  const handleAction = async (nodeId: string, action: "approve" | "reject" | "defer") => {
     setActionLoading(nodeId);
     setNodes((prev) => prev.filter((n) => n.id !== nodeId));
 
@@ -57,6 +62,19 @@ export default function InboxPage() {
       console.error(`Failed to ${action} node:`, e);
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleEdit = async (nodeId: string) => {
+    setActionLoading(nodeId);
+    try {
+      await fetchFromMetaphor(`/graph/nodes/${nodeId}/edit`, { summary: editDraft }, "PUT");
+      setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, summary: editDraft } : n));
+    } catch (e) {
+      console.error("Failed to edit node:", e);
+    } finally {
+      setActionLoading(null);
+      setEditingId(null);
     }
   };
 
@@ -198,44 +216,117 @@ export default function InboxPage() {
           {filteredNodes.map((node) => (
             <Card key={node.id} className="p-6 transition-all duration-200 hover:border-strong">
               <div className="flex flex-col md:flex-row gap-6 justify-between items-start">
-                <div className="flex-1 space-y-3">
+                <div className="flex-1 space-y-3 min-w-0">
                   <div className="flex items-center gap-3">
-                    <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md bg-surface-2 text-foreground border border-border-subtle">
+                    <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md bg-surface-2 text-foreground border border-border-subtle shrink-0">
                       {node.type}
                     </span>
-                    <h3 className="text-base font-semibold text-foreground tracking-tight">{node.title}</h3>
+                    <h3 className="text-base font-semibold text-foreground tracking-tight truncate">{node.title}</h3>
                   </div>
-                  
-                  <p className="text-xs text-muted leading-relaxed bg-surface-1/80 p-3.5 rounded-xl border border-border-subtle font-sans">
-                    {node.summary}
-                  </p>
+
+                  {/* Before / After Diff */}
+                  {node.previous_summary && (
+                    <div
+                      onClick={() => setExpandedId(expandedId === node.id ? null : node.id)}
+                      className="cursor-pointer text-[10px] font-mono uppercase tracking-widest text-muted hover:text-foreground transition-colors"
+                    >
+                      {expandedId === node.id ? "Hide diff ↑" : "Show superseded version ↓"}
+                    </div>
+                  )}
+
+                  {expandedId === node.id && node.previous_summary && (
+                    <div className="grid grid-cols-2 gap-3 animate-in fade-in duration-200">
+                      <div>
+                        <div className="text-[9px] font-bold uppercase tracking-widest text-muted mb-1">Previous</div>
+                        <p className="text-xs text-muted leading-relaxed bg-surface-1/80 p-3 rounded-xl border border-border-subtle line-through opacity-60">
+                          {node.previous_summary}
+                        </p>
+                      </div>
+                      <div>
+                        <div className="text-[9px] font-bold uppercase tracking-widest text-emerald-500 mb-1">Proposed</div>
+                        <p className="text-xs text-foreground leading-relaxed bg-emerald-500/5 p-3 rounded-xl border border-emerald-500/20">
+                          {node.summary}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {editingId === node.id ? (
+                    <textarea
+                      value={editDraft}
+                      onChange={e => setEditDraft(e.target.value)}
+                      rows={3}
+                      className="w-full text-xs text-foreground leading-relaxed bg-background p-3.5 rounded-xl border border-primary focus:outline-none resize-none"
+                    />
+                  ) : (
+                    <p className="text-xs text-muted leading-relaxed bg-surface-1/80 p-3.5 rounded-xl border border-border-subtle font-sans">
+                      {node.summary}
+                    </p>
+                  )}
                   
                   <div className="flex items-center gap-4 text-[11px] font-mono text-muted">
                     <span className="flex items-center gap-1">
-                      <Zap className="w-3 h-3 text-primary" /> Confidence: {(node.confidence * 100).toFixed(0)}%
+                      <Zap className="w-3 h-3 text-primary" /> {(node.confidence * 100).toFixed(0)}% conf
                     </span>
+                    {node.extraction_run && <><span>•</span><span>Run: {node.extraction_run}</span></>}
+                    {node.valid_time && <><span>•</span><span>Valid: {new Date(node.valid_time).toLocaleDateString()}</span></>}
                     <span>•</span>
                     <span>{new Date(node.created_at).toLocaleString()}</span>
                   </div>
                 </div>
                 
                 <div className="flex flex-row md:flex-col gap-2 shrink-0 w-full md:w-auto pt-2 md:pt-0 border-t md:border-t-0 border-border-subtle">
-                  <button
-                    onClick={() => handleAction(node.id, "approve")}
-                    disabled={actionLoading === node.id}
-                    className="flex-1 md:flex-initial px-4 py-2 bg-foreground text-background hover:opacity-90 font-medium text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer shadow-sm"
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                    <span>Approve</span>
-                  </button>
-                  <button
-                    onClick={() => handleAction(node.id, "reject")}
-                    disabled={actionLoading === node.id}
-                    className="flex-1 md:flex-initial px-4 py-2 bg-surface-1 hover:bg-surface-2 border border-border-subtle text-muted hover:text-foreground font-medium text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer"
-                  >
-                    <XCircle className="w-3.5 h-3.5" />
-                    <span>Reject</span>
-                  </button>
+                  {editingId === node.id ? (
+                    <>
+                      <button
+                        onClick={() => handleEdit(node.id)}
+                        disabled={actionLoading === node.id}
+                        className="flex-1 md:flex-initial px-4 py-2 bg-primary text-background hover:opacity-90 font-medium text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Save Edit</span>
+                      </button>
+                      <button
+                        onClick={() => setEditingId(null)}
+                        className="flex-1 md:flex-initial px-4 py-2 bg-surface-1 border border-border-subtle text-muted font-medium text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => handleAction(node.id, "approve")}
+                        disabled={actionLoading === node.id}
+                        className="flex-1 md:flex-initial px-4 py-2 bg-foreground text-background hover:opacity-90 font-medium text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer shadow-sm"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Approve</span>
+                      </button>
+                      <button
+                        onClick={() => { setEditingId(node.id); setEditDraft(node.summary); }}
+                        disabled={actionLoading === node.id}
+                        className="flex-1 md:flex-initial px-4 py-2 bg-surface-1 hover:bg-surface-2 border border-border-subtle text-foreground font-medium text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleAction(node.id, "defer")}
+                        disabled={actionLoading === node.id}
+                        className="flex-1 md:flex-initial px-4 py-2 bg-surface-1 hover:bg-surface-2 border border-border-subtle text-muted hover:text-foreground font-medium text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer"
+                      >
+                        Defer
+                      </button>
+                      <button
+                        onClick={() => handleAction(node.id, "reject")}
+                        disabled={actionLoading === node.id}
+                        className="flex-1 md:flex-initial px-4 py-2 bg-surface-1 hover:bg-surface-2 border border-destructive/30 text-destructive font-medium text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer"
+                      >
+                        <XCircle className="w-3.5 h-3.5" />
+                        <span>Reject</span>
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </Card>

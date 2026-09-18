@@ -5,7 +5,6 @@ import { Handle, Position } from "@xyflow/react";
 import { 
   User, 
   Calendar, 
-  Lightbulb, 
   CheckSquare, 
   GitCommit, 
   Folder,
@@ -29,7 +28,6 @@ interface NodeData {
 const iconMap: Record<string, React.ComponentType<any>> = {
   person: User,
   meeting: Calendar,
-  idea: Lightbulb,
   decision: CheckSquare,
   commit: GitCommit,
   project: Folder,
@@ -43,78 +41,41 @@ const iconMap: Record<string, React.ComponentType<any>> = {
   event: Zap
 };
 
-const colorMap: Record<string, string> = {
-  project: "#3b82f6",   // blue
-  person: "#ec4899",    // pink
-  meeting: "#8b5cf6",   // purple
-  decision: "#10b981",  // emerald
-  commit: "#f59e0b",    // amber
-  idea: "#eab308",      // yellow
-  task: "#06b6d4",      // cyan
-  document: "#64748b",  // slate
-  company: "#6366f1",   // indigo
-  goal: "#ef4444",      // red
-  event: "#14b8a6"      // teal
-};
-
 const CustomNodeComponent = ({ data }: { data: NodeData }) => {
   const typeLower = (data.type || "project").toLowerCase();
   const IconComponent = iconMap[typeLower] || Tag;
-  const brandColor = colorMap[typeLower] || "#d97706";
 
   return (
-    <div 
-      className="px-4 py-3 flex items-center gap-3 border shadow-md hover:shadow-lg hover:scale-105 transition-all min-w-[210px] bg-[var(--card-bg)] border-[var(--card-border)] rounded-xl relative group cursor-pointer"
-      style={{
-        borderLeft: `4px solid ${brandColor}`
-      }}
-    >
-      {/* Node handles for graph edge connections */}
+    <div className="px-3 py-2 flex flex-col gap-2 min-w-[180px] bg-surface-1 border border-border-subtle rounded-none hover:border-foreground transition-all group cursor-pointer shadow-sm relative">
       <Handle 
         type="target" 
         position={Position.Left} 
-        style={{ background: brandColor, borderRadius: "50%", width: "8px", height: "8px", border: "none" }} 
+        style={{ background: "var(--color-foreground)", borderRadius: "0", width: "4px", height: "4px", border: "none" }} 
       />
       
-      {/* Icon Container */}
-      <div 
-        className="p-2.5 rounded-lg flex items-center justify-center"
-        style={{
-          backgroundColor: brandColor + "18",
-          color: brandColor
-        }}
-      >
-        <IconComponent size={16} />
+      <div className="flex items-center gap-2 border-b border-border-subtle pb-1.5">
+        <IconComponent size={12} className="text-muted" />
+        <span className="text-[9px] uppercase tracking-widest font-mono text-muted">
+          {data.type}
+        </span>
+        {data.status === "pending" && (
+          <span className="ml-auto text-[8px] font-mono uppercase border border-border-strong px-1 rounded-none text-muted">
+            Pending
+          </span>
+        )}
       </div>
 
-      {/* Info Container */}
-      <div className="flex flex-col text-left overflow-hidden">
-        <div className="flex items-center gap-1.5 mb-0.5">
-          <span 
-            className="text-[9px] uppercase tracking-wider font-mono font-bold px-1.5 py-0.5 rounded"
-            style={{ backgroundColor: brandColor + "20", color: brandColor }}
-          >
-            {data.type}
-          </span>
-          {data.status === "pending" && (
-            <span className="text-[9px] font-mono text-amber-500 bg-amber-500/10 px-1 py-0.2 rounded border border-amber-500/30">
-              Pending
-            </span>
-          )}
-        </div>
-        <span className="text-xs font-semibold text-[var(--foreground)] truncate max-w-[150px]" title={data.name}>
-          {data.name}
-        </span>
+      <div className="text-xs font-sans text-foreground truncate" title={data.name}>
+        {data.name}
       </div>
 
       <Handle 
         type="source" 
         position={Position.Right} 
-        style={{ background: brandColor, borderRadius: "50%", width: "8px", height: "8px", border: "none" }} 
+        style={{ background: "var(--color-foreground)", borderRadius: "0", width: "4px", height: "4px", border: "none" }} 
       />
     </div>
   );
 };
 
 export const CustomNode = memo(CustomNodeComponent);
-
