@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ClarioProject } from '../../lib/projectStore';
-import { SkeletonLoader } from '@pseudonyms/ui/src/components/SkeletonLoader';
+import { SkeletonLoader } from '@pseudonyms/ui';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

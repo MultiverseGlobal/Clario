@@ -2,13 +2,15 @@ import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Video, Presentation, UploadCloud, Link as LinkIcon, Camera, 
-  CheckCircle2, ArrowRight, X, Scissors, Edit2, Play, FileText, Send, Loader2
+  CheckCircle2, ArrowRight, X, Scissors, Edit2, Play, FileText, Send, Loader2, Sparkles, Layout
 } from 'lucide-react';
+import { Button } from '@pseudonyms/ui';
 import { ClarioProject } from '../../lib/projectStore';
 
 interface ProjectCreationWizardProps {
   onClose: () => void;
   onProjectCreated: (p: ClarioProject) => void;
+  onSaveToLibrary?: (p: any) => void;
 }
 
 export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCreationWizardProps) {
@@ -52,10 +54,9 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
     onProjectCreated({
       id: Date.now().toString(),
       name: atlasBrief ? `Pitch for ${atlasBrief.target}` : 'New Video Draft',
-      status: 'draft',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      shots: []
+      mode: 'sales_pitch',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
     });
   };
 
