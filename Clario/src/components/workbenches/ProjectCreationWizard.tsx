@@ -51,13 +51,19 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
 
   const handleExport = () => {
     // Finish onboarding
-    onProjectCreated({
-      id: Date.now().toString(),
-      name: atlasBrief ? `Pitch for ${atlasBrief.target}` : 'New Video Draft',
-      mode: 'video',
+    const project: ClarioProject = {
+      id: `proj_${Date.now()}`,
+      name: atlasBrief?.recipient ? `Atlas Pitch for ${atlasBrief.recipient}` : 'New Outreach Video',
+      mode: 'video', // 'video' matches ContentMode in HarvesterMode/ContentMode types
+      category: 'sales',
+      targetPurpose: 'cold_outreach',
+      scriptText: script,
       createdAt: Date.now(),
       updatedAt: Date.now(),
-    });
+      companyId: atlasBrief?.companyId,
+      contactId: atlasBrief?.contactId,
+    };
+    onProjectCreated(project);
   };
 
   return (

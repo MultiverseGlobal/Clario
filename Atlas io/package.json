@@ -13,6 +13,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@pseudonyms/core": "*",
     "@pseudonyms/ui": "*",
     "@fontsource/fraunces": "^5.2.9",
     "@fontsource/ibm-plex-mono": "^5.2.7",

@@ -34,6 +34,8 @@ export interface ClarioProject {
   category?: 'sales' | 'content' | 'slides';
   targetPurpose?: string;
   thumbnail?: string; // base64 or data URL
+  companyId?: string; // CRM integration
+  contactId?: string; // CRM integration
   createdAt: number;
   updatedAt: number;
 }

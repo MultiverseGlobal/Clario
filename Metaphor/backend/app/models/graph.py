@@ -2,8 +2,31 @@ import uuid
 from datetime import datetime
 from typing import Optional, Any
 from sqlmodel import SQLModel, Field
-from sqlalchemy import Column, DateTime, String, JSON
+from sqlalchemy import Column, DateTime, String, JSON, Numeric
 from pgvector.sqlalchemy import Vector
+
+class CrmCompany(SQLModel, table=True):
+    __tablename__ = "crm_companies"
+    
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    name: str
+    domain: Optional[str] = None
+    description: Optional[str] = None
+    icp_score: Optional[float] = Field(default=None, sa_column=Column(Numeric))
+    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime(timezone=True)))
+    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime(timezone=True)))
+
+class CrmContact(SQLModel, table=True):
+    __tablename__ = "crm_contacts"
+    
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    company_id: uuid.UUID = Field(foreign_key="crm_companies.id", index=True)
+    name: str
+    email: Optional[str] = None
+    linkedin_url: Optional[str] = None
+    role: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime(timezone=True)))
+    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime(timezone=True)))
 
 class Node(SQLModel, table=True):
     __tablename__ = "nodes"

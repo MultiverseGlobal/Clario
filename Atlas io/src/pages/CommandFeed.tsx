@@ -11,7 +11,7 @@ import {
   dispatchOutreach,
   generateLeadOutreach,
 } from "@/services/campaignEngine";
-import { recordOutreachDispatch } from "@/services/outreachStore";
+import { recordOutreachDispatch, saveLeadToCrm } from "@/services/outreachStore";
 import { useTheme } from "@/hooks/useTheme";
 import { soundManager } from "@/lib/audioFeedback";
 import { toast } from "sonner";
@@ -72,6 +72,9 @@ export default function CommandFeed() {
         if (result.success) {
           soundManager.playSuccess();
 
+          // First save to CRM
+          const contactId = await saveLeadToCrm(leadToProcess);
+
           // Permanently record dispatched outreach in the Ledger
           await recordOutreachDispatch({
             campaign_prompt: campaignState.prompt,
@@ -86,6 +89,7 @@ export default function CommandFeed() {
             status: "delivered",
             delivery_provider: result.resendId ? "Resend" : "Gmail SMTP",
             resend_id: result.resendId,
+            contact_id: contactId || undefined,
           });
 
           toast.success(result.message, {

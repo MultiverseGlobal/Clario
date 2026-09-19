@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { TaskEngine } from "@pseudonyms/core";
 import { 
   CheckCircle2, 
   AlertCircle, 
@@ -10,16 +12,60 @@ import {
   ArrowRight,
   RefreshCcw,
   ShieldAlert,
-  Play
+  Play,
+  Mail,
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function FounderHome() {
-  const [priorities, setPriorities] = useState([
-    { id: 1, text: "Follow up with Acme Logistics (High Fit, New Funding)", action: "Create Video", icon: <Video className="w-4 h-4" /> },
-    { id: 2, text: "Fix onboarding bug blocking 12 users", action: "View Issue", icon: <AlertCircle className="w-4 h-4 text-red-400" /> },
-    { id: 3, text: "Review weekly Clario content batch", action: "Approve 4 Drafts", icon: <CheckCircle2 className="w-4 h-4 text-emerald-400" /> }
-  ]);
+  const [priorities, setPriorities] = useState<any[]>([]);
+  const [loadingPriorities, setLoadingPriorities] = useState(true);
+
+  // Initialize Task Engine
+  const engine = new TaskEngine(supabase);
+
+  useEffect(() => {
+    async function fetchActions() {
+      // 1. Sync automated follow ups
+      await engine.generateFollowUps();
+
+      // 2. Fetch current tasks
+      const { data } = await supabase
+        .from('crm_next_actions')
+        .select('*')
+        .in('status', ['suggested', 'accepted'])
+        .order('created_at', { ascending: false })
+        .limit(3);
+      
+      if (data) {
+        setPriorities(data.map((d, i) => ({
+          id: d.id,
+          status: d.status,
+          text: d.title || d.description,
+          action: d.status === 'accepted' ? 'Complete' : 'Accept',
+          icon: d.status === 'accepted' ? <CheckCircle2 className="w-4 h-4" /> : <Play className="w-4 h-4 text-emerald-400" />
+        })));
+      }
+      setLoadingPriorities(false);
+    }
+    fetchActions();
+  }, []);
+
+  const handleActionClick = async (p: any) => {
+    if (p.status === 'suggested') {
+      await engine.acceptTask(p.id);
+      setPriorities(prev => prev.map(item => item.id === p.id ? { ...item, status: 'accepted', action: 'Complete', icon: <CheckCircle2 className="w-4 h-4" /> } : item));
+    } else {
+      await engine.completeTask(p.id);
+      setPriorities(prev => prev.filter(item => item.id !== p.id));
+    }
+  };
+
+  const handleDismiss = async (id: string) => {
+    await engine.dismissTask(id);
+    setPriorities(prev => prev.filter(item => item.id !== id));
+  };
 
   const [approvals, setApprovals] = useState([
     { id: 1, title: "High-Cost AI Job", desc: "Clario batch processing 15 videos (Est: £8.40)", type: "warning" },
@@ -33,7 +79,7 @@ export default function FounderHome() {
       <div className="max-w-5xl mx-auto space-y-2 mb-12">
         <h1 className="text-3xl font-semibold tracking-tight">Good morning.</h1>
         <p className="text-[#9CA3AF] text-lg leading-relaxed max-w-3xl">
-          You have <span className="text-white font-medium">3 important actions</span> today. One opportunity is waiting for a follow-up, one product issue is blocking activation, and your weekly revenue target is 42% complete.
+          You have <span className="text-white font-medium">{priorities.length} important actions</span> today. One opportunity is waiting for a follow-up, one product issue is blocking activation, and your weekly revenue target is 42% complete.
         </p>
       </div>
 
@@ -44,20 +90,29 @@ export default function FounderHome() {
           
           {/* Priorities */}
           <section className="space-y-4">
-            <h2 className="text-sm font-mono font-bold uppercase tracking-widest text-[#4F46E5] mb-2">Today's Priorities</h2>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-mono font-bold uppercase tracking-widest text-[#4F46E5]">Today's Priorities</h2>
+              {loadingPriorities && <RefreshCcw className="w-4 h-4 animate-spin text-[#4F46E5]" />}
+            </div>
+            
             <div className="space-y-3">
               {priorities.map((p, i) => (
                 <div key={p.id} className="p-4 bg-[#1A1D24] border border-[#374151] rounded-xl hover:border-[#4F46E5]/40 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-start gap-3">
-                    <div className="mt-0.5 w-6 h-6 rounded-full bg-[#111318] border border-[#374151] flex items-center justify-center text-xs font-mono text-[#9CA3AF]">
+                  <div className="flex items-start gap-3 flex-1">
+                    <div className="mt-0.5 shrink-0 w-6 h-6 rounded-full bg-[#111318] border border-[#374151] flex items-center justify-center text-xs font-mono text-[#9CA3AF]">
                       {i + 1}
                     </div>
                     <p className="text-[#E5E7EB] font-medium leading-relaxed">{p.text}</p>
                   </div>
-                  <Button className="shrink-0 bg-[#4F46E5] hover:bg-[#4338CA] text-white">
-                    {p.icon}
-                    <span className="ml-2">{p.action}</span>
-                  </Button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button variant="ghost" className="h-9 px-3 text-[#6B7280] hover:text-[#EF4444] hover:bg-[#EF4444]/10" onClick={() => handleDismiss(p.id)}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                    <Button className="bg-[#4F46E5] hover:bg-[#4338CA] text-white" onClick={() => handleActionClick(p)}>
+                      {p.icon}
+                      <span className="ml-2">{p.action}</span>
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>

@@ -24,6 +24,8 @@ const HqProposal = React.lazy(() => import("./pages/hq/HqProposal"));
 const CommandFeed = React.lazy(() => import("./pages/hq/HqToday"));
 const DailyBriefing = React.lazy(() => import("./pages/hq/HqToday"));
 const HqSettings = React.lazy(() => import("./pages/hq/HqSettings"));
+const HqTrustCenter = React.lazy(() => import("./pages/hq/HqTrustCenter"));
+const HqInsights = React.lazy(() => import("./pages/hq/HqInsights"));
 const HqOutreach = React.lazy(() => import("./pages/hq/HqOutreach"));
 
 const HqToday = React.lazy(() => import("./pages/hq/HqToday"));
@@ -68,6 +70,8 @@ const App = () => (
                   <Route path="/hq">
                     <Route index element={<Navigate to="/hq/radar" replace />} />
                     <Route path="radar" element={<HqRadar />} />
+                    <Route path="trust" element={<HqTrustCenter />} />
+                    <Route path="insights" element={<HqInsights />} />
                     <Route path="outreach" element={<HqOutreach />} />
                     <Route path="engine" element={<HqToday />} />
                     <Route path="command" element={<HqToday />} />
