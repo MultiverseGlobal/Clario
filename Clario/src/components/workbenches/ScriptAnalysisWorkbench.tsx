@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ClarioProject } from '../../lib/projectStore';
+import { SkeletonLoader } from '@pseudonyms/ui/src/components/SkeletonLoader';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -544,17 +545,20 @@ export function ScriptAnalysisWorkbench({
 
           {/* Loading state */}
           {isAnalyzing && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 16 }}>
-              <div style={{
-                width: 32, height: 32, borderRadius: '50%',
-                border: '2px solid var(--pds-border-mid)',
-                borderTopColor: 'var(--pds-text-primary)',
-                animation: 'spin 0.8s linear infinite',
-              }} />
-              <p style={{ margin: 0, fontSize: 13, color: 'var(--pds-text-secondary)', fontFamily: "'Athelas', Georgia, serif" }}>
-                Matching script to library…
-              </p>
-              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            <div style={{ padding: '20px 28px', display: 'flex', flexDirection: 'column', gap: 24, height: '100%' }}>
+              {[1, 2, 3].map((i) => (
+                <div key={i} style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+                  <SkeletonLoader style={{ width: 32, height: 32, borderRadius: '50%', flexShrink: 0 }} />
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 6 }}>
+                    <SkeletonLoader style={{ width: '70%', height: 12, borderRadius: 4 }} />
+                    <SkeletonLoader style={{ width: '40%', height: 12, borderRadius: 4 }} />
+                    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                      <SkeletonLoader style={{ width: 120, height: 68, borderRadius: 6 }} />
+                      <SkeletonLoader style={{ width: 120, height: 68, borderRadius: 6 }} />
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 

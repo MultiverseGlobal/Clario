@@ -1,14 +1,17 @@
 from .identity import User, Organization, OrganizationMember
-from .graph import Node, NodeMetadata, Edge, Evidence, Embedding, SearchDocument
+from .graph import Node, NodeMetadata, Edge, Evidence, Embedding, SearchDocument, Clarification
 from .context import ContextPackage, ContextSession
 from .operations import Integration, WebhookEvent, Activity, APIKey, MCPSession
 from .chat_session import ChatSession
 from .task_handoff import TaskHandoff
+from .insight import ContextInsight
+from .events import UniversalEvent
 
 __all__ = [
     "User", "Organization", "OrganizationMember",
-    "Node", "NodeMetadata", "Edge", "Evidence", "Embedding", "SearchDocument",
+    "Node", "NodeMetadata", "Edge", "Evidence", "Embedding", "SearchDocument", "Clarification",
     "ContextPackage", "ContextSession",
     "Integration", "WebhookEvent", "Activity", "APIKey", "MCPSession",
-    "ChatSession", "TaskHandoff"
+    "ChatSession", "TaskHandoff", "ContextInsight",
+    "UniversalEvent"
 ]

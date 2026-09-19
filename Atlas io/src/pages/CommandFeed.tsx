@@ -73,7 +73,7 @@ export default function CommandFeed() {
           soundManager.playSuccess();
 
           // Permanently record dispatched outreach in the Ledger
-          recordOutreachDispatch({
+          await recordOutreachDispatch({
             campaign_prompt: campaignState.prompt,
             company_name: leadToProcess.company,
             website: leadToProcess.website,

@@ -10,17 +10,19 @@ import {
   Radio, 
   Upload, 
   Link2, 
-  Presentation, 
+  Scissors,
   Search, 
   Copy, 
   Sparkles, 
   Cpu, 
   HardDrive,
   CheckCircle2,
-  Film
+  Loader2
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ProjectCreationWizard } from './ProjectCreationWizard';
+import { resolveVideoDuration } from '../../lib/resolveVideoDuration';
+import { detectCinematicScenes } from '../../lib/clientSceneDetector';
 
 export function HomeView({ 
   onSelectProject,
@@ -37,6 +39,7 @@ export function HomeView({
   const [urlModalOpen, setUrlModalOpen] = useState(false);
   const [importUrlInput, setImportUrlInput] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [analysingFile, setAnalysingFile] = useState<{ name: string; progress: number; msg: string } | null>(null);
 
   async function load() {
     try {
@@ -100,70 +103,145 @@ export function HomeView({
     }
   };
 
-  // Instant Quick-Action: Upload File
-  const handleQuickUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Instant Quick-Action: Upload File — reads real duration and runs scene detection
+  const handleQuickUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // Reset input so same file can be re-selected
+    e.target.value = '';
+
     const blobUrl = URL.createObjectURL(file);
     const projId = `proj_${Date.now()}`;
-    const newProj: ClarioProject = {
-      id: projId,
-      name: file.name.replace(/\.[^/.]+$/, ""),
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      mode: 'asset_pack',
-      targetPurpose: 'content_creator',
-      category: 'content',
-      aspectRatio: '16:9',
-      trackItems: [{
+    const baseName = file.name.replace(/\.[^/.]+$/, '');
+
+    setAnalysingFile({ name: baseName, progress: 5, msg: 'Reading video metadata…' });
+
+    // Step 1: resolve real duration from browser
+    const realDuration = await resolveVideoDuration(file);
+
+    setAnalysingFile({ name: baseName, progress: 15, msg: 'Uploading to scene detector…' });
+
+    let trackItems: ClarioProject['trackItems'];
+
+    try {
+      const result = await detectCinematicScenes(file, (p) => {
+        setAnalysingFile({ name: baseName, progress: p.progressPct, msg: p.statusMsg });
+      });
+
+      trackItems = result.scenes.map((s, idx) => ({
+        id: `track_${s.id}_${idx}`,
+        title: s.sceneTag,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        duration: s.duration,
+        type: 'video' as const,
+        url: blobUrl,
+        videoUrl: blobUrl,
+        isBroll: s.contentType !== 'a_roll',
+        beatType: (idx === 0 ? 'hook' : s.contentType === 'a_roll' ? 'problem' : 'proof') as any,
+        scriptText: s.sceneTag,
+        thumbnailUrl: s.frameUrl,
+        scene_tag: s.sceneTag,
+      }));
+    } catch {
+      // Server unreachable — fall back to single track with real duration
+      const dur = realDuration ?? 30;
+      trackItems = [{
         id: `track_0`,
         type: 'video',
         startTime: 0,
-        duration: 15,
-        title: 'Uploaded Clip',
+        endTime: dur,
+        duration: dur,
+        title: baseName,
         label: file.name,
         sourceFileName: file.name,
         videoUrl: blobUrl,
         url: blobUrl,
         beatType: 'hook',
         dopamineScore: 8,
-      }]
-    };
-    saveProject(newProj).then(() => {
-      onSelectProject(newProj);
-    });
-  };
+      } as any];
+    }
 
-  // Instant Quick-Action: URL Import
-  const handleUrlSubmit = () => {
-    if (!importUrlInput.trim()) return;
-    const projId = `proj_${Date.now()}`;
+    setAnalysingFile(null);
+
     const newProj: ClarioProject = {
       id: projId,
-      name: `Import: ${importUrlInput.slice(0, 30)}`,
+      name: baseName,
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      mode: 'asset_pack',
+      mode: 'video_harvester',
       targetPurpose: 'content_creator',
       category: 'content',
       aspectRatio: '16:9',
-      trackItems: [{
+      trackItems,
+    };
+    await saveProject(newProj);
+    onSelectProject(newProj);
+  };
+
+  // Instant Quick-Action: URL Import — resolves real duration before creating project
+  const handleUrlSubmit = async () => {
+    if (!importUrlInput.trim()) return;
+    setUrlModalOpen(false);
+
+    const url = importUrlInput.trim();
+    const projId = `proj_${Date.now()}`;
+    const label = url.length > 40 ? url.slice(0, 40) + '…' : url;
+
+    setAnalysingFile({ name: label, progress: 10, msg: 'Resolving video duration…' });
+    const realDuration = await resolveVideoDuration(url);
+    setAnalysingFile({ name: label, progress: 20, msg: 'Uploading to scene detector…' });
+
+    let trackItems: ClarioProject['trackItems'];
+    try {
+      const result = await detectCinematicScenes(new URL(url) as unknown as File, (p) => {
+        setAnalysingFile({ name: label, progress: p.progressPct, msg: p.statusMsg });
+      });
+      trackItems = result.scenes.map((s, idx) => ({
+        id: `track_${s.id}_${idx}`,
+        title: s.sceneTag,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        duration: s.duration,
+        type: 'video' as const,
+        url,
+        videoUrl: url,
+        isBroll: s.contentType !== 'a_roll',
+        beatType: (idx === 0 ? 'hook' : 'proof') as any,
+        scene_tag: s.sceneTag,
+      }));
+    } catch {
+      const dur = realDuration ?? 30;
+      trackItems = [{
         id: `track_0`,
         type: 'video',
         startTime: 0,
-        duration: 15,
+        endTime: dur,
+        duration: dur,
         title: 'Web Source Video',
-        label: importUrlInput,
-        videoUrl: importUrlInput,
-        url: importUrlInput,
+        label: url,
+        videoUrl: url,
+        url,
         beatType: 'hook',
         dopamineScore: 7,
-      }]
+      } as any];
+    }
+
+    setAnalysingFile(null);
+
+    const newProj: ClarioProject = {
+      id: projId,
+      name: `Import: ${label}`,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      mode: 'video_harvester',
+      targetPurpose: 'content_creator',
+      category: 'content',
+      aspectRatio: '16:9',
+      trackItems,
     };
-    saveProject(newProj).then(() => {
-      setUrlModalOpen(false);
-      onSelectProject(newProj);
-    });
+    await saveProject(newProj);
+    onSelectProject(newProj);
   };
 
   // Filtered & Searched Projects
@@ -283,35 +361,24 @@ export function HomeView({
           </p>
         </div>
 
-        {/* 4. Slide Deck Harvester */}
+        {/* 4. Extract Source Assets */}
         <div 
-          onClick={() => {
-            const projId = `proj_${Date.now()}`;
-            const slideProj: ClarioProject = {
-              id: projId,
-              name: 'New Slide Deck',
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-              mode: 'slide_harvester',
-              slides: [{ id: 's1', pageNumber: 1, title: 'Title Slide', bulletPoints: ['Key takeaway #1'] }]
-            };
-            saveProject(slideProj).then(() => onSelectProject(slideProj));
-          }}
-          className="group p-4 rounded-2xl bg-card/60 hover:bg-card/90 border border-border/50 hover:border-purple-500/40 transition-all cursor-pointer backdrop-blur-md relative overflow-hidden shadow-xs hover:shadow-md"
+          onClick={() => onNavigatePhase?.('extract_assets')}
+          className="group p-4 rounded-2xl bg-card/60 hover:bg-card/90 border border-border/50 hover:border-emerald-500/40 transition-all cursor-pointer backdrop-blur-md relative overflow-hidden shadow-xs hover:shadow-md"
         >
           <div className="flex items-center justify-between mb-3">
-            <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 group-hover:scale-105 transition-transform">
-              <Presentation className="w-4 h-4" />
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition-transform">
+              <Scissors className="w-4 h-4" />
             </div>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 font-semibold">
-              PDF / Pitch
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold">
+              Asset Extract
             </span>
           </div>
-          <h3 className="font-display text-sm font-bold text-foreground mb-1 group-hover:text-purple-400 transition-colors">
-            Slide Harvester
+          <h3 className="font-display text-sm font-bold text-foreground mb-1 group-hover:text-emerald-400 transition-colors">
+            Extract Source Assets
           </h3>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Deconstruct pitch decks and turn presentation slides into social carousels.
+            Detect every segment, extract clean clips, flag overlays, save to vault.
           </p>
         </div>
 
@@ -376,6 +443,35 @@ export function HomeView({
           />
         </div>
       </div>
+
+      {/* ── Analysing Overlay ─────────────────────────────────────────── */}
+      <AnimatePresence>
+        {analysingFile && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.97 }}
+            transition={{ duration: 0.3 }}
+            className="fixed inset-0 z-[9000] flex items-center justify-center bg-black/60 backdrop-blur-md"
+          >
+            <div className="clario-glass-card rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl border border-border">
+              <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-5">
+                <Loader2 className="w-6 h-6 text-primary animate-spin" />
+              </div>
+              <h3 className="font-display text-base font-bold text-foreground mb-1 truncate">{analysingFile.name}</h3>
+              <p className="text-xs text-muted-foreground mb-5">{analysingFile.msg}</p>
+              <div className="w-full h-1.5 rounded-full bg-border/60 overflow-hidden">
+                <motion.div
+                  className="h-full rounded-full bg-primary"
+                  animate={{ width: `${analysingFile.progress}%` }}
+                  transition={{ duration: 0.4, ease: 'easeOut' }}
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground/60 mt-2 font-mono">{analysingFile.progress}%</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Project Grid / Catalog ───────────────────────────────────── */}
       {loading ? (

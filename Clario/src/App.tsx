@@ -18,6 +18,7 @@ import { VideoCanvas } from './components/canvas/VideoCanvas';
 import { SlideCanvas } from './components/canvas/SlideCanvas';
 import { ResolveShotWorkbench } from './components/workbenches/ResolveShotWorkbench';
 import { DeconstructionDrawer } from './components/blocks/DeconstructionDrawer';
+import { AssetExtractionWorkbench } from './components/workbenches/AssetExtractionWorkbench';
 
 export default function App() {
   const [currentProject, setCurrentProject] = useState<ClarioProject | null>(null);
@@ -572,6 +573,10 @@ export default function App() {
           }}
           onClose={() => setCurrentPhase('home')}
           onApplyRemix={() => {}}
+        />
+      ) : currentPhase === 'extract_assets' ? (
+        <AssetExtractionWorkbench
+          onBack={() => setCurrentPhase('home')}
         />
       ) : (
         <HomeView

@@ -2,6 +2,7 @@ import hashlib
 import secrets
 import base64
 import time
+import asyncio
 import uuid
 import json
 import urllib.parse
@@ -694,7 +695,7 @@ async def remote_mcp_jsonrpc_endpoint(
         tool_res = await call_mcp_tool(
             tool_name, 
             arguments, 
-            token_obj.organization_id, 
+            token_obj, 
             session, 
             scopes=token_scopes,
             project_id=project_id

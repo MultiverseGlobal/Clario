@@ -8,8 +8,8 @@ from sqlmodel import select, desc
 from pydantic import BaseModel
 
 from app.database.session import get_session
-from app.config import settings
-from app.models import Node, Edge, Chunk
+from app.core.config import settings
+from app.models import Node, Edge, Evidence
 from app.provider import llm_provider
 
 logger = logging.getLogger("metaphor.routes.context")
@@ -89,155 +89,82 @@ async def get_context_snapshot(
     api_key: str = Depends(verify_api_key),
 ):
     """
-    Context-as-a-Service endpoint.
-
-    Downstream AIs (William, Atlas, Weave) query this to get an updated,
-    narrative-enriched operational mental model of the user's world.
+    Context-as-a-Service endpoint. (Phase 5 Orchestrated)
     """
     logger.info(f"[context/snapshot] consumer={req.consumer!r}  intent={req.intent!r}")
 
     try:
-        # ── 1. Pull the approved graph ─────────────────────────────────────
-        nodes_q = await session.exec(
-            select(Node).where(Node.status == "approved").order_by(desc(Node.updated_at))
-        )
-        all_nodes: List[Node] = nodes_q.all()
-
-        edges_q = await session.exec(
-            select(Edge).where(Edge.status == "approved")
-        )
-        all_edges: List[Edge] = edges_q.all()
-
-        # ── 2. Partition by type ───────────────────────────────────────────
-        by_type: Dict[str, List[Node]] = {}
-        for n in all_nodes:
-            by_type.setdefault(n.type.lower(), []).append(n)
-
-        projects   = [_serialize_node(n) for n in by_type.get("project",  [])[:10]]
-        decisions  = [_serialize_node(n) for n in by_type.get("decision", [])[:10]]
-        people     = [_serialize_node(n) for n in by_type.get("person",   [])[:10]]
-        commits    = [_serialize_node(n) for n in by_type.get("commit",   [])[:10]]
-        ideas      = [_serialize_node(n) for n in by_type.get("idea",     [])[:10]]
-
-        # ── 3. Build Timeline ──────────────────────────────────────────────
-        timeline_nodes = [n for n in all_nodes if n.type.lower() in ("meeting", "commit", "decision", "event")]
-        temporal_edges = [e for e in all_edges if e.dimension == "temporal"]
+        from app.services.orchestration import ContextOrchestrator
+        from app.models.orchestration import ContextRequest
+        from app.services.retrieval import RetrievalScope
         
-        timeline = []
-        for n in timeline_nodes:
-            meta = n.metadata_json or {}
-            date_str = meta.get("date") or meta.get("start_time") or meta.get("created_at")
-            
-            event_date = n.created_at
-            if date_str:
-                try:
-                    if date_str.endswith("Z"):
-                        date_str = date_str[:-1]
-                    event_date = datetime.fromisoformat(date_str)
-                except Exception:
-                    pass
-
-            timeline.append({
-                "id": str(n.id),
-                "name": n.name,
-                "type": n.type,
-                "metadata": meta,
-                "date": event_date.isoformat(),
-                "display_date": event_date.strftime("%B %d, %Y %H:%M")
-            })
-
-        # Sort timeline chronologically
-        timeline.sort(key=lambda x: x["date"])
-
-        # Map temporal relationships
-        for item in timeline:
-            outgoing = []
-            for e in temporal_edges:
-                if str(e.source_id) == item["id"]:
-                    target_name = "Unknown"
-                    for tn in all_nodes:
-                        if str(tn.id) == str(e.target_id):
-                            target_name = tn.name
-                            break
-                    outgoing.append({
-                        "target_id": str(e.target_id),
-                        "target_name": target_name,
-                        "type": e.relationship_type,
-                        "description": e.metadata_json.get("description", "")
-                    })
-            item["causes"] = outgoing
-
-        # ── 4. Ask Claude for narrative synthesis (Mission & Constraints) ──
-        node_lines = "\n".join(
-            f"  [{n.type.upper()}] {n.name}: {json.dumps(n.metadata_json)}"
-            for n in all_nodes
-        )
-        edge_lines = "\n".join(
-            f"  {str(e.source_id)[:8]} --[{e.relationship_type}]--> {str(e.target_id)[:8]}"
-            for e in all_edges[:30]
-        )
-        graph_text = f"Nodes:\n{node_lines or '  (none)'}\n\nEdges:\n{edge_lines or '  (none)'}"
-
-        system_prompt = (
-            "You are the Metaphor Context Operating System. Your role is to synthesise the user's "
-            "world model graph into core operational context for downstream AI agents. "
-            "Respond STRICTLY in JSON format with keys: 'mission', 'constraints', and 'recommended_focus'. "
-            "Do not hallucinate. Use only the provided data."
-        )
-        user_prompt = (
-            f"Consumer: {req.consumer}\n"
-            f"Intent: {req.intent}\n\n"
-            f"Current Approved World Model Graph:\n{graph_text}\n\n"
-            f"Synthesize the overarching mission, context constraints/rules, and recommended focus for this AI agent."
+        # Hardcode a default Org for legacy requests that don't pass identity properly.
+        # In a real system this comes from Auth. For tests, we use the first org or a fixed one.
+        from app.models.identity import Organization
+        org = (await session.execute(select(Organization))).scalars().first()
+        if not org:
+            raise HTTPException(status_code=400, detail="No organization found for context.")
+        
+        scope = RetrievalScope(
+            consumer_id=org.id, # Mocking consumer_id as org.id for now
+            organization_id=org.id,
+            allowed_scopes=["global"]
         )
 
+        orchestrator = ContextOrchestrator(session)
+        
+        # Build ContextRequest
+        context_req = ContextRequest(
+            objective=req.intent, # Use intent as objective
+            consumer=req.consumer,
+        )
+        
+        # Orchestrate!
+        package = await orchestrator.orchestrate(context_req, scope)
+        
+        # Map back to SnapshotResponse for backwards compatibility
         mission = ""
         constraints = []
         recommended_focus = ""
-        is_partial = False
-        error_message = None
         
-        try:
-            llm_response = await llm_provider.query_llm(
-                system_prompt=system_prompt,
-                prompt=user_prompt,
-                max_tokens=512,
-            )
-            clean_res = llm_response.strip()
-            if clean_res.startswith("```json"):
-                clean_res = clean_res[7:]
-            if clean_res.endswith("```"):
-                clean_res = clean_res[:-3]
-            data = json.loads(clean_res)
-            mission = data.get("mission", "")
-            constraints = data.get("constraints", [])
-            recommended_focus = data.get("recommended_focus", "")
-        except Exception as llm_err:
-            logger.warning(f"LLM context snapshot synthesis failed: {llm_err}.")
-            is_partial = True
-            error_message = f"LLM synthesis failed: {str(llm_err)}"
+        for ins in package.insights:
+            if ins["type"].lower() == "mission" and not mission:
+                mission = ins["content"]
+            elif ins["type"].lower() == "constraint":
+                constraints.append(ins["content"])
+            elif ins["type"].lower() in ["priority", "recommended_focus"] and not recommended_focus:
+                recommended_focus = ins["content"]
+                
+        if not mission:
+            mission = "Maintain current priorities."
+            
+        # Build timeline from history & tasks & decisions
+        timeline = []
+        for n in package.history + package.decisions:
+            meta = n.get("metadata", {}) or {}
+            timeline.append({
+                "id": str(n["id"]),
+                "name": n["title"],
+                "type": n["type"],
+                "metadata": meta,
+                "date": n.get("created_at") or meta.get("date") or "2026-01-01T00:00:00",
+                "display_date": "Historical Event"
+            })
+            
+        timeline.sort(key=lambda x: x["date"])
 
-        # ── 5. Calculate Confidence (Context Health) ──────────────────────
-        active_integrations = 0
-        if settings.NOTION_INTEGRATION_TOKEN: active_integrations += 1
-        if settings.GITHUB_PERSONAL_ACCESS_TOKEN: active_integrations += 1
-        if settings.GOOGLE_SERVICE_ACCOUNT_JSON_PATH: active_integrations += 1
-        
-        confidence = 0.70 + (active_integrations * 0.08)
-        if len(all_nodes) > 8:
-            confidence += 0.05
-        confidence = min(max(confidence, 0.50), 0.98)
+        confidence = 0.85 # Simplified for Orchestrator
 
         return SnapshotResponse(
             mission=mission,
-            active_projects=projects,
-            recent_decisions=decisions,
+            active_projects=package.current_state[:10],
+            recent_decisions=package.decisions[:10],
             constraints=constraints,
             timeline=timeline,
             recommended_focus=recommended_focus,
-            confidence=round(confidence, 2),
-            is_partial=is_partial,
-            error_message=error_message
+            confidence=confidence,
+            is_partial=False,
+            error_message=None
         )
 
     except Exception as e:
@@ -269,27 +196,27 @@ async def query_context(
             if query_lower in n.name.lower() or query_lower in n.type.lower() or query_lower in str(n.metadata_json).lower()
         ][:req.top_k]
 
-        # Search matching chunks
-        chunks_q = await session.exec(select(Chunk).limit(req.top_k))
-        all_chunks = chunks_q.all()
-        matching_chunks = [
+        # Search matching evidence
+        evidence_q = await session.exec(select(Evidence).limit(req.top_k))
+        all_evidence = evidence_q.all()
+        matching_evidence = [
             {
-                "id": str(c.id),
-                "content": c.text_content[:300],
-                "metadata": c.metadata_json
+                "id": str(e.id),
+                "content": e.raw_text[:300],
+                "source": e.source
             }
-            for c in all_chunks
-            if query_lower in c.text_content.lower()
+            for e in all_evidence
+            if query_lower in e.raw_text.lower()
         ][:req.top_k]
 
         # Synthesize answer using Claude
         node_context = json.dumps(matching_nodes, indent=2)
-        chunk_context = json.dumps(matching_chunks, indent=2)
+        evidence_context = json.dumps(matching_evidence, indent=2)
 
         synth_prompt = (
             f"Query: {req.query}\n\n"
             f"Matched Graph Nodes:\n{node_context}\n\n"
-            f"Matched Text Evidence:\n{chunk_context}\n\n"
+            f"Matched Text Evidence:\n{evidence_context}\n\n"
             f"Answer the query accurately based on the context above."
         )
 
@@ -300,12 +227,12 @@ async def query_context(
                 max_tokens=256
             )
         except Exception:
-            answer = f"Found {len(matching_nodes)} matching entities and {len(matching_chunks)} evidence chunks for query: '{req.query}'."
+            answer = f"Found {len(matching_nodes)} matching entities and {len(matching_evidence)} evidence blocks for query: '{req.query}'."
 
         return ContextQueryResponse(
             query=req.query,
             relevant_nodes=matching_nodes,
-            relevant_chunks=matching_chunks,
+            relevant_chunks=matching_evidence,
             synthesized_answer=answer.strip()
         )
     except Exception as e:

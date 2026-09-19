@@ -9,6 +9,7 @@ class Integration(SQLModel, table=True):
     
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     organization_id: uuid.UUID = Field(foreign_key="organizations.id", index=True)
+    consumer_id: Optional[uuid.UUID] = Field(default=None, foreign_key="consumers.id", index=True)
     user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
     
     provider: str # e.g., "notion", "github"
@@ -50,6 +51,7 @@ class APIKey(SQLModel, table=True):
     
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     organization_id: uuid.UUID = Field(foreign_key="organizations.id", index=True)
+    consumer_id: Optional[uuid.UUID] = Field(default=None, foreign_key="consumers.id", index=True)
     
     name: str
     hashed_key: str
@@ -61,6 +63,7 @@ class MCPSession(SQLModel, table=True):
     
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     organization_id: uuid.UUID = Field(foreign_key="organizations.id", index=True)
+    consumer_id: Optional[uuid.UUID] = Field(default=None, foreign_key="consumers.id", index=True)
     
     client: str
     
@@ -72,6 +75,7 @@ class SyncJob(SQLModel, table=True):
     
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     organization_id: uuid.UUID = Field(foreign_key="organizations.id", index=True)
+    consumer_id: Optional[uuid.UUID] = Field(default=None, foreign_key="consumers.id", index=True)
     
     provider: str
     status: str = Field(default="processing") # processing, completed, failed
@@ -92,6 +96,7 @@ class MCPOAuthClient(SQLModel, table=True):
     redirect_uris_json: dict = Field(default_factory=dict, sa_column=Column(JSON))
     grant_types_json: dict = Field(default_factory=dict, sa_column=Column(JSON))
     organization_id: uuid.UUID = Field(foreign_key="organizations.id", index=True)
+    consumer_id: Optional[uuid.UUID] = Field(default=None, foreign_key="consumers.id", index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime(timezone=True)))
 
 class MCPOAuthAuthCode(SQLModel, table=True):
@@ -119,6 +124,7 @@ class MCPOAuthToken(SQLModel, table=True):
     organization_id: uuid.UUID = Field(foreign_key="organizations.id", index=True)
     user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
     scope: str = Field(default="read:workspace")
+    consumer_id: Optional[uuid.UUID] = Field(default=None, foreign_key="consumers.id", index=True)
     expires_at: datetime = Field(sa_column=Column(DateTime(timezone=True)))
     refresh_expires_at: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=True)))
     revoked_at: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=True)))
@@ -129,6 +135,7 @@ class MCPAuditLog(SQLModel, table=True):
     
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     organization_id: uuid.UUID = Field(foreign_key="organizations.id", index=True)
+    consumer_id: Optional[uuid.UUID] = Field(default=None, foreign_key="consumers.id", index=True)
     token_id: Optional[uuid.UUID] = Field(default=None, index=True)
     project_id: Optional[uuid.UUID] = Field(default=None, index=True)
     client_name: str
@@ -138,4 +145,6 @@ class MCPAuditLog(SQLModel, table=True):
     status_code: int = Field(default=200)
     response_time_ms: float = Field(default=0.0)
     timestamp: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime(timezone=True)))
+
+
 

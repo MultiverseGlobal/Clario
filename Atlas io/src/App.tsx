@@ -16,16 +16,17 @@ import Landing from "./pages/Landing";
 import NotFound from "./pages/NotFound";
 
 const Onboarding = React.lazy(() => import("./pages/Onboarding"));
+const FounderHome = React.lazy(() => import("./pages/FounderHome"));
 const ObjectivesStudio = React.lazy(() => import("./pages/hq/ObjectivesStudio"));
 const HqRadar = React.lazy(() => import("./pages/hq/HqRadar"));
 const HqLeadDetail = React.lazy(() => import("./pages/hq/HqLeadDetail"));
 const HqProposal = React.lazy(() => import("./pages/hq/HqProposal"));
-const DailyBriefing = React.lazy(() => import("./pages/hq/DailyBriefing"));
-const CommandFeed = React.lazy(() => import("./pages/CommandFeed"));
+const CommandFeed = React.lazy(() => import("./pages/hq/HqToday"));
+const DailyBriefing = React.lazy(() => import("./pages/hq/HqToday"));
 const HqSettings = React.lazy(() => import("./pages/hq/HqSettings"));
 const HqOutreach = React.lazy(() => import("./pages/hq/HqOutreach"));
 
-const HqDashboard = React.lazy(() => import("./pages/hq/HqDashboard"));
+const HqToday = React.lazy(() => import("./pages/hq/HqToday"));
 const HqPartnerships = React.lazy(() => import("./pages/hq/HqPartnerships"));
 const HqTeam = React.lazy(() => import("./pages/hq/HqTeam"));
 const HqReport = React.lazy(() => import("./pages/hq/HqReport"));
@@ -55,22 +56,22 @@ const App = () => (
               <Routes>
                 {/* ── Sovereign App Shell (Atlas V1 Core Surfaces & Extended) ─ */}
                 <Route element={<HqShell />}>
-                  <Route path="/" element={<CommandFeed />} />
-                  <Route path="/briefing" element={<DailyBriefing />} />
+                  <Route path="/" element={<FounderHome />} />
+                  <Route path="/briefing" element={<HqToday />} />
                   <Route path="/objectives" element={<ObjectivesStudio />} />
                   <Route path="/outreach" element={<HqOutreach />} />
-                  <Route path="/workspace" element={<CommandFeed />} />
-                  <Route path="/command" element={<CommandFeed />} />
-                  <Route path="/engine" element={<CommandFeed />} />
+                  <Route path="/workspace" element={<HqToday />} />
+                  <Route path="/command" element={<HqToday />} />
+                  <Route path="/engine" element={<HqToday />} />
 
                   {/* ── Sovereign Pipeline Flow ────────────────────────────── */}
                   <Route path="/hq">
                     <Route index element={<Navigate to="/hq/radar" replace />} />
                     <Route path="radar" element={<HqRadar />} />
                     <Route path="outreach" element={<HqOutreach />} />
-                    <Route path="engine" element={<CommandFeed />} />
-                    <Route path="command" element={<CommandFeed />} />
-                    <Route path="dashboard" element={<HqDashboard />} />
+                    <Route path="engine" element={<HqToday />} />
+                    <Route path="command" element={<HqToday />} />
+                    <Route path="dashboard" element={<HqToday />} />
                     <Route path="partnerships" element={<HqPartnerships />} />
                     <Route path="team" element={<HqTeam />} />
                     <Route path="report" element={<HqReport />} />

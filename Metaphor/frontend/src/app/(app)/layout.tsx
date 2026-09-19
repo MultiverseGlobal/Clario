@@ -26,6 +26,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     async function fetchUser() {
       try {
+        const settings = await import("@/lib/settings").then(m => m.pullSettingsFromCloud());
+        const storedCustomName = settings?.user_name || null;
+
         const { fetchFromMetaphor } = await import("@/app/api");
         const data = await fetchFromMetaphor("/auth/me");
 
@@ -33,7 +36,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         const supabase = createClient();
         const { data: { session } } = await supabase.auth.getSession();
         const sbUser = session?.user;
-        const storedCustomName = typeof window !== "undefined" ? localStorage.getItem("metaphor_user_name") : null;
 
         const googleFullName = sbUser?.user_metadata?.full_name || sbUser?.user_metadata?.name;
         const emailPrefix = sbUser?.email ? sbUser.email.split("@")[0] : null;
@@ -47,12 +49,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         const resolvedName = storedCustomName || (!isGenericName ? data.name : fallbackName);
         setUser({ name: resolvedName, email: data?.email || sbUser?.email || "workspace@metaphor.os" });
       } catch {
-        const stored = typeof window !== "undefined" ? localStorage.getItem("metaphor_user_name") : null;
+        const { getLocalSettings } = await import("@/lib/settings");
+        const stored = getLocalSettings()?.user_name || null;
         setUser({ name: stored || "Local User", email: "user@local" });
       }
     }
     fetchUser();
-    import("@/lib/settings").then((m) => m.pullSettingsFromCloud());
 
     const handleProfileUpdate = () => {
       fetchUser();

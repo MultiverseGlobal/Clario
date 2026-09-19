@@ -21,7 +21,8 @@ class GraphService:
         confidence: float = 1.0, 
         source_event_id: Optional[uuid.UUID] = None,
         decided_at: Optional[datetime] = None,
-        reasoning: Optional[str] = None
+        reasoning: Optional[str] = None,
+        workspace_id: Optional[uuid.UUID] = None
     ) -> Node:
         # Idempotency check
         if source_event_id:
@@ -37,6 +38,7 @@ class GraphService:
 
         node = Node(
             organization_id=org_id,
+            workspace_id=workspace_id,
             type=type,
             title=title[:255],
             summary=summary,

@@ -1,35 +1,39 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 from sqlmodel import SQLModel, Field
-from sqlalchemy.dialects.postgresql import UUID as pg_UUID
-from sqlalchemy import Column as SAColumn, Text, DateTime, String
+from sqlalchemy import Column, DateTime, JSON
 
 class TaskHandoff(SQLModel, table=True):
     __tablename__ = "task_handoffs"
-
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True, index=True)
-    project_id: uuid.UUID = Field(
-        sa_column=SAColumn(pg_UUID(as_uuid=True), index=True, nullable=False)
-    )
     
-    # E.g. "antigravity", "claude"
-    source_ai: str = Field(sa_column=SAColumn(String, index=True, nullable=False))
-    target_ai: str = Field(sa_column=SAColumn(String, index=True, nullable=False))
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    organization_id: uuid.UUID = Field(foreign_key="organizations.id", index=True)
+    workspace_id: Optional[uuid.UUID] = Field(default=None, index=True)
+    project_id: Optional[uuid.UUID] = Field(default=None, index=True)
     
-    payload: str = Field(sa_column=SAColumn(Text, nullable=False))
-    instructions: Optional[str] = Field(default=None, sa_column=SAColumn(Text, nullable=True))
+    source_consumer_id: uuid.UUID = Field(foreign_key="consumers.id", index=True)
+    target_consumer_id: uuid.UUID = Field(foreign_key="consumers.id", index=True)
+    created_by: Optional[uuid.UUID] = Field(default=None, foreign_key="users.id", index=True)
     
-    # 'pending', 'resolved', 'cancelled'
-    status: str = Field(default="pending", sa_column=SAColumn(String, index=True, nullable=False))
+    title: str
+    objective: str
+    instructions: Optional[str] = None
     
-    resolution_summary: Optional[str] = Field(default=None, sa_column=SAColumn(Text, nullable=True))
-
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
-        sa_column=SAColumn(DateTime(timezone=True), nullable=False)
-    )
-    resolved_at: Optional[datetime] = Field(
-        default=None,
-        sa_column=SAColumn(DateTime(timezone=True), nullable=True)
-    )
+    # State: draft, pending, accepted, in_progress, completed, rejected, cancelled, superseded
+    status: str = Field(default="pending", index=True)
+    priority: str = Field(default="normal")
+    
+    # References as JSON lists of {"type": "node", "id": "..."}
+    context_refs: dict = Field(default_factory=list, sa_column=Column(JSON))
+    artifact_refs: dict = Field(default_factory=list, sa_column=Column(JSON))
+    decision_refs: dict = Field(default_factory=list, sa_column=Column(JSON))
+    constraint_refs: dict = Field(default_factory=list, sa_column=Column(JSON))
+    insight_refs: dict = Field(default_factory=list, sa_column=Column(JSON))
+    
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime(timezone=True)))
+    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime(timezone=True)))
+    accepted_at: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=True)))
+    completed_at: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=True)))
+    expires_at: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=True)))

@@ -2,7 +2,7 @@ import uuid
 import hashlib
 import json
 import logging
-from typing import List, Dict, Any, Callable
+from typing import List, Dict, Any, Callable, Optional
 from datetime import datetime
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select
@@ -30,7 +30,7 @@ class SyncEngine:
         result = await self.session.execute(stmt)
         return result.first() is not None
 
-    async def run_pull_sync(self, provider: str, org_id: uuid.UUID, limit: int = 5):
+    async def run_pull_sync(self, provider: str, org_id: uuid.UUID, limit: int = 5, workspace_id: Optional[uuid.UUID] = None, project_id: Optional[uuid.UUID] = None):
         # Create SyncJob
         job = SyncJob(
             organization_id=org_id,
@@ -55,7 +55,7 @@ class SyncEngine:
                 raw_events = await GoogleParser().fetch_documents()
             elif provider == "linear":
                 from app.services.integrations.linear import fetch_linear_workspace
-                from app.config import settings
+                from app.core.config import settings
                 content = await fetch_linear_workspace(settings.LINEAR_CLIENT_SECRET)
                 if content.startswith("Failed"):
                     raise RuntimeError(content)
@@ -81,7 +81,7 @@ class SyncEngine:
                 await self.session.commit()
                 await self.session.refresh(event)
 
-                await self.reflection.reflect_and_evolve(org_id, event)
+                await self.reflection.reflect_and_evolve(org_id, event, workspace_id=workspace_id, project_id=project_id)
                 
                 event.processed_at = datetime.utcnow()
                 self.session.add(event)

@@ -1,11 +1,13 @@
 import json
 import logging
+import uuid
 from datetime import datetime
 from typing import List, Dict, Any
 from sqlmodel import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Node, Edge, Chunk, NodeEvidence, UniversalEvent
+from app.models.graph import Node, Edge, Evidence, Embedding
+from app.models.operations import UniversalEvent
 from app.ingestion.normalizer import normalizer
 from app.provider import llm_provider
 from app.database.session import get_session
@@ -40,7 +42,7 @@ class ReflectionEngine:
         existing_nodes_query = await session.exec(select(Node))
         existing_nodes = existing_nodes_query.all()
         existing_nodes_context = [
-            {"id": str(n.id), "name": n.name, "type": n.type}
+            {"id": str(n.id), "name": n.title, "type": n.type}
             for n in existing_nodes
         ]
 
@@ -120,24 +122,17 @@ class ReflectionEngine:
     async def _apply_graph_updates(self, session: AsyncSession, raw_logs: List[Dict[str, Any]], parsed_updates: Dict[str, Any], status: str = "approved") -> Dict[str, Any]:
         """Apply extracted nodes, edges, chunks and evidence linkages to Postgres."""
         
-        # A. Store raw logs as Chunks and compute embeddings
-        chunk_map = {} # Maps log_id to Chunk object
+        # A. Store raw logs as Evidence
+        evidence_map = {} # Maps log_id to Evidence object
+        
+        # Get a default organization_id for nodes (temporary shim for single-tenant mode)
+        from app.models.identity import Organization
+        org_q = await session.exec(select(Organization).limit(1))
+        default_org = org_q.first()
+        org_id = default_org.id if default_org else uuid.uuid4()
+        
         for log in raw_logs:
-            # Check if chunk exists
-            from sqlalchemy import text
-            existing_chunk_q = await session.exec(select(Chunk).where(text("metadata_json->>'log_id' = :log_id")).params(log_id=str(log["id"])))
-            chunk = existing_chunk_q.first()
-            if not chunk:
-                # Create embedding
-                embedding = await llm_provider.generate_embedding(log["content"])
-                chunk = Chunk(
-                    text_content=log["content"],
-                    embedding=embedding,
-                    metadata_json={"log_id": log["id"], "title": log["title"], "source": log["source"], **log["metadata"]}
-                )
-                session.add(chunk)
-                await session.flush() # Populate chunk ID
-            chunk_map[log["id"]] = chunk
+            evidence_map[log["id"]] = log
 
         # B. Resolve or Create Nodes
         node_map = {} # Maps lowercase node name to Node object
@@ -145,7 +140,7 @@ class ReflectionEngine:
         # Load existing nodes into node_map
         existing_nodes_q = await session.exec(select(Node))
         for n in existing_nodes_q.all():
-            node_map[n.name.lower()] = n
+            node_map[n.title.lower()] = n
 
         created_nodes_count = 0
         for n_data in parsed_updates.get("nodes_to_create", []):
@@ -155,9 +150,11 @@ class ReflectionEngine:
             
             if name.lower() not in node_map:
                 node = Node(
-                    name=name,
+                    organization_id=org_id,
+                    title=name,
+                    summary=name,
+                    content=json.dumps(metadata),
                     type=n_type,
-                    metadata_json=metadata,
                     status=status
                 )
                 session.add(node)
@@ -165,9 +162,9 @@ class ReflectionEngine:
                 node_map[name.lower()] = node
                 created_nodes_count += 1
             else:
-                # Node already exists, update metadata if relevant
+                # Node already exists
                 node = node_map[name.lower()]
-                node.metadata_json.update(metadata)
+                # Could update content/summary here if desired
                 session.add(node)
 
         # C. Create Evidence Links
@@ -177,16 +174,31 @@ class ReflectionEngine:
             log_id = link["log_id"]
             
             node = node_map.get(node_name.lower())
-            chunk = chunk_map.get(log_id)
+            log_item = evidence_map.get(log_id)
             
-            if node and chunk:
-                # Check if association already exists
+            if node and log_item:
+                # Check if evidence already exists
+                from sqlalchemy import text
                 assoc_q = await session.exec(
-                    select(NodeEvidence).where(NodeEvidence.node_id == node.id, NodeEvidence.chunk_id == chunk.id)
+                    select(Evidence).where(Evidence.node_id == node.id, Evidence.checksum == str(log_id))
                 )
                 if not assoc_q.first():
-                    assoc = NodeEvidence(node_id=node.id, chunk_id=chunk.id)
-                    session.add(assoc)
+                    # Generate embedding
+                    embedding_vector = await llm_provider.generate_embedding(log_item["content"])
+                    emb = Embedding(
+                        node_id=node.id,
+                        vector=embedding_vector
+                    )
+                    session.add(emb)
+                    
+                    evidence = Evidence(
+                        node_id=node.id,
+                        source=log_item["source"],
+                        source_type="log",
+                        raw_text=log_item["content"],
+                        checksum=str(log_id)
+                    )
+                    session.add(evidence)
                     evidence_links_count += 1
 
         # D. Create Edges
@@ -213,12 +225,9 @@ class ReflectionEngine:
                 )
                 if not existing_edge_q.first():
                     edge = Edge(
-                        source_id=src_node.id,
-                        target_id=tgt_node.id,
-                        dimension=dim,
-                        relationship_type=rel_type,
-                        metadata_json={"description": desc},
-                        status=status
+                        from_node=src_node.id,
+                        to_node=tgt_node.id,
+                        relationship=rel_type,
                     )
                     session.add(edge)
                     created_edges_count += 1

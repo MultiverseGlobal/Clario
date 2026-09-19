@@ -6,11 +6,13 @@ import Link from "next/link";
 import { ArrowRight, Mail, Lock, Sparkles, CheckCircle2 } from "lucide-react";
 import { MetaphorLogo } from "@/components/ui/MetaphorLogo";
 import { createClient } from "@/utils/supabase/client";
+import { getLocalSettings, pushSettingsToCloud } from "@/lib/settings";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const isAlreadyOnboarded = typeof window !== "undefined" && (localStorage.getItem("metaphor_onboarded") === "true" || document.cookie.includes("metaphor_onboarded=true"));
+  const settingsMem = typeof window !== "undefined" ? getLocalSettings() : null;
+  const isAlreadyOnboarded = settingsMem?.onboarded || (typeof window !== "undefined" && document.cookie.includes("metaphor_onboarded=true"));
   const defaultTarget = isAlreadyOnboarded ? "/explorer" : "/onboarding";
   const redirectTarget = searchParams.get("redirect") || defaultTarget;
 
@@ -62,22 +64,27 @@ function LoginForm() {
     setError("");
     setMessage("");
 
-    if (isSignUp) {
-      setError("Sign up is disabled in single-tenant mode.");
-      setLoading(false);
-      return;
-    } else {
-      // Single-tenant sovereign bypass:
-      document.cookie = "metaphor_unlocked=true; path=/; max-age=31536000";
-      document.cookie = "metaphor_onboarded=true; path=/; max-age=31536000";
-      if (typeof window !== "undefined") {
-        localStorage.setItem("metaphor_unlocked", "true");
-        localStorage.setItem("metaphor_onboarded", "true");
-        localStorage.setItem("metaphor_user_name", "Admin");
+    const { error, data } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      if (error.message.toLowerCase().includes("invalid login credentials")) {
+        setError("Account not found or password incorrect.");
+      } else {
+        setError("Error signing in: " + error.message);
       }
       setLoading(false);
-      router.push(redirectTarget);
+      return;
     }
+
+    setMessage("Success! Redirecting...");
+    
+    // Ensure settings proxy is updated optimistically if needed
+    pushSettingsToCloud({ onboarded: true });
+    
+    router.push(redirectTarget);
   };
 
 
@@ -166,6 +173,11 @@ function LoginForm() {
                   required
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border-subtle bg-background text-sm text-foreground placeholder:text-muted focus:outline-none focus:border-border-strong transition-colors shadow-sm"
                 />
+              </div>
+              <div className="flex justify-end">
+                <a href="#" className="text-xs text-muted hover:text-foreground transition-colors" onClick={(e) => { e.preventDefault(); setError("Password recovery is currently disabled."); }}>
+                  Forgot password?
+                </a>
               </div>
             </div>
 

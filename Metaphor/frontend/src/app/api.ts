@@ -43,6 +43,8 @@ if (typeof window !== 'undefined') {
   } catch {}
 }
 
+import { getLocalSettings } from "@/lib/settings";
+
 // Simple client-side API helper with lightweight GET caching
 export async function fetchFromMetaphor(endpoint: string, body?: any, method?: string, allowAnonymous: boolean = false, skipCache: boolean = false) {
   // Normalize trailing slash on /graph to eliminate 307 redirect penalty
@@ -65,7 +67,8 @@ export async function fetchFromMetaphor(endpoint: string, body?: any, method?: s
   let token = null;
 
   if (typeof window !== 'undefined') {
-    apiKey = localStorage.getItem("metaphor_api_key");
+    const settings = getLocalSettings();
+    apiKey = settings?.api_key || null;
     token = await getCachedSession();
   }
 

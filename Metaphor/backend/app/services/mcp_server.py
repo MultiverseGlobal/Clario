@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.graph import Node, Edge
 from app.services.graph import GraphService
 from app.services.context import ContextService
+from app.services.retrieval import RetrievalService
 from app.models.operations import MCPAuditLog
 
 logger = logging.getLogger("metaphor.mcp_server")
@@ -246,6 +247,19 @@ async def list_mcp_tools() -> List[Dict[str, Any]]:
             "annotations": {"readOnly": True, "destructive": False}
         },
         {
+            "name": "get_current_context",
+            "description": "Retrieve orchestrated context package based on the consumer's objective.",
+            "inputSchema": {
+                "type": "object", 
+                "properties": {
+                    "objective": {"type": "string"},
+                    "intent": {"type": "string", "description": "Optional intent like research, debugging, execution"}
+                },
+                "required": ["objective"]
+            },
+            "annotations": {"readOnly": True, "destructive": False}
+        },
+        {
             "name": "retrieve_documents",
             "description": "Lookup workspace documentation.",
             "inputSchema": {"type": "object", "properties": {"limit": {"type": "integer", "default": 10}}},
@@ -318,44 +332,22 @@ async def list_mcp_tools() -> List[Dict[str, Any]]:
             "annotations": {"readOnly": False, "destructive": False}
         },
         {
-            "name": "push_handoff",
-            "description": "Push a task, error, or context state to another AI model in the same project queue.",
+            "name": "create_handoff",
+            "description": "Create a Task Handoff to transfer work or context to another AI consumer (e.g. Orion, Atlas).",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "source_ai": {"type": "string"},
-                    "target_ai": {"type": "string"},
-                    "project_id": {"type": "string"},
-                    "payload": {"type": "string", "description": "The state, error, or context to hand off"},
-                    "instructions": {"type": "string", "description": "Instructions for the target AI"}
+                    "target_consumer_id": {"type": "string", "description": "UUID of the target consumer"},
+                    "title": {"type": "string"},
+                    "objective": {"type": "string"},
+                    "instructions": {"type": "string"},
+                    "priority": {"type": "string", "default": "normal"},
+                    "context_refs": {"type": "array", "items": {"type": "object"}},
+                    "artifact_refs": {"type": "array", "items": {"type": "object"}},
+                    "decision_refs": {"type": "array", "items": {"type": "object"}},
+                    "constraint_refs": {"type": "array", "items": {"type": "object"}}
                 },
-                "required": ["source_ai", "target_ai", "project_id", "payload"]
-            },
-            "annotations": {"readOnly": False, "destructive": False}
-        },
-        {
-            "name": "pull_handoffs",
-            "description": "Check the project queue for any tasks or context handed off to you by other AIs.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "my_ai_name": {"type": "string", "description": "Your AI name (e.g. claude, antigravity, cursor)"},
-                    "project_id": {"type": "string"}
-                },
-                "required": ["my_ai_name", "project_id"]
-            },
-            "annotations": {"readOnly": True, "destructive": False}
-        },
-        {
-            "name": "resolve_handoff",
-            "description": "Mark a handoff task as resolved and provide a summary.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "handoff_id": {"type": "string"},
-                    "resolution_summary": {"type": "string"}
-                },
-                "required": ["handoff_id", "resolution_summary"]
+                "required": ["target_consumer_id", "title", "objective"]
             },
             "annotations": {"readOnly": False, "destructive": False}
         },
@@ -435,11 +427,30 @@ async def list_mcp_tools() -> List[Dict[str, Any]]:
 async def call_mcp_tool(
     name: str,
     arguments: Dict[str, Any],
-    organization_id: uuid.UUID,
+    token_obj: Any,
     session: AsyncSession,
     scopes: Optional[List[str]] = None,
     project_id: Optional[str] = None
 ) -> Dict[str, Any]:
+    organization_id = token_obj.organization_id
+    
+    # Construct RetrievalScope
+    from app.services.retrieval import RetrievalScope
+    try:
+        scope_workspace_id = getattr(token_obj, "workspace_id", None)
+        allowed_scopes = getattr(token_obj, "allowed_scopes", scopes or [])
+        scope_project_id = uuid.UUID(project_id) if project_id else None
+    except:
+        scope_project_id = None
+        
+    retrieval_scope = RetrievalScope(
+        consumer_id=token_obj.user_id if hasattr(token_obj, 'user_id') else token_obj.id,
+        organization_id=organization_id,
+        workspace_id=scope_workspace_id,
+        project_id=scope_project_id,
+        allowed_scopes=allowed_scopes
+    )
+
     # Every tool query strictly filters by organization_id
     if name == "sync_chat_drop":
         # 1. Verify Write Scope
@@ -571,22 +582,45 @@ async def call_mcp_tool(
         return {"content": [{"type": "text", "text": json.dumps(data, indent=2)}]}
     if name == "search_context":
         query = arguments.get("query", "")
-        graph = GraphService(session)
-        ctx_service = ContextService(session, graph)
+        retrieval = RetrievalService(session)
         try:
-            package = await ctx_service.generate_context_package(organization_id, "mcp", query, project_id=project_id)
-            pkg_data = package.package_json
+            pkg_data = await retrieval.retrieve_context(retrieval_scope, query)
         except Exception as e:
             logger.warning(f"Context package generation fallback: {e}")
             pkg_data = {
                 "status": "no_results",
                 "query": query,
-                "answer": "I searched your Metaphor workspace, but found no indexed nodes matching your query.",
-                "workspace_summary": {"total_items_found": 0, "categories": []},
-                "evidence": [],
-                "confidence": 0.0
+                "consumer": str(retrieval_scope.consumer_id),
+                "nodes": [],
+                "results_count": 0
             }
         return {"content": [{"type": "text", "text": json.dumps(pkg_data, indent=2)}]}
+        
+    elif name == "get_current_context":
+        from app.services.orchestration import ContextOrchestrator
+        from app.models.orchestration import ContextRequest, IntentMode
+
+        objective = arguments.get("objective", "General context retrieval")
+        intent_str = arguments.get("intent")
+        
+        intent = None
+        if intent_str:
+            try:
+                intent = IntentMode(intent_str.lower())
+            except ValueError:
+                pass
+                
+        request = ContextRequest(
+            objective=objective,
+            consumer="mcp_tool",
+            requested_mode=intent,
+            workspace_id=retrieval_scope.workspace_id
+        )
+        
+        orchestrator = ContextOrchestrator(session)
+        package = await orchestrator.orchestrate(request, retrieval_scope)
+        
+        return {"content": [{"type": "text", "text": json.dumps(package.model_dump(), indent=2, default=str)}]}
 
 
     elif name == "retrieve_documents":
@@ -611,15 +645,9 @@ async def call_mcp_tool(
 
     elif name == "answer_from_workspace":
         question = arguments.get("question", "")
-        graph = GraphService(session)
-        ctx_service = ContextService(session, graph)
+        retrieval = RetrievalService(session)
         try:
-            is_decision = any(q in question.lower() for q in ["why did we choose", "what was the reasoning", "why did we decide", "decision behind"])
-            if is_decision:
-                package = await ctx_service.generate_decision_package(organization_id, "mcp", question, project_id=project_id)
-            else:
-                package = await ctx_service.generate_context_package(organization_id, "mcp", question, project_id=project_id)
-            pkg_data = package.package_json
+            pkg_data = await retrieval.retrieve_context(retrieval_scope, question)
         except Exception as e:
             logger.warning(f"Workspace answer generation fallback: {e}")
             pkg_data = {"question": question, "nodes": [], "edges": [], "answer": "Workspace query completed"}
@@ -639,58 +667,29 @@ async def call_mcp_tool(
         nodes = res.scalars().all()
         return {"content": [{"type": "text", "text": json.dumps([{"id": str(n.id), "title": n.title, "node_type": n.type} for n in nodes], indent=2)}]}
 
-    elif name == "push_handoff":
-        from app.models.task_handoff import TaskHandoff
-        source_ai = arguments.get("source_ai")
-        target_ai = arguments.get("target_ai")
-        project_id_raw = arguments.get("project_id")
-        payload = arguments.get("payload")
-        instructions = arguments.get("instructions")
+    elif name == "create_handoff":
+        from app.services.handoff import HandoffService
+        target_consumer_id_raw = arguments.get("target_consumer_id")
         
         try:
-            pid = uuid.UUID(project_id_raw)
+            target_consumer_id = uuid.UUID(target_consumer_id_raw)
         except Exception:
-            raise HTTPException(400, detail="Invalid project_id UUID")
+            raise HTTPException(400, detail="Invalid target_consumer_id UUID")
 
-        handoff = TaskHandoff(
-            project_id=pid,
-            source_ai=source_ai.lower(),
-            target_ai=target_ai.lower(),
-            payload=payload,
-            instructions=instructions,
-            status="pending"
+        service = HandoffService(session)
+        handoff = await service.create_handoff(
+            scope=retrieval_scope,
+            target_consumer_id=target_consumer_id,
+            title=arguments.get("title"),
+            objective=arguments.get("objective"),
+            instructions=arguments.get("instructions"),
+            priority=arguments.get("priority", "normal"),
+            context_refs=arguments.get("context_refs", []),
+            artifact_refs=arguments.get("artifact_refs", []),
+            decision_refs=arguments.get("decision_refs", []),
+            constraint_refs=arguments.get("constraint_refs", [])
         )
-        session.add(handoff)
-        await session.commit()
-        return {"content": [{"type": "text", "text": f"Handoff successfully pushed to {target_ai}. Handoff ID: {handoff.id}"}]}
-
-    elif name == "pull_handoffs":
-        from app.models.task_handoff import TaskHandoff
-        my_ai_name = arguments.get("my_ai_name")
-        project_id_raw = arguments.get("project_id")
-        
-        try:
-            pid = uuid.UUID(project_id_raw)
-        except Exception:
-            raise HTTPException(400, detail="Invalid project_id UUID")
-
-        stmt = select(TaskHandoff).where(
-            TaskHandoff.project_id == pid,
-            TaskHandoff.target_ai == my_ai_name.lower(),
-            TaskHandoff.status == "pending"
-        ).order_by(TaskHandoff.created_at.asc())
-        
-        res = await session.execute(stmt)
-        tasks = res.scalars().all()
-        data = [{
-            "id": str(t.id),
-            "source_ai": t.source_ai,
-            "payload": t.payload,
-            "instructions": t.instructions,
-            "created_at": t.created_at.isoformat()
-        } for t in tasks]
-        
-        return {"content": [{"type": "text", "text": json.dumps(data, indent=2)}]}
+        return {"content": [{"type": "text", "text": f"Handoff successfully created. ID: {handoff.id}"}]}
 
     elif name == "dispatch_to_tool":
         source_tool = arguments.get("source_tool")
@@ -708,6 +707,7 @@ async def call_mcp_tool(
         from app.models.task_handoff import TaskHandoff
         handoff = TaskHandoff(
             id=uuid.uuid4(),
+            organization_id=organization_id,
             project_id=pid,
             source_ai=source_tool.lower() if source_tool else "unknown",
             target_ai=target_tool.lower() if target_tool else "unknown",
@@ -755,31 +755,6 @@ async def call_mcp_tool(
 
         return {"content": [{"type": "text", "text": result_msg}]}
 
-
-    elif name == "resolve_handoff":
-        from app.models.task_handoff import TaskHandoff
-        handoff_id_raw = arguments.get("handoff_id")
-        summary = arguments.get("resolution_summary")
-        
-        try:
-            hid = uuid.UUID(handoff_id_raw)
-        except Exception:
-            raise HTTPException(400, detail="Invalid handoff_id UUID")
-            
-        stmt = select(TaskHandoff).where(TaskHandoff.id == hid)
-        res = await session.execute(stmt)
-        handoff = res.scalar_one_or_none()
-        
-        if not handoff:
-            raise HTTPException(404, detail="Handoff not found")
-            
-        handoff.status = "resolved"
-        handoff.resolution_summary = summary
-        handoff.resolved_at = datetime.now(timezone.utc)
-        
-        session.add(handoff)
-        await session.commit()
-        return {"content": [{"type": "text", "text": "Handoff resolved successfully."}]}
 
     elif name == "list_recent_changes":
         stmt = select(Node).where(Node.organization_id == organization_id).order_by(Node.updated_at.desc()).limit(10)

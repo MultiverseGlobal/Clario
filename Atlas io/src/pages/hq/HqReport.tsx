@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { format, startOfWeek, endOfWeek } from "date-fns";
 import { invokeSourcingMachine } from "@/lib/sourcingMachineProxy";
 import { soundManager } from "@/lib/audioFeedback";
-import { getStoredOutreachRecords } from "@/services/outreachStore";
+import { EvidenceChip } from "@pseudonyms/ui/src/components/EvidenceChip";
 
 interface WeeklyReport {
   id: string;
@@ -109,31 +109,31 @@ export default function HqReport() {
 
   const report = reports[currentIdx];
 
-  // Load checked priority states from localStorage
+  // Load checked priority states from Supabase content
   useEffect(() => {
     if (!report?.id) return;
-    try {
-      const saved = localStorage.getItem(`atlas_report_priorities_${report.id}`);
-      if (saved) {
-        setCheckedPriorities(JSON.parse(saved));
-      } else {
-        setCheckedPriorities({});
-      }
-    } catch {
-      setCheckedPriorities({});
-    }
-  }, [report?.id]);
+    const checked = (report.content as any).checked_priorities || {};
+    setCheckedPriorities(checked);
+  }, [report?.id, (report?.content as any)?.checked_priorities]);
 
-  const togglePriority = (idx: number) => {
+  const togglePriority = async (idx: number) => {
     soundManager.playClick();
     if (!report?.id) return;
     const key = `p_${idx}`;
     const updated = { ...checkedPriorities, [key]: !checkedPriorities[key] };
     setCheckedPriorities(updated);
+    
     try {
-      localStorage.setItem(`atlas_report_priorities_${report.id}`, JSON.stringify(updated));
+      await supabase.from("atlas_reports").update({
+        content: {
+          ...report.content,
+          checked_priorities: updated
+        }
+      }).eq("id", report.id);
+      
+      setReports(prev => prev.map(r => r.id === report.id ? { ...r, content: { ...r.content, checked_priorities: updated } } : r));
     } catch (err) {
-      console.warn("Could not save priority state:", err);
+      console.warn("Could not save priority state to Supabase:", err);
     }
   };
 
@@ -168,21 +168,11 @@ export default function HqReport() {
       const deals = (dealRes.data ?? []) as any[];
       const opps = (oppRes.data ?? []) as any[];
 
-      // Merge with localStorage dispatched outreach if Supabase is sparse
-      const localDispatched = getStoredOutreachRecords();
-
       const weeklyOutreach = outData.filter((o: any) => new Date(o.created_at) >= weekStart);
       const activeOutreach = weeklyOutreach.length > 0 ? weeklyOutreach : outData;
 
       let outreach_sent = activeOutreach.filter((o: any) => o.status !== "draft").length;
-      if (outreach_sent === 0 && localDispatched.length > 0) {
-        outreach_sent = localDispatched.length;
-      }
-
       let replies = activeOutreach.filter((o: any) => ["replied", "booked"].includes(o.status)).length;
-      if (replies === 0 && localDispatched.some((l) => l.status === "replied")) {
-        replies = localDispatched.filter((l) => l.status === "replied").length;
-      }
 
       await delay(400);
       setTelemetryStage(3);
@@ -459,7 +449,7 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
                 <h1 className="text-sm font-bold font-sans tracking-tight text-foreground">
                   Weekly Founder Report
                 </h1>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-semibold">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/5 text-foreground border border-border/40 font-semibold">
                   Autonomous Audit
                 </span>
               </div>
@@ -508,7 +498,7 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
                 onClick={copyExecutiveBriefing}
                 className="h-8 px-3 rounded-xl border border-border/80 bg-card hover:bg-muted text-foreground text-xs font-mono flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
               >
-                {copiedMemo ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                {copiedMemo ? <Check className="h-3.5 w-3.5 text-foreground" /> : <Copy className="h-3.5 w-3.5" />}
                 <span>{copiedMemo ? "Copied" : "Export Briefing"}</span>
               </button>
             )}
@@ -519,7 +509,7 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
               disabled={generating}
               className="h-8 px-3.5 rounded-xl bg-foreground text-background hover:bg-foreground/90 gap-1.5 text-xs font-semibold font-mono cursor-pointer shadow-sm"
             >
-              {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 text-emerald-400" />}
+              {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
               <span>{generating ? "Auditing Pipeline..." : report ? "Recalibrate Report" : "Generate Report"}</span>
             </Button>
           </div>
@@ -537,8 +527,8 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
           </div>
         ) : !report ? (
           /* Empty State */
-          <div className="rounded-3xl border border-dashed border-border/80 bg-white dark:bg-[#0c0d12] p-16 text-center shadow-sm max-w-2xl mx-auto space-y-5">
-            <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto text-emerald-500">
+          <div className="rounded-3xl border border-dashed border-border/60 bg-white dark:bg-[#0c0d12] p-16 text-center shadow-sm max-w-2xl mx-auto space-y-5">
+            <div className="w-14 h-14 rounded-2xl bg-white/5 border border-border/50 flex items-center justify-center mx-auto text-foreground">
               <Sparkles className="h-7 w-7" />
             </div>
             <div>
@@ -552,7 +542,7 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
               disabled={generating}
               className="h-10 px-6 rounded-2xl bg-foreground text-background hover:bg-foreground/90 gap-2 font-semibold text-xs font-mono cursor-pointer shadow-md"
             >
-              <Zap className="h-4 w-4 text-emerald-400" />
+              <Zap className="h-4 w-4" />
               Generate First Weekly Report
             </Button>
           </div>
@@ -571,7 +561,7 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
                   <p className="text-[11px] font-mono text-muted-foreground flex items-center gap-2">
                     <span>Generated {format(new Date(report.generated_at), "PP · HH:mm")}</span>
                     <span>•</span>
-                    <span className="text-emerald-500">Autonomous Evidence Check Complete</span>
+                    <span className="text-foreground/50">Autonomous Evidence Check Complete</span>
                   </p>
                 </div>
               </div>
@@ -584,7 +574,7 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
                     {healthScore >= 75 ? "High Momentum" : healthScore >= 50 ? "Active Traction" : "Ignition Phase"}
                   </span>
                 </div>
-                <div className="h-8 w-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center font-mono font-bold text-emerald-500 text-xs">
+                <div className="h-8 w-8 rounded-xl bg-[#0c0f1d] border border-[#1d2642] flex items-center justify-center font-mono font-bold text-foreground text-xs">
                   {healthScore}
                 </div>
               </div>
@@ -595,14 +585,17 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
               <div className="flex items-start justify-between gap-4">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-emerald-500">
+                    <span className="flex h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-foreground/60">
                       The Single Weekly Move · Tactical North Star
                     </span>
                   </div>
                   <p className="text-base sm:text-lg font-semibold text-foreground leading-relaxed font-sans">
                     {report.content.the_decision}
                   </p>
+                  <div className="pt-2">
+                    <EvidenceChip sourceName="Atlas Decision Engine" confidence={98} />
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -621,7 +614,7 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
               <div className="rounded-3xl border border-border bg-white dark:bg-[#0c0d12] p-6 shadow-xs space-y-5">
                 <div className="flex items-center justify-between pb-3 border-b border-border/50">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500">
+                    <div className="w-7 h-7 rounded-lg bg-white/[0.04] border border-border/50 flex items-center justify-center text-foreground">
                       <DollarSign className="h-4 w-4" />
                     </div>
                     <h3 className="text-xs font-bold uppercase font-mono tracking-wider text-foreground">
@@ -637,7 +630,7 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
                 <div className="grid grid-cols-2 gap-3">
                   <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-[#13151f] border border-border/60">
                     <span className="text-[10px] font-mono text-muted-foreground uppercase">This Month Closed</span>
-                    <div className="text-xl font-bold font-mono text-emerald-500 mt-1">
+                    <div className="text-xl font-bold font-mono text-foreground mt-1">
                       {formatMoney(report.content.revenue_this_month)}
                     </div>
                   </div>
@@ -649,11 +642,11 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
                   </div>
                   <div className="p-3 rounded-2xl bg-slate-50 dark:bg-[#13151f] border border-border/60 flex items-center justify-between">
                     <span className="text-[10px] font-mono text-muted-foreground uppercase">Deals Won</span>
-                    <span className="text-sm font-bold font-mono text-emerald-500">{report.content.deals_won}</span>
+                    <span className="text-sm font-bold font-mono text-foreground">{report.content.deals_won}</span>
                   </div>
                   <div className="p-3 rounded-2xl bg-slate-50 dark:bg-[#13151f] border border-border/60 flex items-center justify-between">
                     <span className="text-[10px] font-mono text-muted-foreground uppercase">Deals Lost</span>
-                    <span className="text-sm font-bold font-mono text-rose-500">{report.content.deals_lost}</span>
+                    <span className="text-sm font-bold font-mono text-muted-foreground">{report.content.deals_lost}</span>
                   </div>
                 </div>
 
@@ -667,7 +660,7 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
                   </div>
                   <div className="h-2 bg-muted/60 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-emerald-500 rounded-full transition-all duration-700 ease-out"
+                      className="h-full bg-foreground/80 rounded-full transition-all duration-700 ease-out"
                       style={{
                         width: `${Math.max(4, Math.min(100, Math.round((report.content.revenue_this_month / GOAL) * 100)))}%`,
                       }}
@@ -680,7 +673,7 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
               <div className="rounded-3xl border border-border bg-white dark:bg-[#0c0d12] p-6 shadow-xs space-y-5">
                 <div className="flex items-center justify-between pb-3 border-b border-border/50">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-500">
+                    <div className="w-7 h-7 rounded-lg bg-white/[0.04] border border-border/50 flex items-center justify-center text-foreground">
                       <MessageSquare className="h-4 w-4" />
                     </div>
                     <h3 className="text-xs font-bold uppercase font-mono tracking-wider text-foreground">
@@ -702,13 +695,13 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
                   </div>
                   <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-[#13151f] border border-border/60 text-center">
                     <span className="text-[10px] font-mono text-muted-foreground uppercase block">Replies</span>
-                    <div className="text-2xl font-bold font-mono text-emerald-500 mt-1">
+                    <div className="text-2xl font-bold font-mono text-foreground mt-1">
                       {report.content.replies}
                     </div>
                   </div>
                   <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-[#13151f] border border-border/60 text-center">
                     <span className="text-[10px] font-mono text-muted-foreground uppercase block">Reply Rate</span>
-                    <div className="text-2xl font-bold font-mono text-sky-500 mt-1">
+                    <div className="text-2xl font-bold font-mono text-foreground mt-1">
                       {report.content.outreach_sent > 0
                         ? `${Math.round((report.content.replies / report.content.outreach_sent) * 100)}%`
                         : "—"}
@@ -719,7 +712,7 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
                 {/* Conversion Guidance */}
                 <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-[#13151f] border border-border/40 text-xs font-mono space-y-1">
                   <div className="flex items-center gap-1.5 text-muted-foreground">
-                    <Activity className="h-3.5 w-3.5 text-emerald-500" />
+                    <Activity className="h-3.5 w-3.5 text-foreground/50" />
                     <span>Outreach Cadence Status:</span>
                     <span className="font-bold text-foreground">
                       {report.content.outreach_sent >= 10
@@ -738,15 +731,15 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
 
             {/* ── Stalled Deals Action Matrix ── */}
             {(report.content?.stalled || []).length > 0 && (
-              <div className="rounded-3xl border border-amber-500/30 bg-amber-500/5 p-6 space-y-4 shadow-xs">
+              <div className="rounded-3xl border border-[#1d2642] bg-[#0c0f1d] p-6 space-y-4 shadow-xs">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <ShieldAlert className="h-4 w-4 text-amber-500" />
-                    <h3 className="text-xs font-bold text-amber-500 uppercase font-mono tracking-wider">
+                    <ShieldAlert className="h-4 w-4 text-foreground/70" />
+                    <h3 className="text-xs font-bold text-foreground uppercase font-mono tracking-wider">
                       Stalled Accounts · Direct Intervention Required
                     </h3>
                   </div>
-                  <span className="text-[10px] font-mono text-amber-500/80">
+                  <span className="text-[10px] font-mono text-muted-foreground">
                     {report.content.stalled.length} deal{report.content.stalled.length > 1 ? "s" : ""} quiet &gt;5 days
                   </span>
                 </div>
@@ -755,13 +748,13 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
                   {report.content.stalled.map((d, i) => (
                     <div
                       key={i}
-                      className="p-4 rounded-2xl bg-white dark:bg-[#0c0d12] border border-amber-500/20 flex items-center justify-between gap-3 shadow-xs"
+                      className="p-4 rounded-2xl bg-[#0e1118] border border-[#1d2642]/60 flex items-center justify-between gap-3 shadow-xs"
                     >
                       <div className="min-w-0">
                         <span className="font-bold text-xs text-foreground truncate block font-sans">
                           {d.company}
                         </span>
-                        <span className="text-[10px] font-mono text-amber-500 font-semibold">
+                        <span className="text-[10px] font-mono text-muted-foreground font-semibold">
                           {d.days} days with zero movement
                         </span>
                       </div>
@@ -769,7 +762,7 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
                       <button
                         type="button"
                         onClick={() => copyNudge(d.company)}
-                        className="h-8 px-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 text-[11px] font-mono font-semibold transition-colors cursor-pointer shrink-0"
+                        className="h-8 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-foreground text-[11px] font-mono font-semibold transition-colors cursor-pointer shrink-0 border border-border/40"
                       >
                         Copy Nudge
                       </button>
@@ -782,29 +775,35 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
             {/* ── Qualitative Strategic Diagnosis ── */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* What's Working */}
-              <div className="rounded-3xl border border-emerald-500/30 bg-emerald-500/5 p-6 space-y-3 shadow-xs">
+              <div className="rounded-3xl border border-[#1d2642] bg-[#0c0f1d] p-6 space-y-3 shadow-xs">
                 <div className="flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-emerald-500" />
-                  <h3 className="text-xs font-bold text-emerald-500 uppercase font-mono tracking-wider">
+                  <TrendingUp className="h-4 w-4 text-foreground/60" />
+                  <h3 className="text-xs font-bold text-foreground uppercase font-mono tracking-wider">
                     What's Working (Traction Signals)
                   </h3>
                 </div>
-                <p className="text-xs text-foreground/90 leading-relaxed font-sans font-medium">
+                <p className="text-xs text-foreground/80 leading-relaxed font-sans font-medium">
                   {report.content.whats_working}
                 </p>
+                <div className="pt-2 border-t border-border/40 mt-3">
+                  <EvidenceChip sourceName="Atlas AI Synthesis" confidence={92} />
+                </div>
               </div>
 
               {/* What's Dragging */}
-              <div className="rounded-3xl border border-rose-500/30 bg-rose-500/5 p-6 space-y-3 shadow-xs">
+              <div className="rounded-3xl border border-border/50 bg-white dark:bg-[#0c0d12] p-6 space-y-3 shadow-xs">
                 <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-rose-500" />
-                  <h3 className="text-xs font-bold text-rose-500 uppercase font-mono tracking-wider">
+                  <AlertCircle className="h-4 w-4 text-foreground/50" />
+                  <h3 className="text-xs font-bold text-foreground/70 uppercase font-mono tracking-wider">
                     What's Dragging (Pipeline Friction)
                   </h3>
                 </div>
-                <p className="text-xs text-foreground/90 leading-relaxed font-sans font-medium">
+                <p className="text-xs text-foreground/80 leading-relaxed font-sans font-medium">
                   {report.content.whats_not}
                 </p>
+                <div className="pt-2 border-t border-border/40 mt-3">
+                  <EvidenceChip sourceName="Atlas AI Synthesis" confidence={87} />
+                </div>
               </div>
             </div>
 
@@ -837,10 +836,10 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
                     >
                       <button
                         type="button"
-                        className="mt-0.5 text-foreground hover:text-emerald-500 transition-colors cursor-pointer"
+                        className="mt-0.5 text-foreground hover:text-foreground/80 transition-colors cursor-pointer"
                       >
                         {isChecked ? (
-                          <CheckSquare className="h-4 w-4 text-emerald-500" />
+                          <CheckSquare className="h-4 w-4 text-foreground" />
                         ) : (
                           <Square className="h-4 w-4 text-muted-foreground" />
                         )}
@@ -882,7 +881,7 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
                 {/* Header */}
                 <div className="flex items-center justify-between pb-3 border-b border-border">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500">
+                    <div className="w-8 h-8 rounded-xl bg-[#0c0f1d] border border-[#1d2642] flex items-center justify-center text-foreground">
                       <Sparkles className="h-4 w-4 animate-spin" />
                     </div>
                     <div>
@@ -894,7 +893,7 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
                       </p>
                     </div>
                   </div>
-                  <span className="text-xs font-mono font-bold text-emerald-500">
+                  <span className="text-xs font-mono font-bold text-foreground">
                     {telemetryPercent}%
                   </span>
                 </div>
@@ -902,7 +901,7 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
                 {/* Progress Bar */}
                 <div className="w-full bg-muted/60 h-2 rounded-full overflow-hidden">
                   <motion.div
-                    className="h-full bg-emerald-500 rounded-full"
+                    className="h-full bg-foreground/80 rounded-full"
                     animate={{ width: `${telemetryPercent}%` }}
                     transition={{ duration: 0.3 }}
                   />
@@ -918,7 +917,7 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
                         key={stage.id}
                         className={`flex items-start gap-3 p-3 rounded-2xl border transition-colors ${
                           isCurrent
-                            ? "bg-emerald-500/5 border-emerald-500/30 text-foreground"
+                            ? "bg-white/[0.03] border-border/50 text-foreground"
                             : isDone
                             ? "bg-muted/20 border-border/40 text-muted-foreground"
                             : "opacity-40 border-transparent text-muted-foreground"
@@ -926,9 +925,9 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
                       >
                         <div className="mt-0.5">
                           {isDone ? (
-                            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                            <CheckCircle2 className="h-4 w-4 text-foreground" />
                           ) : isCurrent ? (
-                            <Loader2 className="h-4 w-4 animate-spin text-emerald-500" />
+                            <Loader2 className="h-4 w-4 animate-spin text-foreground/70" />
                           ) : (
                             <div className="h-4 w-4 rounded-full border border-border" />
                           )}
@@ -949,7 +948,7 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
                 {/* Terminal Footer */}
                 <div className="pt-2 border-t border-border flex items-center justify-between text-[10px] font-mono text-muted-foreground">
                   <span className="flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
                     Live telemetry link established
                   </span>
                   <span>Atlas v5.2</span>

@@ -3,7 +3,8 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   AlertCircle, X, ChevronRight, Mail, MessageSquare, RefreshCw, 
-  Send, Sparkles, Building2, User, Globe, Check, ArrowRight 
+  Send, Sparkles, Building2, User, Globe, Check, ArrowRight,
+  ExternalLink, Video, Radar
 } from "lucide-react";
 import type { DiscoveredLead, OutreachDraft } from "@/services/campaignEngine";
 import { soundManager } from "@/lib/audioFeedback";
@@ -223,8 +224,42 @@ export function InterventionDrawer({
                     <div className={`text-[10px] rounded p-2.5 font-mono leading-relaxed ${
                       isDark ? "bg-white/5 text-white/70" : "bg-neutral-100 text-neutral-600"
                     }`}>
-                      <span className="text-foreground font-bold uppercase tracking-wider block mb-1">Observed Bottleneck:</span>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-foreground font-bold uppercase tracking-wider">Observed Bottleneck:</span>
+                        {lead.recon?.problem_confidence && (
+                          <span className="text-[9px] font-mono text-emerald-500 bg-emerald-500/10 px-1.5 py-0.2 rounded font-bold uppercase">
+                            {lead.recon.problem_confidence}
+                          </span>
+                        )}
+                      </div>
                       {lead.bottleneck}
+
+                      {/* Multi-Platform Evidence Badges */}
+                      {lead.recon?.problem_evidence && lead.recon.problem_evidence.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 pt-2 mt-2 border-t border-white/10">
+                          {lead.recon.problem_evidence.map((ev, i) => (
+                            <a
+                              key={i}
+                              href={ev.source_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={`text-[9px] font-mono px-2 py-0.5 rounded border flex items-center gap-1 transition-colors hover:underline ${
+                                ev.source_type === "job_board"
+                                  ? isDark ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : ev.source_type === "review_directory"
+                                  ? isDark ? "bg-amber-500/10 text-amber-400 border-amber-500/20" : "bg-amber-50 text-amber-700 border-amber-200"
+                                  : isDark ? "bg-sky-500/10 text-sky-400 border-sky-500/20" : "bg-sky-50 text-sky-700 border-sky-200"
+                              }`}
+                            >
+                              <span className="font-bold uppercase">
+                                {ev.source_type === "job_board" ? "Careers" : ev.source_type === "review_directory" ? "Reviews" : "Domain"}:
+                              </span>
+                              <span className="truncate max-w-[130px]">{ev.claim}</span>
+                              <ExternalLink className="h-2 w-2 shrink-0 opacity-60" />
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -338,15 +373,20 @@ export function InterventionDrawer({
 
               {/* Clario Video Protocol Explanation */}
               {channel === "clario_script" && (
-                <div className={`p-3.5 rounded-2xl border text-xs leading-relaxed space-y-1 ${
+                <div className={`p-3.5 rounded-2xl border text-xs leading-relaxed space-y-1.5 ${
                   isDark ? "border-indigo-500/30 bg-indigo-500/10 text-indigo-300" : "border-indigo-200 bg-indigo-50 text-indigo-900"
                 }`}>
-                  <div className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wider">
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>Clario 60–90s Spoken Workflow Protocol</span>
+                  <div className="flex items-center justify-between font-mono text-[10px] font-bold uppercase tracking-wider">
+                    <div className="flex items-center gap-1.5">
+                      <Video className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Clario 60–90s Spoken Workflow Protocol</span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-[9px]">
+                      Multi-Platform Grounded
+                    </span>
                   </div>
                   <p className="text-[11px]">
-                    Spoken script for {lead?.company}. Focuses on showing the actual workflow resolution rather than pitching. Embed URL token <code className="font-mono text-[10px] bg-black/20 px-1 py-0.5 rounded">{"{{CLARIO_VIDEO_URL}}"}</code> is embedded in the outbound email copy.
+                    Spoken script for {lead?.company}. Grounded in verifiable multi-platform evidence across website, careers hiring drag, or directory feedback. Demonstrates an interactive workflow walkthrough rather than a generic sales pitch. Embed token <code className="font-mono text-[10px] bg-black/20 px-1 py-0.5 rounded">{"{{CLARIO_VIDEO_URL}}"}</code> is attached to outbound email.
                   </p>
                 </div>
               )}

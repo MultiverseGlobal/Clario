@@ -1,13 +1,13 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 from app.database.session import get_session
-from app.services.context import ContextService
+from app.services.retrieval import RetrievalService
 from app.services.graph import GraphService
 from app.services.identity import IdentityService
 from app.services.reflection import ReflectionService
-from app.core.security import get_user_via_api_key
+from app.core.security import get_user_via_api_key, get_authorized_consumer
 from app.core.rate_limiter import llm_rate_limiter
 from app.models.identity import User
 from app.models.operations import WebhookEvent
@@ -21,21 +21,27 @@ class ContextRequest(BaseModel):
 
 class LoreRequest(BaseModel):
     content: str
+    workspace_id: Optional[str] = None
+    project_id: Optional[str] = None
 
 class AnalyzeDraftRequest(BaseModel):
     answers: List[Dict[str, Any]]
 
 
 @router.post("/query")
-async def query_context(req: ContextRequest, current_user: User = Depends(get_user_via_api_key), db: AsyncSession = Depends(get_session), _rate_limit: bool = Depends(llm_rate_limiter)):
-    identity = IdentityService(db)
-    org = await identity.get_user_organization(current_user.id) or await identity.get_or_create_default_organization()
+async def query_context(req: ContextRequest, consumer: Any = Depends(get_authorized_consumer), db: AsyncSession = Depends(get_session), _rate_limit: bool = Depends(llm_rate_limiter)):
+    from app.services.retrieval import RetrievalScope
     
-    graph = GraphService(db)
-    context = ContextService(db, graph)
+    scope = RetrievalScope(
+        consumer_id=consumer.id,
+        organization_id=consumer.organization_id,
+        workspace_id=consumer.workspace_id,
+        allowed_scopes=consumer.allowed_scopes
+    )
     
-    package = await context.generate_context_package(org.id, req.ai_consumer, req.query)
-    return package.package_json
+    retrieval = RetrievalService(db)
+    package = await retrieval.retrieve_context(scope, req.query)
+    return package
 
 @router.post("/analyze-draft")
 async def analyze_draft(req: AnalyzeDraftRequest, current_user: User = Depends(get_user_via_api_key), db: AsyncSession = Depends(get_session), _rate_limit: bool = Depends(llm_rate_limiter)):
@@ -45,33 +51,43 @@ async def analyze_draft(req: AnalyzeDraftRequest, current_user: User = Depends(g
     return result
 
 @router.post("/chat")
-async def chat_with_context(req: ContextRequest, current_user: User = Depends(get_user_via_api_key), db: AsyncSession = Depends(get_session), _rate_limit: bool = Depends(llm_rate_limiter)):
+async def chat_with_context(req: ContextRequest, current_user: User = Depends(get_user_via_api_key), consumer: Any = Depends(get_authorized_consumer), db: AsyncSession = Depends(get_session), _rate_limit: bool = Depends(llm_rate_limiter)):
     """Powers the Playground UI by simulating a Consumer AI that uses Metaphor Context."""
+    from app.services.retrieval import RetrievalScope
+    
     identity = IdentityService(db)
     org = await identity.get_user_organization(current_user.id) or await identity.get_or_create_default_organization()
     
-    graph = GraphService(db)
-    context = ContextService(db, graph)
+    scope = RetrievalScope(
+        consumer_id=consumer.id,
+        organization_id=consumer.organization_id,
+        workspace_id=consumer.workspace_id,
+        allowed_scopes=consumer.allowed_scopes
+    )
+    
+    retrieval = RetrievalService(db)
     
     # 1. Pull the context package from Metaphor
-    package = await context.generate_context_package(org.id, "playground", req.query)
-    package_json = package.package_json
+    package_json = await retrieval.retrieve_context(scope, req.query)
     
     # If no vector nodes matched, fetch top workspace nodes as fallback context
-    if not package_json.get("evidence"):
+    if package_json.get("status") == "no_results" or not package_json.get("nodes"):
         try:
             from sqlmodel import select
             from app.models.graph import Node
-            stmt = select(Node).where(Node.organization_id == org.id).limit(10)
+            stmt = select(Node).where(Node.organization_id == scope.organization_id)
+            if scope.workspace_id:
+                stmt = stmt.where(Node.workspace_id == scope.workspace_id)
+            stmt = stmt.limit(10)
             res = await db.execute(stmt)
             fallback_nodes = res.scalars().all()
             if fallback_nodes:
-                package_json["evidence"] = [
+                package_json["nodes"] = [
                     {"id": str(n.id), "type": n.type, "title": n.title, "summary": n.summary, "source": "workspace"}
                     for n in fallback_nodes
                 ]
                 package_json["status"] = "matched"
-                package_json["workspace_summary"]["total_items_found"] = len(fallback_nodes)
+                package_json["results_count"] = len(fallback_nodes)
         except Exception as e:
             print("Fallback node query error:", e)
 
@@ -228,7 +244,10 @@ async def build_lore(req: LoreRequest, current_user: User = Depends(get_user_via
     
         print("CALLING REFLECT AND EVOLVE")
         try:
-            result = await reflection.reflect_and_evolve(org.id, event)
+            import uuid
+            w_id = uuid.UUID(req.workspace_id) if req.workspace_id else None
+            p_id = uuid.UUID(req.project_id) if req.project_id else None
+            result = await reflection.reflect_and_evolve(org.id, event, workspace_id=w_id, project_id=p_id)
             print("RESULT:", result)
             return result
         except Exception as e:

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { decomposeCampaignPrompt, discoverCampaignLeads, generateLeadOutreach } from "../services/campaignEngine";
+import { decomposeCampaignPrompt, discoverCampaignLeads, generateLeadOutreach, runMultiPlatformRecon } from "../services/campaignEngine";
 
 describe("Campaign Engine Lead Discovery & Decomposition Verification", () => {
   it("flawlessly decomposes 'Primary ICP: US-based digital agencies with ~10-50 staff'", async () => {
@@ -102,5 +102,33 @@ describe("Campaign Engine Lead Discovery & Decomposition Verification", () => {
     expect(strategy.industry).toBe("Marketing & Advertising");
     expect(strategy.targetCount).toBe(10);
     expect(strategy.channel).toBe("clutch");
+  });
+
+  it("harvests multi-platform signals across website, hiring, reviews, and tech stack", async () => {
+    const targetLead = {
+      company: "Apex Design Co",
+      website: "https://apexdesign.co",
+      bottleneck: "Client onboarding bottlenecks and sprint review delays",
+    };
+
+    const recon = await runMultiPlatformRecon(targetLead, {
+      focusHypothesis: "Automating sprint reporting and design token handoffs",
+    });
+
+    expect(recon.signals).toBeDefined();
+    expect(recon.signals.website).toBeDefined();
+    expect(recon.signals.hiring).toBeDefined();
+    expect(recon.signals.reviews).toBeDefined();
+    expect(recon.signals.tech_stack).toBeDefined();
+
+    // Verify source evidence attribution
+    expect(recon.problem_evidence.length).toBeGreaterThan(0);
+    const sourceTypes = recon.problem_evidence.map((e) => e.source_type);
+    expect(sourceTypes).toContain("official_website");
+    expect(sourceTypes).toContain("job_board");
+    expect(sourceTypes).toContain("review_directory");
+
+    expect(recon.likely_operational_problem).toBeTruthy();
+    expect(recon.opportunity_hypothesis).toBeTruthy();
   });
 });

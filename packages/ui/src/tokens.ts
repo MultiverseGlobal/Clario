@@ -12,25 +12,36 @@
 
 // Canvas & Surface
 export const COLOR = {
-  canvas:    '#07080c',
-  surface1:  '#10131b',
-  surface2:  '#151924',
-  surface3:  '#1b202e',
-  hairline:  'rgba(255, 255, 255, 0.08)',
-  hairlineMd:'rgba(255, 255, 255, 0.12)',
-  textPrimary:   '#e8eef8',
-  textSecondary: '#8892a4',
-  textMuted:     '#4a5568',
+  // Base colors (Quiet Command Center)
+  canvasLight:   '#F7F6F2',
+  surfaceLight:  '#FFFFFF',
+  canvasDark:    '#111318',
+  surfaceDark:   '#1A1D24',
+  
+  // Text
+  textPrimaryLight:   '#111318',
+  textSecondaryLight: '#6B7280',
+  textPrimaryDark:    '#F4F1EA',
+  textSecondaryDark:  '#9CA3AF',
+  textMuted:          '#6B7280', // Shared fallback
+
+  // Borders
+  borderLight:   'rgba(17, 19, 24, 0.1)',
+  borderDark:    'rgba(244, 241, 234, 0.1)',
+  
+  // Accent & Semantic
+  primaryAction: '#4F46E5', // Electric Cobalt/Violet
+  success:       '#10B981', // Green for confirmed state
+  warning:       '#F59E0B', // Amber for attention
+  danger:        '#EF4444', // Red for destructive
+
+  // Legacy App Colors (Kept for backwards compatibility but deprioritized)
   orion:     '#00f0ff',
   atlas:     '#10b981',
   clario:    '#ec4899',
   metaphor:  'hsl(260, 70%, 62%)',
   weave:     '#f59e0b',
   id:        '#6366f1',
-  success:   '#10b981',
-  warning:   '#f59e0b',
-  error:     '#ef4444',
-  info:      '#3b82f6',
 } as const;
 
 export const FONT = {
@@ -54,7 +65,10 @@ export const SPACE = {
 } as const;
 
 export const RADIUS = {
-  sm: 6, md: 10, lg: 14, xl: 20, full: 9999,
+  sm: 6,
+  control: 12,
+  card: 20,
+  full: 9999,
 } as const;
 
 export const SPRING = {
@@ -65,10 +79,9 @@ export const SPRING = {
 
 export const DURATION = {
   instant:  80,
-  fast:     160,
-  normal:   280,
-  slow:     460,
-  verySlow: 700,
+  fast:     150,
+  normal:   200,
+  slow:     220,
 } as const;
 
 export const GLOW = {

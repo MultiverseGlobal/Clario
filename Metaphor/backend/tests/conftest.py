@@ -17,6 +17,11 @@ def event_loop():
     yield loop
     loop.close()
 
+@pytest_asyncio.fixture
+async def test_db_session():
+    async with async_session_maker() as session:
+        yield session
+
 @pytest_asyncio.fixture(scope="session")
 async def setup_test_user():
     # 1. Setup real records in the actual database
@@ -50,31 +55,35 @@ async def setup_test_user():
     # 2. Teardown: Cleanup real records after test completes
     async with async_session_maker() as session:
         # We manually delete all records to avoid polluting the DB
-        tables = [
-            "context_packages", "context_sessions", "nodes", "embeddings", 
-            "api_keys", "organization_members", "organizations", "users"
-        ]
         
         # Delete related data first
-        await session.execute(text(f"DELETE FROM node_metadata WHERE node_id IN (SELECT id FROM nodes WHERE organization_id = '{org_id}')"))
-        await session.execute(text(f"DELETE FROM evidence WHERE node_id IN (SELECT id FROM nodes WHERE organization_id = '{org_id}')"))
+        await session.exec(text(f"DELETE FROM universal_events WHERE organization_id = '{org_id}'"))
+        await session.exec(text(f"DELETE FROM task_handoffs WHERE organization_id = '{org_id}'"))
+        await session.exec(text(f"DELETE FROM context_insights WHERE organization_id = '{org_id}'"))
+        
+        await session.exec(text(f"DELETE FROM node_metadata WHERE node_id IN (SELECT id FROM nodes WHERE organization_id = '{org_id}')"))
+        await session.exec(text(f"DELETE FROM evidence WHERE node_id IN (SELECT id FROM nodes WHERE organization_id = '{org_id}')"))
         
         # Unlink embeddings from nodes before deleting embeddings
-        await session.execute(text(f"UPDATE nodes SET embedding_id = NULL WHERE organization_id = '{org_id}'"))
-        await session.execute(text(f"DELETE FROM embeddings WHERE node_id IN (SELECT id FROM nodes WHERE organization_id = '{org_id}')"))
+        await session.exec(text(f"UPDATE nodes SET embedding_id = NULL WHERE organization_id = '{org_id}'"))
+        await session.exec(text(f"DELETE FROM embeddings WHERE node_id IN (SELECT id FROM nodes WHERE organization_id = '{org_id}')"))
         
-        await session.execute(text(f"DELETE FROM edges WHERE from_node IN (SELECT id FROM nodes WHERE organization_id = '{org_id}') OR to_node IN (SELECT id FROM nodes WHERE organization_id = '{org_id}')"))
+        await session.exec(text(f"DELETE FROM edges WHERE from_node IN (SELECT id FROM nodes WHERE organization_id = '{org_id}') OR to_node IN (SELECT id FROM nodes WHERE organization_id = '{org_id}')"))
         
-        await session.execute(text(f"DELETE FROM nodes WHERE organization_id = '{org_id}'"))
-        await session.execute(text(f"DELETE FROM context_sessions WHERE organization_id = '{org_id}'"))
-        await session.execute(text(f"DELETE FROM context_packages WHERE objective LIKE 'Integration Test%'"))
+        await session.exec(text(f"DELETE FROM nodes WHERE organization_id = '{org_id}'"))
+        await session.exec(text(f"DELETE FROM context_sessions WHERE organization_id = '{org_id}'"))
+        await session.exec(text(f"DELETE FROM context_packages WHERE objective LIKE 'Integration Test%'"))
         
-        await session.execute(text(f"DELETE FROM api_keys WHERE organization_id = '{org_id}'"))
-        await session.execute(text(f"DELETE FROM organization_members WHERE organization_id = '{org_id}'"))
-        await session.execute(text(f"DELETE FROM organizations WHERE id = '{org_id}'"))
-        await session.execute(text(f"DELETE FROM users WHERE id = '{user_id}'"))
+        await session.exec(text(f"DELETE FROM api_keys WHERE organization_id = '{org_id}'"))
+        await session.exec(text(f"DELETE FROM organization_members WHERE organization_id = '{org_id}'"))
+        await session.exec(text(f"DELETE FROM organizations WHERE id = '{org_id}'"))
+        await session.exec(text(f"DELETE FROM users WHERE id = '{user_id}'"))
+        # We don't delete consumers since they might be shared, but in tests it's okay if we don't clean them up, or we can clean up any consumers we created.
         
         await session.commit()
+        
+        from app.database.session import engine
+        await engine.dispose()
 
 @pytest_asyncio.fixture
 async def async_client(setup_test_user):

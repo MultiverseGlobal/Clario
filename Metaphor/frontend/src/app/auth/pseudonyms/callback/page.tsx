@@ -33,7 +33,9 @@ function CallbackContent() {
         }
       }
 
-      const onboarded = localStorage.getItem("metaphor_onboarded") === "true";
+      const settingsModule = await import("@/lib/settings");
+      const settingsMem = await settingsModule.pullSettingsFromCloud();
+      const onboarded = settingsMem?.onboarded;
       if (!onboarded && next === "/dashboard") {
         next = "/onboarding?step=connect";
       }

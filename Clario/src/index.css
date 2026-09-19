@@ -522,43 +522,6 @@
   border: 1px solid var(--clario-glass-border);
   box-shadow: var(--clario-glass-highlight), 0 1px 4px rgba(17, 19, 24, 0.03);
 }
-
-/* ── Frame Card ──────────────────────────────────────────────────────────── */
-/* Use as a wrapper — adds the specular rim highlight detail from Atlas's    */
-/* TactileOpportunityCard: a 1px gradient line across the top edge.         */
-.clario-frame-card {
-  position: relative;
-}
-.clario-frame-card::before {
-  content: "";
-  position: absolute;
-  inset-inline: 20px;
-  top: 0;
-  height: 1px;
-  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.80) 40%, rgba(255, 255, 255, 0.80) 60%, transparent);
-  pointer-events: none;
-  z-index: 1;
-}
-.dark .clario-frame-card::before {
-  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.12) 40%, rgba(255, 255, 255, 0.12) 60%, transparent);
-}
-
-/* ── Grid Background ─────────────────────────────────────────────────────── */
-/* Subtle dot-grid pattern for empty states and canvas areas.                */
-.clario-grid-bg {
-  background-color: var(--pds-canvas);
-  background-image: radial-gradient(rgba(17, 19, 24, 0.045) 1px, transparent 1px);
-  background-size: 22px 22px;
-}
-.dark .clario-grid-bg {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-}
-
-/* ── Ambient Glow ────────────────────────────────────────────────────────── */
-/* Soft radial light behind hero content / empty state art.                 */
-.clario-ambient-glow {
-  background: radial-gradient(circle at 50% -5%, rgba(17, 19, 24, 0.06) 0%, transparent 65%);
-}
 .dark .clario-ambient-glow {
   background: radial-gradient(circle at 50% -5%, rgba(255, 255, 255, 0.06) 0%, transparent 65%);
 }
@@ -595,10 +558,7 @@
 
 /* %% Mesh Gradients & Cap.so Aesthetics %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% */
 .clario-mesh-gradient {
-    background-color: #111318;
-    background-image: radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
-    background-size: 200% 200%;
-    animation: clarioMesh 15s ease infinite;
+    background-color: var(--pds-canvas);
 }
 
 @keyframes clarioMesh {

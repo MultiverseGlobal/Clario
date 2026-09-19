@@ -1,4 +1,5 @@
 import { decomposePromptWithGemini, discoverLeadsWithGemini, draftOutreachWithGemini } from "./gemini";
+import { runMultiPlatformRecon } from "../services/campaignEngine";
 
 export async function invokeSourcingMachine(payload: any): Promise<{ data: any, error: any }> {
   try {
@@ -33,6 +34,13 @@ export async function invokeSourcingMachine(payload: any): Promise<{ data: any, 
         payload.body.campaign_hypothesis
       );
       return { data: { draft }, error: null };
+    }
+
+    if (action === "multiplatform-recon") {
+      const data = await runMultiPlatformRecon(payload.body.lead, {
+        focusHypothesis: payload.body.hypothesis,
+      });
+      return { data, error: null };
     }
 
     // Unrecognized action

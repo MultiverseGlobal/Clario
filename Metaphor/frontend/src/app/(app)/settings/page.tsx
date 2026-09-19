@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Settings, Moon, Sun, Monitor, Bell, Database, Key, Copy, Shield } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { fetchFromMetaphor } from "@/app/api";
+import { getLocalSettings } from "@/lib/settings";
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState({
@@ -24,12 +25,12 @@ export default function SettingsPage() {
   useEffect(() => {
     async function loadSettings() {
       try {
-        // Read localStorage first — this is the source of truth, defaults to dark
-        const localTheme = localStorage.getItem("metaphor_theme") || "dark";
+        const settingsMem = getLocalSettings();
+        const localTheme = settingsMem?.theme || "dark";
         applyTheme(localTheme);
         setSettings(prev => ({ ...prev, theme: localTheme }));
 
-        const storedName = localStorage.getItem("metaphor_user_name");
+        const storedName = settingsMem?.user_name;
         const user = await fetchFromMetaphor("/auth/me", undefined, "GET", false, true);
         if (user) {
           const cleanName = storedName || (user.name && user.name !== "Supabase User" && user.name !== "Developer User"
@@ -37,8 +38,7 @@ export default function SettingsPage() {
             : user.email ? user.email.split("@")[0] : "multiverseglobals");
           setUserName(cleanName);
           setUserEmail(user.email || "");
-          // Only override if user has explicitly saved a theme to the backend AND nothing is in localStorage
-          if (user.settings?.theme && !localStorage.getItem("metaphor_theme")) {
+          if (user.settings?.theme && !settingsMem?.theme) {
             applyTheme(user.settings.theme);
             setSettings(prev => ({ ...prev, ...user.settings }));
           }
@@ -78,7 +78,7 @@ export default function SettingsPage() {
         root.setAttribute("data-theme", "light");
       }
     }
-    localStorage.setItem("metaphor_theme", themeName);
+    // Theme changes will be captured when saving all settings, but we apply classes immediately
   };
 
   const updateSetting = async (key: string, value: any) => {
@@ -104,7 +104,7 @@ export default function SettingsPage() {
     if (!userName.trim()) return;
     setSavingName(true);
     const targetName = userName.trim();
-    localStorage.setItem("metaphor_user_name", targetName);
+    // No more localStorage.setItem("metaphor_user_name", targetName);
     try {
       await fetchFromMetaphor("/auth/me", {
         name: targetName,

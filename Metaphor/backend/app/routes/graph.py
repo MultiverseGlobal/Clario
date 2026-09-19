@@ -5,10 +5,11 @@ from sqlmodel import select
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
 import uuid
+from datetime import datetime
 
 from app.database.session import get_session
-from app.config import settings
-from app.models import Node, Edge, Chunk, NodeEvidence, Clarification
+from app.core.config import settings
+from app.models import Node, Edge, Evidence, Clarification
 from app.provider import llm_provider
 from app.reflection import reflection_engine
 
@@ -72,23 +73,23 @@ async def get_graph(
             nodes=[
                 {
                     "id": str(n.id),
-                    "name": n.name,
+                    "name": n.title,
                     "type": n.type,
-                    "metadata": n.metadata_json,
-                    "created_at": n.created_at.isoformat()
+                    "metadata": {"summary": n.summary, "content": n.content},
+                    "created_at": n.created_at.isoformat() if n.created_at else ""
                 }
                 for n in filtered_nodes
             ],
             edges=[
                 {
                     "id": str(e.id),
-                    "source": str(e.source_id),
-                    "target": str(e.target_id),
-                    "dimension": e.dimension,
-                    "type": e.relationship_type,
+                    "source": str(e.from_node),
+                    "target": str(e.to_node),
+                    "dimension": "structural",
+                    "type": e.relationship,
                     "weight": e.weight,
-                    "description": e.metadata_json.get("description", ""),
-                    "created_at": e.created_at.isoformat()
+                    "description": "",
+                    "created_at": e.created_at.isoformat() if e.created_at else ""
                 }
                 for e in filtered_edges
             ]
@@ -109,40 +110,36 @@ async def explain_relationship(
     """
     try:
         # Find Node A
-        node_a_q = await session.exec(select(Node).where(Node.name == req.node_a_name))
+        node_a_q = await session.exec(select(Node).where(Node.title == req.node_a_name))
         node_a = node_a_q.first()
         # Find Node B
-        node_b_q = await session.exec(select(Node).where(Node.name == req.node_b_name))
+        node_b_q = await session.exec(select(Node).where(Node.title == req.node_b_name))
         node_b = node_b_q.first()
 
         if not node_a or not node_b:
             raise HTTPException(status_code=404, detail="One or both nodes not found")
 
         # Gather evidence chunks for Node A and Node B
-        chunks_a_q = await session.exec(
-            select(Chunk).join(NodeEvidence).where(NodeEvidence.node_id == node_a.id)
-        )
-        chunks_a = chunks_a_q.all()
-        evidence_a = "\n".join([f"- {c.text_content[:300]}..." for c in chunks_a])
+        evidence_a_q = await session.exec(select(Evidence).where(Evidence.node_id == node_a.id))
+        chunks_a = evidence_a_q.all()
+        evidence_a = "\n".join([f"- {c.raw_text[:300]}..." for c in chunks_a])
 
-        chunks_b_q = await session.exec(
-            select(Chunk).join(NodeEvidence).where(NodeEvidence.node_id == node_b.id)
-        )
-        chunks_b = chunks_b_q.all()
-        evidence_b = "\n".join([f"- {c.text_content[:300]}..." for c in chunks_b])
+        evidence_b_q = await session.exec(select(Evidence).where(Evidence.node_id == node_b.id))
+        chunks_b = evidence_b_q.all()
+        evidence_b = "\n".join([f"- {c.raw_text[:300]}..." for c in chunks_b])
 
         # Fetch direct paths between A and B
         edges_q = await session.exec(
             select(Edge).where(
-                ((Edge.source_id == node_a.id) & (Edge.target_id == node_b.id)) |
-                ((Edge.source_id == node_b.id) & (Edge.target_id == node_a.id))
+                ((Edge.from_node == node_a.id) & (Edge.to_node == node_b.id)) |
+                ((Edge.from_node == node_b.id) & (Edge.to_node == node_a.id))
             )
         )
         edges = edges_q.all()
         direct_paths = []
         for e in edges:
             direct_paths.append(
-                f"- Connection: {req.node_a_name} -> {req.node_b_name} | Dimension: {e.dimension} | Relation: {e.relationship_type} | Desc: {e.metadata_json.get('description', '')}"
+                f"- Connection: {req.node_a_name} -> {req.node_b_name} | Relation: {e.relationship}"
             )
         paths_text = "\n".join(direct_paths) if direct_paths else "- No direct edges between them, searching graph paths."
 
@@ -150,12 +147,12 @@ async def explain_relationship(
         system_prompt = "You are Metaphor's Context Explainer. You translate graph database paths and source evidence into human explanations."
         
         prompt = (
-            f"Please explain how '{node_a.name}' ({node_a.type}) relates to '{node_b.name}' ({node_b.type}) in the user's workspace.\n\n"
+            f"Please explain how '{node_a.title}' ({node_a.type}) relates to '{node_b.title}' ({node_b.type}) in the user's workspace.\n\n"
             f"Graph Path Context:\n"
             f"{paths_text}\n\n"
-            f"Evidence supporting '{node_a.name}':\n"
+            f"Evidence supporting '{node_a.title}':\n"
             f"{evidence_a or '- No direct evidence text stored.'}\n\n"
-            f"Evidence supporting '{node_b.name}':\n"
+            f"Evidence supporting '{node_b.title}':\n"
             f"{evidence_b or '- No direct evidence text stored.'}\n\n"
             f"Synthesize this context. Explain: \n"
             f"1. The causal or chronological chain of connection (how they relate in time, e.g., meetings, commits, ideas).\n"
@@ -166,8 +163,8 @@ async def explain_relationship(
         explanation = await llm_provider.query_llm(prompt=prompt, system_prompt=system_prompt)
         
         return {
-            "node_a": node_a.name,
-            "node_b": node_b.name,
+            "node_a": node_a.title,
+            "node_b": node_b.title,
             "explanation": explanation
         }
 
@@ -216,11 +213,11 @@ async def get_history(
 
             timeline.append({
                 "id": str(n.id),
-                "name": n.name,
+                "name": n.title,
                 "type": n.type,
                 "metadata": meta,
-                "date": event_date.isoformat(),
-                "display_date": event_date.strftime("%B %d, %Y %H:%M")
+                "date": event_date.isoformat() if event_date else "",
+                "display_date": event_date.strftime("%B %d, %Y %H:%M") if event_date else ""
             })
 
         # Sort timeline chronologically
@@ -231,18 +228,18 @@ async def get_history(
         for item in timeline:
             outgoing = []
             for e in edges:
-                if str(e.source_id) == item["id"]:
+                if str(e.from_node) == item["id"]:
                     # Find target node name
                     target_name = "Unknown"
                     for tn in nodes:
-                        if str(tn.id) == str(e.target_id):
-                            target_name = tn.name
+                        if str(tn.id) == str(e.to_node):
+                            target_name = tn.title
                             break
                     outgoing.append({
-                        "target_id": str(e.target_id),
+                        "target_id": str(e.to_node),
                         "target_name": target_name,
-                        "type": e.relationship_type,
-                        "description": e.metadata_json.get("description", "")
+                        "type": e.relationship,
+                        "description": ""
                     })
             item["causes"] = outgoing
 
@@ -296,26 +293,26 @@ async def get_inbox(
         # Serialize pending edges with names
         edges_serialized = []
         for e in pending_edges:
-            src_node = await session.get(Node, e.source_id)
-            tgt_node = await session.get(Node, e.target_id)
+            src_node = await session.get(Node, e.from_node)
+            tgt_node = await session.get(Node, e.to_node)
             edges_serialized.append({
                 "id": str(e.id),
-                "source_id": str(e.source_id),
-                "target_id": str(e.target_id),
-                "source_name": src_node.name if src_node else "Unknown",
-                "target_name": tgt_node.name if tgt_node else "Unknown",
-                "dimension": e.dimension,
-                "relationship_type": e.relationship_type,
-                "description": e.metadata_json.get("description", "") if e.metadata_json else ""
+                "source_id": str(e.from_node),
+                "target_id": str(e.to_node),
+                "source_name": src_node.title if src_node else "Unknown",
+                "target_name": tgt_node.title if tgt_node else "Unknown",
+                "dimension": "structural",
+                "relationship_type": e.relationship,
+                "description": ""
             })
 
         return InboxResponse(
             pending_nodes=[
                 {
                     "id": str(n.id),
-                    "name": n.name,
+                    "name": n.title,
                     "type": n.type,
-                    "metadata": n.metadata_json
+                    "metadata": {"summary": n.summary, "content": n.content}
                 }
                 for n in pending_nodes
             ],
@@ -379,7 +376,7 @@ async def reject_inbox_item(
                 raise HTTPException(status_code=404, detail="Node not found")
             # Delete associated edges
             edges_q = await session.exec(select(Edge).where(
-                (Edge.source_id == item_uuid) | (Edge.target_id == item_uuid)
+                (Edge.from_node == item_uuid) | (Edge.to_node == item_uuid)
             ))
             for e in edges_q.all():
                 await session.delete(e)

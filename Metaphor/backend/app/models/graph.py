@@ -10,6 +10,7 @@ class Node(SQLModel, table=True):
     
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     organization_id: uuid.UUID = Field(foreign_key="organizations.id", index=True)
+    workspace_id: Optional[uuid.UUID] = Field(default=None, foreign_key="workspaces.id", index=True)
     
     type: str = Field(index=True) # e.g., "decision", "goal", "constraint", "project"
     title: str
@@ -98,11 +99,23 @@ class ContextModel(SQLModel, table=True):
     
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     organization_id: uuid.UUID = Field(foreign_key="organizations.id", index=True)
+    workspace_id: Optional[uuid.UUID] = Field(default=None, foreign_key="workspaces.id", index=True)
     
     name: str
     description: str
     node_types: str # comma-separated list of types to include, e.g., "project,constraint"
     is_default: bool = Field(default=False)
     
+    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime(timezone=True)))
+
+
+class Clarification(SQLModel, table=True):
+    __tablename__ = "clarifications"
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    question_text: str = Field(index=True)
+    options_json: list = Field(default_factory=list, sa_column=Column(JSON))
+    resolved: bool = Field(default=False, index=True)
+    resolved_answer: Optional[str] = Field(default=None)
+    target_node_id: Optional[uuid.UUID] = Field(default=None, foreign_key="nodes.id")
     created_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime(timezone=True)))
 

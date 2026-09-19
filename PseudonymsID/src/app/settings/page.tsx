@@ -41,9 +41,9 @@ export default function SettingsPage() {
   };
 
   const providers = [
-    { id: "gemini" as const, label: "Google Gemini", placeholder: "AIzaSy..." },
-    { id: "anthropic" as const, label: "Anthropic Claude", placeholder: "sk-ant-..." },
-    { id: "openai" as const, label: "OpenAI", placeholder: "sk-..." },
+    { id: "gemini" as const, label: "Google Gemini", placeholder: "AIzaSy...", prefix: "AIza" },
+    { id: "anthropic" as const, label: "Anthropic Claude", placeholder: "sk-ant-...", prefix: "sk-ant-" },
+    { id: "openai" as const, label: "OpenAI", placeholder: "sk-...", prefix: "sk-" },
   ];
 
   return (
@@ -107,7 +107,17 @@ export default function SettingsPage() {
                   value={keys[p.id]}
                   onChange={(e) => setKeys((prev) => ({ ...prev, [p.id]: e.target.value }))}
                   className="pds-input mono icon"
+                  style={{ paddingRight: '40px' }}
                 />
+                {keys[p.id] && (
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center">
+                    {keys[p.id].startsWith(p.prefix) ? (
+                      <CheckCircle2 size={16} className="text-[#10B981]" />
+                    ) : (
+                      <AlertCircle size={16} className="text-[#EF4444]" title={`Should start with ${p.prefix}`} />
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))}

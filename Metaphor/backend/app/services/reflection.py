@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from app.services.llm import llm_service
 from app.services.graph import GraphService
 from app.models.operations import WebhookEvent
@@ -12,7 +12,13 @@ class ReflectionService:
     def __init__(self, graph_service: GraphService):
         self.graph = graph_service
 
-    async def reflect_and_evolve(self, org_id: uuid.UUID, event: WebhookEvent) -> Dict[str, Any]:
+    async def reflect_and_evolve(
+        self, 
+        org_id: uuid.UUID, 
+        event: WebhookEvent,
+        workspace_id: Optional[uuid.UUID] = None,
+        project_id: Optional[uuid.UUID] = None
+    ) -> Dict[str, Any]:
         """
         Run the Reflection Agent to translate a WebhookEvent into Graph mutations.
         The Intelligence Layer emits structured operations: CREATE_NODE, UPDATE_NODE, SUPERSEDE_NODE, CREATE_EDGE, IGNORE.
@@ -126,6 +132,7 @@ class ReflectionService:
                             
                     node = await self.graph.create_node(
                         org_id=org_id,
+                        workspace_id=workspace_id,
                         type=n_data.get("type", "Concept"),
                         title=title,
                         summary=summary,
@@ -139,6 +146,17 @@ class ReflectionService:
                     )
                     node_map[title.lower()] = node
                     applied_ops += 1
+                    
+                    if project_id:
+                        try:
+                            await self.graph.create_edge(
+                                from_node=node.id, 
+                                to_node=project_id, 
+                                relationship="belongs_to", 
+                                source_event_id=event.id
+                            )
+                        except Exception as e:
+                            logger.error(f"Error automatically linking node to project: {e}")
                     
             elif action == "SUPERSEDE_NODE":
                 old_id_str = op.get("old_node_id")
@@ -164,6 +182,7 @@ class ReflectionService:
                         # Create the new node
                         new_node = await self.graph.create_node(
                             org_id=org_id,
+                            workspace_id=workspace_id,
                             type=n_data.get("type", "Concept"),
                             title=title,
                             summary=summary,
@@ -183,6 +202,17 @@ class ReflectionService:
                         # Create an explicit edge
                         await self.graph.create_edge(from_node=new_node.id, to_node=old_id, relationship="supersedes", source_event_id=event.id)
                         
+                        if project_id:
+                            try:
+                                await self.graph.create_edge(
+                                    from_node=new_node.id, 
+                                    to_node=project_id, 
+                                    relationship="belongs_to", 
+                                    source_event_id=event.id
+                                )
+                            except Exception as e:
+                                logger.error(f"Error automatically linking new node to project: {e}")
+                                
                         applied_ops += 1
                     except Exception as e:
                         logger.error(f"Error superseding node: {e}")
@@ -227,8 +257,9 @@ class ReflectionService:
                 question = op.get("question", "Unknown question")
                 context = op.get("context", "")
                 try:
-                    await self.graph.create_node(
+                    clarification_node = await self.graph.create_node(
                         org_id=org_id,
+                        workspace_id=workspace_id,
                         type="Clarification",
                         title=question,
                         summary=context,
@@ -237,6 +268,18 @@ class ReflectionService:
                         source_event_id=event.id
                     )
                     applied_ops += 1
+                    
+                    if project_id:
+                        try:
+                            await self.graph.create_edge(
+                                from_node=clarification_node.id, 
+                                to_node=project_id, 
+                                relationship="belongs_to", 
+                                source_event_id=event.id
+                            )
+                        except Exception as e:
+                            logger.error(f"Error automatically linking clarification to project: {e}")
+                            
                 except Exception as e:
                     logger.error(f"Error creating clarification: {e}")
 

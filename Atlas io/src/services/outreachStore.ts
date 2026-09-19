@@ -19,25 +19,39 @@ export interface OutreachRecord {
   notes?: string;
 }
 
-const STORAGE_KEY = "atlas_dispatched_outreach_v1";
-
-export function getStoredOutreachRecords(): OutreachRecord[] {
+export async function fetchOutreachRecords(): Promise<OutreachRecord[]> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return [];
-    }
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData?.user?.id) return [];
 
-    // Filter out any legacy fake seed records (outreach-seed-*)
-    const clean = parsed.filter((r) => !r.id?.startsWith("outreach-seed-"));
-    if (clean.length !== parsed.length) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
-    }
-    return clean;
+    const { data, error } = await supabase
+      .from("atlas_outreach")
+      .select("*")
+      .eq("user_id", userData.user.id)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    
+    return data.map((d: any) => ({
+      id: d.id,
+      campaign_prompt: d.campaign_prompt || "",
+      company_name: d.company_name || "",
+      website: d.website,
+      recipient_name: d.to_name,
+      recipient_email: d.to_email,
+      recipient_role: d.recipient_role,
+      channel: d.channel as any,
+      subject: d.subject,
+      body: d.body,
+      status: d.status as any,
+      delivery_provider: d.delivery_provider || "Manual",
+      sent_at: d.sent_at || d.created_at,
+      resend_id: d.resend_id,
+      clario_video_url: d.clario_video_url,
+      notes: d.notes,
+    }));
   } catch (err) {
-    console.warn("[OutreachStore] Failed to read from localStorage:", err);
+    console.error("[OutreachStore] Failed to fetch from Supabase:", err);
     return [];
   }
 }
@@ -64,21 +78,11 @@ export async function recordOutreachDispatch(
     notes: entry.notes,
   };
 
-  // 1. Update localStorage
-  try {
-    const existing = getStoredOutreachRecords();
-    const updated = [newRecord, ...existing.filter((r) => r.id !== newRecord.id)];
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    window.dispatchEvent(new CustomEvent("atlas_outreach_updated", { detail: newRecord }));
-  } catch (err) {
-    console.error("[OutreachStore] Error persisting outreach record:", err);
-  }
-
-  // 2. Best-effort Supabase sync
   try {
     const { data: userData } = await supabase.auth.getUser();
     if (userData?.user?.id) {
-      await (supabase as any).from("atlas_outreach").insert({
+      // Use standard insert for the new outreach record
+      const { data, error } = await supabase.from("atlas_outreach").insert({
         user_id: userData.user.id,
         to_name: newRecord.recipient_name,
         to_email: newRecord.recipient_email,
@@ -91,58 +95,83 @@ export async function recordOutreachDispatch(
         type: "cold_email",
         clario_video_url: newRecord.clario_video_url,
         sent_at: newRecord.sent_at,
-      });
+      }).select().single();
+      
+      if (error) throw error;
+      if (data) {
+        newRecord.id = data.id; // update to real UUID from backend
+      }
     }
+    
+    // Dispatch event so UI can react
+    window.dispatchEvent(new CustomEvent("atlas_outreach_updated", { detail: newRecord }));
   } catch (err) {
-    // Non-blocking: localStorage acts as source of truth when edge table or auth is offline
-    console.debug("[OutreachStore] Supabase remote sync notice:", err);
+    console.error("[OutreachStore] Supabase insert failed:", err);
   }
 
   return newRecord;
 }
 
-export function updateOutreachStatus(
+export async function updateOutreachStatus(
   id: string,
   newStatus: OutreachRecord["status"],
   notes?: string
-): OutreachRecord | null {
+): Promise<OutreachRecord | null> {
   try {
-    const existing = getStoredOutreachRecords();
-    const target = existing.find((r) => r.id === id);
-    if (!target) return null;
+    const updatePayload: any = { status: newStatus };
+    if (notes !== undefined) updatePayload.notes = notes;
 
-    target.status = newStatus;
-    if (notes !== undefined) target.notes = notes;
+    const { data, error } = await supabase
+      .from("atlas_outreach")
+      .update(updatePayload)
+      .eq("id", id)
+      .select()
+      .single();
 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
-    window.dispatchEvent(new CustomEvent("atlas_outreach_updated", { detail: target }));
-    return target;
+    if (error) throw error;
+    
+    window.dispatchEvent(new CustomEvent("atlas_outreach_updated", { detail: data }));
+    return data as unknown as OutreachRecord;
   } catch (err) {
-    console.error("[OutreachStore] Failed to update outreach status:", err);
+    console.error("[OutreachStore] Failed to update outreach status in Supabase:", err);
     return null;
   }
 }
 
-export function deleteOutreachRecord(id: string): boolean {
+export async function deleteOutreachRecord(id: string): Promise<boolean> {
   try {
-    const existing = getStoredOutreachRecords();
-    const updated = existing.filter((r) => r.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    const { error } = await supabase
+      .from("atlas_outreach")
+      .delete()
+      .eq("id", id);
+      
+    if (error) throw error;
+    
     window.dispatchEvent(new CustomEvent("atlas_outreach_updated", { detail: { id, deleted: true } }));
     return true;
   } catch (err) {
-    console.error("[OutreachStore] Failed to delete outreach record:", err);
+    console.error("[OutreachStore] Failed to delete outreach record from Supabase:", err);
     return false;
   }
 }
 
-export function clearAllOutreachRecords(): boolean {
+export async function clearAllOutreachRecords(): Promise<boolean> {
   try {
-    localStorage.removeItem(STORAGE_KEY);
-    window.dispatchEvent(new CustomEvent("atlas_outreach_updated", { detail: { cleared: true } }));
-    return true;
+    const { data: userData } = await supabase.auth.getUser();
+    if (userData?.user?.id) {
+      const { error } = await supabase
+        .from("atlas_outreach")
+        .delete()
+        .eq("user_id", userData.user.id);
+        
+      if (error) throw error;
+      
+      window.dispatchEvent(new CustomEvent("atlas_outreach_updated", { detail: { cleared: true } }));
+      return true;
+    }
+    return false;
   } catch (err) {
-    console.error("[OutreachStore] Failed to clear outreach records:", err);
+    console.error("[OutreachStore] Failed to clear outreach records in Supabase:", err);
     return false;
   }
 }

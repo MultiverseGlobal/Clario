@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Dict, Any
 
 from app.database.session import get_session
-from app.config import settings
+from app.core.config import settings
 from app.parsers.notion import NotionParser
 from app.parsers.github import GitHubParser
 from app.parsers.google_services import GoogleParser

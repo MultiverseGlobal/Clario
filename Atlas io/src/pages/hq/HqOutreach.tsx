@@ -9,7 +9,7 @@ import {
   Plus, Trash2
 } from "lucide-react";
 import {
-  getStoredOutreachRecords,
+  fetchOutreachRecords,
   updateOutreachStatus,
   deleteOutreachRecord,
   clearAllOutreachRecords,
@@ -45,8 +45,8 @@ export default function HqOutreach() {
   const [formStatus, setFormStatus] = useState<OutreachRecord["status"]>("sent");
 
   // Load records and subscribe to live dispatch events
-  const refreshRecords = useCallback(() => {
-    const data = getStoredOutreachRecords();
+  const refreshRecords = useCallback(async () => {
+    const data = await fetchOutreachRecords();
     setRecords(data);
   }, []);
 
@@ -71,8 +71,8 @@ export default function HqOutreach() {
   };
 
   // Status update handler
-  const handleStatusChange = (id: string, newStatus: OutreachRecord["status"]) => {
-    const updated = updateOutreachStatus(id, newStatus);
+  const handleStatusChange = async (id: string, newStatus: OutreachRecord["status"]) => {
+    const updated = await updateOutreachStatus(id, newStatus);
     if (updated) {
       soundManager.playSuccess();
       toast.success(`Updated status to ${newStatus.toUpperCase()}`);
@@ -84,9 +84,9 @@ export default function HqOutreach() {
   };
 
   // Delete record handler
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm("Remove this outreach entry from your ledger?")) {
-      deleteOutreachRecord(id);
+      await deleteOutreachRecord(id);
       if (selectedRecord?.id === id) {
         setSelectedRecord(null);
       }
@@ -96,9 +96,9 @@ export default function HqOutreach() {
   };
 
   // Clear all handler
-  const handleClearAll = () => {
+  const handleClearAll = async () => {
     if (confirm("Are you sure you want to clear all outreach records? This cannot be undone.")) {
-      clearAllOutreachRecords();
+      await clearAllOutreachRecords();
       setSelectedRecord(null);
       refreshRecords();
       toast.success("Outreach ledger cleared");

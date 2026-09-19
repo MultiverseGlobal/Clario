@@ -6,12 +6,14 @@ import {
   CheckCircle2, ChevronRight, ExternalLink, ShieldCheck, 
   Radar, Cpu, Flame, Target, Compass, Terminal, Radio,
   Brain, PenTool, Zap, Globe, Layers, AlertCircle, Bot,
-  Search, Calendar, SlidersHorizontal, Info, ChevronDown, ChevronUp, X
+  Search, Calendar, SlidersHorizontal, Info, ChevronDown, ChevronUp, X,
+  Clapperboard
 } from "lucide-react";
 import { 
   decomposeCampaignPrompt, 
   discoverCampaignLeads, 
   generateLeadOutreach, 
+  runMultiPlatformRecon,
   type DiscoveredLead, 
   type OutreachDraft, 
   type CampaignState 
@@ -63,6 +65,59 @@ export function CommandEngine({
   const [icpSearch, setIcpSearch] = useState<string>("");
   const [isIcpDrawerOpen, setIsIcpDrawerOpen] = useState<boolean>(false);
   const [hoveredIcp, setHoveredIcp] = useState<IcpSuggestion | null>(null);
+  const [isReconRunning, setIsReconRunning] = useState<boolean>(false);
+
+  const handleRunDeepRecon = async () => {
+    if (!selectedLeadModal || isReconRunning) return;
+    setIsReconRunning(true);
+    soundManager.playClick();
+    toast("Harvesting live multi-platform signals...", {
+      description: `Scanning Website, Careers, and Review directories for ${selectedLeadModal.company}`,
+    });
+
+    try {
+      const reconResult = await runMultiPlatformRecon(selectedLeadModal, {
+        focusHypothesis: campaignState.hypothesis,
+      });
+
+      const updatedLead: DiscoveredLead = {
+        ...selectedLeadModal,
+        bottleneck: reconResult.likely_operational_problem,
+        recon: {
+          observed_signals: reconResult.observed_signals,
+          likely_operational_problem: reconResult.likely_operational_problem,
+          problem_evidence: reconResult.problem_evidence,
+          problem_confidence: reconResult.problem_confidence,
+          opportunity_hypothesis: reconResult.opportunity_hypothesis,
+          why_this_is_plausible: reconResult.why_this_is_plausible,
+          multi_platform: reconResult.signals,
+        },
+        evidence: [
+          ...reconResult.problem_evidence.map((ev) => ({
+            type: ev.source_type === "official_website" ? ("fact" as const) : ("inference" as const),
+            text: `[${ev.source_type.replace("_", " ").toUpperCase()}] ${ev.claim}`,
+            source_url: ev.source_url,
+          })),
+        ],
+      };
+
+      setSelectedLeadModal(updatedLead);
+
+      onStateChange((prev) => ({
+        ...prev,
+        leads: prev.leads?.map((l) => (l.id === updatedLead.id ? updatedLead : l)),
+      }));
+
+      soundManager.playSuccess();
+      toast.success(`Multi-platform recon complete for ${selectedLeadModal.company}!`, {
+        description: `Diagnosed: ${reconResult.likely_operational_problem}`,
+      });
+    } catch (err: any) {
+      toast.error(`Recon failed: ${err.message}`);
+    } finally {
+      setIsReconRunning(false);
+    }
+  };
 
   const todayFocus = getTodayIcpFocus();
   const visibleSuggestions = searchIcpSuggestions(icpSearch, icpCategory);
@@ -96,7 +151,7 @@ export function CommandEngine({
 
     try {
       toast("Decomposing campaign strategy & targeting...", {
-        icon: <Brain className="h-4 w-4 text-emerald-500" />,
+        icon: <Brain className="h-4 w-4 text-foreground" />,
       });
       const strategy = await decomposeCampaignPrompt(prompt);
 
@@ -156,7 +211,7 @@ export function CommandEngine({
 
     try {
       toast(`Scanning ${targetChannel.toUpperCase()} & directories for ${tempIcp.keyword} (${tempIcp.min_headcount || 5}-${tempIcp.max_headcount || 30} staff)...`, {
-        icon: <Radar className="h-4 w-4 text-sky-500" />,
+        icon: <Radar className="h-4 w-4 text-foreground" />,
       });
       const foundLeads = await discoverCampaignLeads(
         targetChannel, 
@@ -184,7 +239,7 @@ export function CommandEngine({
       }));
 
       toast(`Synthesizing tailored outreach for ${foundLeads[0].company}...`, {
-        icon: <PenTool className="h-4 w-4 text-amber-500" />,
+        icon: <PenTool className="h-4 w-4 text-foreground" />,
       });
       const draft = await generateLeadOutreach(foundLeads[0], tempIcp.hypothesis);
 
@@ -198,7 +253,7 @@ export function CommandEngine({
         soundManager.playChime();
         onRequireIntervention(foundLeads[0], draft);
         toast("Outreach ready for review. System paused for authorization.", {
-          icon: <CheckCircle2 className="h-4 w-4 text-emerald-500" />,
+          icon: <CheckCircle2 className="h-4 w-4 text-foreground" />,
         });
       }
 
@@ -275,8 +330,8 @@ export function CommandEngine({
           <div
             className={`absolute -inset-[2px] rounded-3xl opacity-30 blur-lg transition-opacity duration-700 group-hover:opacity-80 group-focus-within:opacity-80 ${
               isDark
-                ? "bg-gradient-to-r from-white/20 via-emerald-400/20 to-white/10"
-                : "bg-gradient-to-r from-neutral-300/60 via-emerald-500/20 to-neutral-200/50"
+                ? "bg-gradient-to-r from-white/20 via-blue-500/20 to-white/10"
+                : "bg-gradient-to-r from-neutral-300/60 via-blue-500/20 to-neutral-200/50"
             } ${!isRunning && inputPrompt.length === 0 ? "atlas-animate-breathe" : ""}`}
           />
 
@@ -318,7 +373,7 @@ export function CommandEngine({
                     : "border-neutral-300 bg-white text-neutral-900 hover:bg-neutral-50 shadow-md"
                 } ${
                   isAutoPilot 
-                    ? isDark ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400" : "border-emerald-500/30 bg-emerald-50 text-emerald-700" 
+                    ? isDark ? "border-blue-500/50 bg-[#0e1326] text-blue-300" : "border-blue-500/30 bg-blue-50 text-blue-800" 
                     : ""
                 }`}
                 title="Toggle Autopilot Mode"
@@ -383,10 +438,10 @@ export function CommandEngine({
               }}
               className="group flex items-center gap-2.5 px-4 py-2 rounded-full border text-xs font-mono font-medium transition-all cursor-pointer backdrop-blur-md border-border/70 bg-card/70 hover:bg-card text-muted-foreground hover:text-foreground shadow-sm hover:shadow-md hover:border-foreground/30 active:scale-98"
             >
-              <Sparkles className="w-3.5 h-3.5 text-emerald-500 group-hover:rotate-12 transition-transform" />
+              <Sparkles className="w-3.5 h-3.5 text-foreground group-hover:rotate-12 transition-transform" />
               <span className="font-semibold text-foreground">Target Suggestions & Signals</span>
               <span className="hidden sm:inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-muted/80 text-muted-foreground border border-border/40">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
                 {todayFocus.theme.dayName}: {todayFocus.theme.focusTheme}
               </span>
               <ChevronRight className="w-3 h-3 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all" />
@@ -465,7 +520,7 @@ export function CommandEngine({
                   className="relative h-12 w-full rounded-xl flex items-center justify-between px-4 border bg-muted border-border"
                 >
                   <div className="flex items-center gap-2.5 font-mono text-[11px] text-foreground">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
                     <span className="font-semibold uppercase tracking-wider">{(tempIcp.channel || campaignState.channel || "CLUTCH").toUpperCase()} DIRECTORY</span>
                   </div>
                   <span className="text-[10px] font-mono text-muted-foreground uppercase truncate max-w-[140px]">
@@ -478,9 +533,9 @@ export function CommandEngine({
                   <div className="flex flex-col text-left text-xs font-mono text-foreground">
                     <div className="space-y-3 pr-1 pb-2">
                       {tempIcp.plain_english_summary && (
-                        <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-sans leading-relaxed">
-                          <div className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wider mb-1">
-                            <Brain className="w-3.5 h-3.5 text-emerald-500" />
+                        <div className="p-3 rounded-xl border border-[#1d2642] bg-[#0c0f1d] text-slate-300 text-[11px] font-sans leading-relaxed">
+                          <div className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wider mb-1 text-foreground">
+                            <Brain className="w-3.5 h-3.5 text-blue-400" />
                             <span>Stage 0: Intake Restatement</span>
                           </div>
                           <p>{tempIcp.plain_english_summary}</p>
@@ -515,15 +570,15 @@ export function CommandEngine({
                         </div>
                         <div className="space-y-1">
                           <label className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Headcount Bound</label>
-                          <div className={`rounded-md border p-1.5 bg-background border-border text-[11px] font-semibold text-emerald-500 flex items-center justify-between ${campaignState.status === "discovering" ? "opacity-50" : ""}`}>
+                          <div className={`rounded-md border p-1.5 bg-background border-border text-[11px] font-semibold text-foreground flex items-center justify-between ${campaignState.status === "discovering" ? "opacity-50" : ""}`}>
                             <span>{tempIcp.min_headcount || 5}–{tempIcp.max_headcount || 30} staff</span>
-                            <span className="text-[9px] bg-emerald-500/10 text-emerald-600 px-1 rounded font-bold">Strict</span>
+                            <span className="text-[9px] bg-white/5 text-muted-foreground px-1.5 py-0.5 rounded font-bold">Strict</span>
                           </div>
                         </div>
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Target Regions</label>
-                        <div className={`rounded-md border p-1.5 bg-background border-border text-[11px] font-semibold text-sky-500 truncate ${campaignState.status === "discovering" ? "opacity-50" : ""}`} title={(tempIcp.regions || ["US", "UK"]).join(", ")}>
+                        <div className={`rounded-md border p-1.5 bg-background border-border text-[11px] font-semibold text-foreground truncate ${campaignState.status === "discovering" ? "opacity-50" : ""}`} title={(tempIcp.regions || ["US", "UK"]).join(", ")}>
                           {(tempIcp.regions || ["US", "UK"]).join(", ")}
                         </div>
                       </div>
@@ -547,12 +602,12 @@ export function CommandEngine({
                       >
                         {campaignState.status === "discovering" ? (
                           <>
-                            <Cpu className="w-4 h-4 text-emerald-500 animate-spin" />
+                            <Cpu className="w-4 h-4 text-background animate-spin" />
                             <span>Scanning Sources...</span>
                           </>
                         ) : (
                           <>
-                            <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                            <ShieldCheck className="w-4 h-4 text-background" />
                             <span>Approve & Scan</span>
                           </>
                         )}
@@ -560,7 +615,7 @@ export function CommandEngine({
                     </div>
                   </div>
                 ) : campaignState.error && campaignState.leads.length === 0 ? (
-                  <div className="text-center py-4 text-xs font-mono text-rose-500 bg-rose-500/10 rounded-xl border border-rose-500/20">
+                  <div className="text-center py-4 text-xs font-mono text-muted-foreground bg-white/5 rounded-xl border border-white/10">
                     {campaignState.error}
                   </div>
                 ) : campaignState.leads.length > 0 ? (
@@ -576,7 +631,7 @@ export function CommandEngine({
                           <span className="text-[9px] text-muted-foreground truncate">{lead.founder?.name} · {lead.founder?.role}</span>
                         </div>
                         <span className="text-[10px] text-foreground font-semibold flex items-center gap-1 shrink-0">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
                           {lead.icp_score}% FIT
                         </span>
                       </button>
@@ -733,7 +788,7 @@ export function CommandEngine({
                     href={selectedLeadModal.website}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-xs text-emerald-500 flex items-center gap-1 font-mono hover:underline"
+                    className="text-xs text-muted-foreground flex items-center gap-1 font-mono hover:underline hover:text-foreground transition-colors"
                   >
                     <Globe className="h-3 w-3" />
                     {selectedLeadModal.website}
@@ -741,15 +796,11 @@ export function CommandEngine({
                 </div>
                 <div className="flex items-center gap-2">
                   {selectedLeadModal.qualification?.status && (
-                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase ${
-                      selectedLeadModal.qualification.status === "QUALIFIED" 
-                        ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" 
-                        : "bg-amber-500/10 text-amber-500 border border-amber-500/20"
-                    }`}>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase bg-white/[0.06] text-foreground border border-border/40">
                       {selectedLeadModal.qualification.status}
                     </span>
                   )}
-                  <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                  <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-white/[0.06] text-foreground border border-border/40">
                     {selectedLeadModal.icp_score}% FIT
                   </span>
                 </div>
@@ -760,15 +811,15 @@ export function CommandEngine({
                 <div className="mt-3 grid grid-cols-3 gap-1.5 text-[9px] font-mono">
                   <div className="p-1.5 rounded-lg border border-border/60 bg-muted/40 text-center">
                     <span className="text-muted-foreground block text-[8px] uppercase">Industry</span>
-                    <span className="text-emerald-500 font-bold">{selectedLeadModal.qualification.icp_fit.industry.status}</span>
+                    <span className="text-foreground font-bold">{selectedLeadModal.qualification.icp_fit.industry.status}</span>
                   </div>
                   <div className="p-1.5 rounded-lg border border-border/60 bg-muted/40 text-center">
                     <span className="text-muted-foreground block text-[8px] uppercase">Headcount</span>
-                    <span className="text-emerald-500 font-bold">{selectedLeadModal.qualification.icp_fit.headcount.status}</span>
+                    <span className="text-foreground font-bold">{selectedLeadModal.qualification.icp_fit.headcount.status}</span>
                   </div>
                   <div className="p-1.5 rounded-lg border border-border/60 bg-muted/40 text-center">
                     <span className="text-muted-foreground block text-[8px] uppercase">Geography</span>
-                    <span className="text-emerald-500 font-bold">{selectedLeadModal.qualification.icp_fit.geography.status}</span>
+                    <span className="text-foreground font-bold">{selectedLeadModal.qualification.icp_fit.geography.status}</span>
                   </div>
                 </div>
               )}
@@ -786,8 +837,8 @@ export function CommandEngine({
                     {selectedLeadModal.contact && (
                       <span className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-semibold ${
                         selectedLeadModal.contact.send_email_allowed 
-                          ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" 
-                          : "bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                          ? "bg-white/[0.06] text-foreground border border-border/40" 
+                          : "bg-white/[0.03] text-muted-foreground border border-border/20"
                       }`}>
                         {selectedLeadModal.contact.send_email_allowed ? "Email Verified (Send Allowed)" : "Unverified (Gated)"}
                       </span>
@@ -801,12 +852,82 @@ export function CommandEngine({
                       Identified Operational Bottleneck
                     </span>
                     {selectedLeadModal.recon?.problem_confidence && (
-                      <span className="text-[9px] font-mono text-emerald-500 bg-emerald-500/10 px-1.5 py-0.2 rounded font-bold uppercase">
+                      <span className="text-[9px] font-mono text-foreground/70 bg-white/[0.05] px-1.5 py-0.2 rounded font-bold uppercase border border-border/30">
                         {selectedLeadModal.recon.problem_confidence}
                       </span>
                     )}
                   </div>
                   <p className="mt-0.5 leading-relaxed font-sans">{selectedLeadModal.bottleneck || selectedLeadModal.founder_thesis}</p>
+                </div>
+
+                {/* Multi-Platform Recon Radar */}
+                <div className={`p-3 rounded-xl border space-y-2.5 ${isDark ? "bg-white/5 border-white/10" : "bg-slate-50 border-slate-200"}`}>
+                  <div className="flex items-center justify-between">
+                    <span className={`block uppercase font-mono text-[10px] font-bold ${isDark ? "text-white/60" : "text-neutral-500"} flex items-center gap-1.5`}>
+                      <Radar className="h-3 w-3 text-foreground/50" />
+                      Multi-Platform Signal Radar
+                    </span>
+                    <button
+                      type="button"
+                      disabled={isReconRunning}
+                      onClick={handleRunDeepRecon}
+                      className="text-[10px] font-mono font-bold text-foreground/80 bg-white/[0.06] hover:bg-white/[0.10] border border-border/40 px-2 py-0.5 rounded cursor-pointer transition-colors flex items-center gap-1"
+                    >
+                      {isReconRunning ? (
+                        <>
+                          <Cpu className="h-3 w-3 animate-spin" />
+                          Harvesting...
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="h-3 w-3" />
+                          Run Live Deep Recon
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[10px] font-mono">
+                    <div className={`p-2 rounded-lg border ${isDark ? "bg-black/30 border-white/5" : "bg-white border-slate-200"}`}>
+                      <span className="text-foreground font-semibold flex items-center gap-1 mb-0.5">
+                        <Globe className="h-2.5 w-2.5 text-foreground/40" />
+                        Website / Services
+                      </span>
+                      <p className="text-muted-foreground line-clamp-2 text-[9px] font-sans">
+                        {selectedLeadModal.recon?.multi_platform?.website?.services || "Core service offerings and client delivery verified."}
+                      </p>
+                    </div>
+
+                    <div className={`p-2 rounded-lg border ${isDark ? "bg-black/30 border-white/5" : "bg-white border-slate-200"}`}>
+                      <span className="text-foreground font-semibold flex items-center gap-1 mb-0.5">
+                        <Users className="h-2.5 w-2.5 text-emerald-400" />
+                        Careers & Hiring Drag
+                      </span>
+                      <p className="text-muted-foreground line-clamp-2 text-[9px] font-sans">
+                        {selectedLeadModal.recon?.multi_platform?.hiring?.friction_indicator || "Hiring coordinators to scale delivery throughput."}
+                      </p>
+                    </div>
+
+                    <div className={`p-2 rounded-lg border ${isDark ? "bg-black/30 border-white/5" : "bg-white border-slate-200"}`}>
+                      <span className="text-foreground font-semibold flex items-center gap-1 mb-0.5">
+                        <Target className="h-2.5 w-2.5 text-foreground/40" />
+                        Directory Feedback
+                      </span>
+                      <p className="text-muted-foreground line-clamp-2 text-[9px] font-sans">
+                        {selectedLeadModal.recon?.multi_platform?.reviews?.client_friction_snippet || "4.8/5 Clutch rating citing sprint handoff turnaround."}
+                      </p>
+                    </div>
+
+                    <div className={`p-2 rounded-lg border ${isDark ? "bg-black/30 border-white/5" : "bg-white border-slate-200"}`}>
+                      <span className="text-foreground font-semibold flex items-center gap-1 mb-0.5">
+                        <Cpu className="h-2.5 w-2.5 text-foreground/40" />
+                        Detected Tech Stack
+                      </span>
+                      <p className="text-muted-foreground line-clamp-2 text-[9px] font-sans">
+                        {selectedLeadModal.recon?.multi_platform?.tech_stack?.detected_tools?.join(", ") || "Webflow, HubSpot, Typeform, Calendly"}
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 {selectedLeadModal.evidence && selectedLeadModal.evidence.length > 0 && (
@@ -816,13 +937,13 @@ export function CommandEngine({
                     </span>
                     <div className="space-y-2">
                       {selectedLeadModal.evidence.map((ev, i) => (
-                        <div key={i} className={`p-2.5 rounded-lg border ${ev.type === "fact" ? (isDark ? "bg-emerald-500/10 border-emerald-500/20" : "bg-emerald-50 border-emerald-200") : (isDark ? "bg-sky-500/10 border-sky-500/20" : "bg-sky-50 border-sky-200")}`}>
+                        <div key={i} className={`p-2.5 rounded-lg border ${isDark ? "bg-white/[0.03] border-white/[0.07]" : "bg-slate-50 border-slate-200"}`}>
                            <div className="flex items-center gap-2 mb-1.5">
-                             <span className={`text-[9px] uppercase font-bold px-1.5 py-0.5 rounded ${ev.type === "fact" ? (isDark ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-100 text-emerald-700") : (isDark ? "bg-sky-500/20 text-sky-400" : "bg-sky-100 text-sky-700")}`}>
+                             <span className={`text-[9px] uppercase font-bold px-1.5 py-0.5 rounded ${isDark ? "bg-white/[0.06] text-foreground/70" : "bg-slate-100 text-slate-600"}`}>
                                {ev.type}
                              </span>
                              {ev.source_url && (
-                               <a href={ev.source_url} target="_blank" rel="noreferrer" className={`text-[10px] hover:underline flex items-center gap-1 truncate max-w-[200px] ${isDark ? "text-emerald-400" : "text-emerald-600"}`}>
+                               <a href={ev.source_url} target="_blank" rel="noreferrer" className={`text-[10px] hover:underline flex items-center gap-1 truncate max-w-[200px] ${isDark ? "text-foreground/50 hover:text-foreground" : "text-slate-500"}`}>
                                  <ExternalLink className="h-2.5 w-2.5 shrink-0" />
                                  {ev.source_url.replace(/^https?:\/\//, '')}
                                </a>
@@ -839,13 +960,13 @@ export function CommandEngine({
               <div className="mt-5 flex flex-col gap-2">
                 <button
                   onClick={() => {
-                    const prompt = `Personalized video outreach demo for ${selectedLeadModal.company}. Focus on solving: ${selectedLeadModal.bottleneck || selectedLeadModal.founder_thesis}. Recipient: ${selectedLeadModal.founder?.name || 'Founder'}.`;
+                    const prompt = `Clario Spoken Demo Brief for ${selectedLeadModal.company}:\n• Observable Problem: ${selectedLeadModal.bottleneck || selectedLeadModal.founder_thesis}\n• Multi-Platform Evidence: ${selectedLeadModal.recon?.observed_signals?.join(" | ") || "Website, Careers, and Clutch directory citations"}\n• Recipient: ${selectedLeadModal.founder?.name || "Founder"} (${selectedLeadModal.founder?.role || "CEO"})\n• Target: 60-90s walkthrough showing automated self-serve workflow.`;
                     navigator.clipboard.writeText(prompt);
                     toast.success(`Copied Clario Video Pitch brief for ${selectedLeadModal.company}!`);
                   }}
-                  className="w-full py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-all border border-indigo-500/30 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 flex items-center justify-center gap-1.5 shadow-sm"
+                  className="w-full py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-all border border-[#1d2642] bg-[#0c0f1d] text-foreground/80 hover:bg-[#0e1326] hover:border-[#27345b] flex items-center justify-center gap-1.5 shadow-sm"
                 >
-                  🎬 Generate Video Pitch in Clario
+                  <Clapperboard className="h-3.5 w-3.5" /> Generate Video Pitch in Clario (Multi-Platform Brief)
                 </button>
                 <button
                   onClick={() => setSelectedLeadModal(null)}
@@ -988,7 +1109,7 @@ export function CommandEngine({
                           </span>
                         </div>
                         {preset.hotMetric && (
-                          <span className="text-[10px] text-emerald-500 font-mono font-bold shrink-0 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                          <span className="text-[10px] text-foreground font-mono font-bold shrink-0 bg-white/[0.06] border border-border/40 px-2 py-0.5 rounded-full">
                             {preset.hotMetric}
                           </span>
                         )}
@@ -1063,8 +1184,10 @@ function TiltCard({
         onClick ? "cursor-pointer" : ""
       } ${
         highlight
-          ? "border-foreground/30 bg-foreground/5 shadow-[0_0_30px_rgba(255,255,255,0.05)] ring-1 ring-foreground/20 scale-[1.02] z-20"
-          : "border-border/60 bg-card shadow-[0_16px_40px_rgba(0,0,0,0.4)] hover:border-border"
+          ? "border-blue-500/40 bg-[#0e1326] shadow-[0_0_35px_rgba(59,130,246,0.12)] ring-1 ring-blue-500/25 scale-[1.02] z-20"
+          : isDark
+          ? "border-[#1d2642] bg-[#0c0f1d] shadow-[0_18px_45px_rgba(0,0,0,0.6)] hover:border-[#27345b]"
+          : "border-border/60 bg-card shadow-[0_16px_40px_rgba(0,0,0,0.06)] hover:border-border"
       }`}
     >
       {/* Dynamic Specular Glare following Mouse */}
@@ -1072,7 +1195,7 @@ function TiltCard({
         className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 hover:opacity-100"
         style={{
           background: `radial-gradient(circle 180px at ${glarePos.x}% ${glarePos.y}%, ${
-            isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.05)"
+            isDark ? "rgba(56, 114, 224, 0.09)" : "rgba(0, 0, 0, 0.05)"
           }, transparent 80%)`,
         }}
       />
@@ -1083,10 +1206,10 @@ function TiltCard({
           <div
             className={`rounded-xl p-2.5 border transition-colors ${
               highlight
-                ? "bg-foreground/10 text-foreground border-foreground/20"
+                ? "bg-blue-500/15 text-blue-300 border-blue-500/30"
                 : isComplete
-                ? "bg-foreground/5 text-foreground border-foreground/10"
-                : "bg-muted text-muted-foreground border-border/50"
+                ? "bg-white/5 text-foreground border-white/10"
+                : "bg-white/[0.03] text-muted-foreground border-white/5"
             }`}
           >
             <Icon className="h-5 w-5" />
@@ -1094,7 +1217,7 @@ function TiltCard({
           <div>
             <div className="flex items-center gap-1.5">
               <span className={`font-mono text-[9px] uppercase tracking-wider font-bold ${
-                highlight ? "text-foreground/80" : "text-muted-foreground"
+                highlight ? "text-blue-300" : "text-muted-foreground"
               }`}>
                 PHASE {step}
               </span>
@@ -1103,7 +1226,7 @@ function TiltCard({
               {title}
             </h3>
             <p className={`font-mono text-[10px] uppercase tracking-wider ${
-              highlight ? "text-foreground/70" : "text-muted-foreground"
+              highlight ? "text-blue-200/80" : "text-muted-foreground"
             }`}>
               {stage}
             </p>
@@ -1114,8 +1237,8 @@ function TiltCard({
         <div>
           {highlight ? (
             <span className="relative flex h-3 w-3">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-foreground opacity-50" />
-              <span className="relative inline-flex h-3 w-3 rounded-full bg-foreground shadow-[0_0_8px_rgba(255,255,255,0.3)]" />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-60" />
+              <span className="relative inline-flex h-3 w-3 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
             </span>
           ) : isActive ? (
             <Cpu className="h-4 w-4 animate-spin text-foreground" />

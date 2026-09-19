@@ -4,6 +4,7 @@
 import React from 'react';
 import { useMetaphor } from '../../context/MetaphorContext';
 import { Network, Search, Filter, Sparkles, Layers, Compass, CircleDot } from 'lucide-react';
+import { EvidenceChip } from '../ui/EvidenceChip';
 
 export const KnowledgeView: React.FC = () => {
   const { entities, inspectEntity } = useMetaphor();
@@ -35,11 +36,12 @@ export const KnowledgeView: React.FC = () => {
             onClick={() => inspectEntity(entity.id)}
             className="metaphor-glass p-5 border border-border bg-card/60 rounded-xl space-y-3 hover:border-primary/40 transition-all cursor-pointer group hover:scale-[1.01]"
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
-                {entity.type}
-              </span>
-              <span className="text-[10px] font-mono text-muted-foreground">{entity.confidence ? `${(entity.confidence * 100).toFixed(0)}%` : 'Indexed'}</span>
+            <div className="flex items-center justify-between mb-2">
+              <EvidenceChip 
+                sourceName={entity.type.toUpperCase()} 
+                confidence={entity.confidence ? Math.round(entity.confidence * 100) : undefined} 
+                date={!entity.confidence ? 'Indexed' : undefined}
+              />
             </div>
 
             <div className="space-y-1">

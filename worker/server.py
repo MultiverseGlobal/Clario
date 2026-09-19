@@ -14,14 +14,36 @@ import os, uuid, json, asyncio, tempfile, shutil, subprocess
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
+import time
 
 load_dotenv()
 
 app = FastAPI(title="Clario Media Worker", version="1.0.0")
+
+# ── Rate Limiting ─────────────────────────────────────────────────────────────
+RATE_LIMIT_STORE = {}
+RATE_LIMIT_MAX_REQUESTS = 10
+RATE_LIMIT_WINDOW = 60 # seconds
+
+def check_rate_limit(request: Request):
+    ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    
+    if ip not in RATE_LIMIT_STORE:
+        RATE_LIMIT_STORE[ip] = []
+        
+    # Clean up old requests
+    RATE_LIMIT_STORE[ip] = [ts for ts in RATE_LIMIT_STORE[ip] if now - ts < RATE_LIMIT_WINDOW]
+    
+    if len(RATE_LIMIT_STORE[ip]) >= RATE_LIMIT_MAX_REQUESTS:
+        raise HTTPException(status_code=429, detail="Too many requests. Please try again later.")
+        
+    RATE_LIMIT_STORE[ip].append(now)
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -175,8 +197,8 @@ def health():
 
 # ── Broadcast-Grade Scene Detection (PySceneDetect + Whisper Word Alignment) ───
 
-@app.post("/api/v1/detect-scenes")
-@app.post("/detect-scenes")
+@app.post("/api/v1/detect-scenes", dependencies=[Depends(check_rate_limit)])
+@app.post("/detect-scenes", dependencies=[Depends(check_rate_limit)])
 async def detect_scenes_worker_endpoint(
     file: Optional[UploadFile] = File(None),
     video_url: Optional[str] = Form(None)
@@ -298,7 +320,7 @@ async def detect_scenes_worker_endpoint(
 
 # ── Harvest: Ingest File or URL ────────────────────────────────────────────────
 
-@app.post("/api/v1/harvest/ingest-file")
+@app.post("/api/v1/harvest/ingest-file", dependencies=[Depends(check_rate_limit)])
 async def ingest_file(
     file: Optional[UploadFile] = File(None),
     mode: str = Form("video_harvester"),
@@ -340,7 +362,7 @@ async def ingest_file(
 
 # ── Job Status Polling ─────────────────────────────────────────────────────────
 
-@app.get("/api/v1/harvest/jobs/{job_id}")
+@app.get("/api/v1/harvest/jobs/{job_id}", dependencies=[Depends(check_rate_limit)])
 def get_job(job_id: str):
     if job_id not in JOBS:
         raise HTTPException(status_code=404, detail="Job not found")

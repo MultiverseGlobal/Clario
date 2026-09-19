@@ -10,6 +10,7 @@ from .pipeline import router as pipeline_router
 from .system import router as system_router
 from app.routes.ai_registry import router as ai_registry_router
 from app.routes.callbacks import router as callbacks_router
+from app.routes.events import router as events_router
 
 api_router = APIRouter()
 api_router.include_router(integrations_router, prefix="/integrations", tags=["integrations"])
@@ -23,4 +24,5 @@ api_router.include_router(pipeline_router, prefix="/pipeline", tags=["pipeline"]
 api_router.include_router(system_router, prefix="/system", tags=["system"])
 api_router.include_router(ai_registry_router, prefix="/orchestration", tags=["AI Orchestration"])
 api_router.include_router(callbacks_router, prefix="/callbacks", tags=["Callbacks"])
+api_router.include_router(events_router) # prefix is defined inside the router file
 

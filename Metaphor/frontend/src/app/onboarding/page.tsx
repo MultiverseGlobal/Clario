@@ -38,15 +38,15 @@ function OnboardingContent() {
   }, [phase]);
 
   // Finish
-  const finalize = () => {
+  const finalize = async () => {
     document.cookie = "metaphor_onboarded=true; path=/; max-age=31536000";
-    localStorage.setItem("metaphor_onboarded", "true");
     
-    // Save tokens locally if provided
-    if (githubToken.trim()) localStorage.setItem("metaphor_github_token", githubToken.trim());
-    if (notionToken.trim()) localStorage.setItem("metaphor_notion_token", notionToken.trim());
-    
-    import("@/lib/settings").then(m => m.pushSettingsToCloud());
+    const settingsModule = await import("@/lib/settings");
+    await settingsModule.pushSettingsToCloud({
+      onboarded: true,
+      github_token: githubToken.trim() || null,
+      notion_token: notionToken.trim() || null,
+    });
     router.push("/explorer");
   };
 

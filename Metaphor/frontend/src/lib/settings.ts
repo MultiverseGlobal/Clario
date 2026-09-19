@@ -1,14 +1,20 @@
 import { supabase } from './supabase';
 
-/**
- * Pulls the user's settings from Supabase and populates localStorage.
- * This allows all existing synchronous Next.js UI code to continue functioning
- * without major refactors, while gaining the benefits of cloud sync.
- */
-export async function pullSettingsFromCloud(): Promise<void> {
+export interface MetaphorSettings {
+  api_key: string | null;
+  github_token: string | null;
+  notion_token: string | null;
+  theme: string;
+  user_name: string | null;
+  onboarded: boolean;
+}
+
+let memorySettings: MetaphorSettings | null = null;
+
+export async function pullSettingsFromCloud(): Promise<MetaphorSettings | null> {
   try {
     const { data: userAuth } = await supabase.auth.getUser();
-    if (!userAuth?.user?.id) return;
+    if (!userAuth?.user?.id) return null;
 
     const { data, error } = await supabase
       .from('metaphor_user_settings')
@@ -18,47 +24,60 @@ export async function pullSettingsFromCloud(): Promise<void> {
 
     if (error && error.code !== 'PGRST116') {
       console.warn("Failed to pull settings from cloud:", error);
-      return;
+      return null;
     }
 
     if (data) {
-      if (data.api_key) localStorage.setItem("metaphor_api_key", data.api_key);
-      if (data.github_token) localStorage.setItem("metaphor_github_token", data.github_token);
-      if (data.notion_token) localStorage.setItem("metaphor_notion_token", data.notion_token);
+      memorySettings = {
+        api_key: data.api_key || null,
+        github_token: data.github_token || null,
+        notion_token: data.notion_token || null,
+        theme: data.theme || 'dark',
+        user_name: data.user_name || null,
+        onboarded: data.onboarded || false,
+      };
+
       if (data.theme) {
-        localStorage.setItem("metaphor_theme", data.theme);
         document.documentElement.setAttribute('data-theme', data.theme);
         if (data.theme === 'dark') document.documentElement.classList.add('dark');
         else document.documentElement.classList.remove('dark');
       }
-      if (data.user_name) localStorage.setItem("metaphor_user_name", data.user_name);
-      if (data.onboarded) localStorage.setItem("metaphor_onboarded", "true");
       
-      // Dispatch an event so React components can re-render if needed
       window.dispatchEvent(new Event("metaphor-settings-synced"));
+      return memorySettings;
     }
   } catch (err) {
     console.warn("Error pulling settings:", err);
   }
+  return null;
 }
 
-/**
- * Pushes the current localStorage settings to Supabase.
- * Call this whenever a setting is updated in the UI.
- */
-export async function pushSettingsToCloud(): Promise<void> {
+export function getLocalSettings(): MetaphorSettings | null {
+  return memorySettings;
+}
+
+export async function pushSettingsToCloud(settings: Partial<MetaphorSettings>): Promise<void> {
   try {
     const { data: userAuth } = await supabase.auth.getUser();
     if (!userAuth?.user?.id) return;
 
+    if (memorySettings) {
+      memorySettings = { ...memorySettings, ...settings };
+    } else {
+      memorySettings = {
+        api_key: null,
+        github_token: null,
+        notion_token: null,
+        theme: 'dark',
+        user_name: null,
+        onboarded: false,
+        ...settings,
+      };
+    }
+
     const payload = {
       user_id: userAuth.user.id,
-      api_key: localStorage.getItem("metaphor_api_key") || null,
-      github_token: localStorage.getItem("metaphor_github_token") || null,
-      notion_token: localStorage.getItem("metaphor_notion_token") || null,
-      theme: localStorage.getItem("metaphor_theme") || 'dark',
-      user_name: localStorage.getItem("metaphor_user_name") || null,
-      onboarded: localStorage.getItem("metaphor_onboarded") === "true",
+      ...memorySettings,
       updated_at: new Date().toISOString()
     };
 

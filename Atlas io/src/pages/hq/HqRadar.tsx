@@ -446,6 +446,17 @@ export default function HqRadar() {
     }
   };
 
+  // ── Cancel Draft ────────────────────────────────────────────────────────
+  const handleCancelDraft = async (draftId: string) => {
+    try {
+      await supabase.from("atlas_outreach").delete().eq("id", draftId);
+      toast.success("Draft canceled.");
+      loadWaitingDrafts();
+    } catch (e: any) {
+      toast.error(`Failed to cancel: ${e.message}`);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center">
@@ -662,7 +673,7 @@ export default function HqRadar() {
                       {!drafts && (
                         <Button onClick={handleGenerate} disabled={generating} size="sm" className="h-8 text-xs bg-foreground text-background hover:bg-foreground/90 transition-all duration-300 w-[140px]">
                           {generating ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Zap className="w-3.5 h-3.5 mr-1.5" />}
-                          {generating ? "Synthesizing..." : "Generate Angle"}
+                          {generating ? "Synthesizing..." : "Synthesize Pitch"}
                         </Button>
                       )}
                     </div>
@@ -719,8 +730,11 @@ export default function HqRadar() {
                               <Button variant="outline" size="sm" onClick={handleCopy} className="h-8 text-xs">
                                 <Copy className="w-3.5 h-3.5 mr-1.5" /> Copy Text
                               </Button>
+                              <Button variant="outline" size="sm" onClick={handleGenerate} disabled={generating} className="h-8 text-xs">
+                                <Zap className="w-3.5 h-3.5 mr-1.5" /> Re-synthesize
+                              </Button>
                               <Button size="sm" onClick={handleRequestClario} className="h-8 text-xs bg-foreground text-background">
-                                <Video className="w-3.5 h-3.5 mr-1.5" /> Request Clario Video
+                                <Video className="w-3.5 h-3.5 mr-1.5" /> Queue for Production
                               </Button>
                             </div>
                           </motion.div>
@@ -777,15 +791,20 @@ export default function HqRadar() {
                                   <p className="text-[11px] font-mono text-muted-foreground mt-0.5">{draft.to_email}</p>
                                 )}
                               </div>
-                              {isReady ? (
-                                <span className="flex items-center gap-1 text-[10px] font-mono text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded shrink-0">
-                                  <CheckCircle2 className="w-3 h-3" /> Ready
-                                </span>
-                              ) : (
-                                <span className="flex items-center gap-1 text-[10px] font-mono text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded shrink-0">
-                                  <Clock className="w-3 h-3" /> Waiting
-                                </span>
-                              )}
+                              <div className="flex items-center gap-2">
+                                {isReady ? (
+                                  <span className="flex items-center gap-1 text-[10px] font-mono text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded shrink-0">
+                                    <CheckCircle2 className="w-3 h-3" /> Ready
+                                  </span>
+                                ) : (
+                                  <span className="flex items-center gap-1 text-[10px] font-mono text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded shrink-0">
+                                    <Clock className="w-3 h-3" /> Waiting
+                                  </span>
+                                )}
+                                <button type="button" onClick={() => handleCancelDraft(draft.id)} className="text-muted-foreground hover:text-destructive p-1 transition-colors rounded" title="Cancel this draft">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
 
                             {/* Auto-pushed URL display */}
@@ -814,7 +833,7 @@ export default function HqRadar() {
                                   className="h-8 text-xs bg-foreground text-background shrink-0"
                                 >
                                   {savingClario[draft.id] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3 mr-1" />}
-                                  Attach & Send
+                                  Queue & Deliver
                                 </Button>
                               </div>
                             )}
@@ -828,7 +847,7 @@ export default function HqRadar() {
                                 className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white w-full"
                               >
                                 {savingClario[draft.id] ? <Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> : <Send className="w-3 h-3 mr-1.5" />}
-                                Send Now
+                                Deliver
                               </Button>
                             )}
                           </div>

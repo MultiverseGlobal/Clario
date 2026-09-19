@@ -107,7 +107,8 @@ value trigger / bottleneck: ${hypothesis || ""}
 2. Headcount gate: PASS only when estimated headcount falls within ${minH}–${maxH}. Strictly reject out-of-range enterprises (e.g. 500+ or 1500+).
 3. Decision-maker: Real Founder / CEO / Managing Director.
 4. Contact: send_email_allowed is TRUE ONLY if email_status is VERIFIED with real public evidence.
-5. Pain strength taxonomy: DIRECT | STRONG_SIGNAL | INDIRECT_SIGNAL | SPECULATIVE.
+5. Multi-Platform signals: Surface observable signals across official website, careers/job boards (hiring drag), and review directories (Clutch/G2).
+6. Pain strength taxonomy: DIRECT | STRONG_SIGNAL | INDIRECT_SIGNAL | SPECULATIVE.
 
 Respond ONLY in valid JSON matching this schema:
 {
@@ -143,10 +144,15 @@ Respond ONLY in valid JSON matching this schema:
         "send_email_allowed": true
       },
       "recon": {
-        "observed_signals": ["Expanding service lines", "Multiple client accounts"],
+        "observed_signals": [
+          "[Website] Core service lines and intake process",
+          "[Careers] Hiring operational coordinators",
+          "[Clutch] Client reviews citing sprint handoff turnaround"
+        ],
         "likely_operational_problem": "Sprint onboarding and client handoff latency",
         "problem_evidence": [
-          { "claim": "Manual feedback rounds across client deliverables", "source_url": "https://example.com", "source_type": "official_website", "confidence": "HIGH" }
+          { "claim": "Manual feedback rounds across client deliverables", "source_url": "https://example.com/services", "source_type": "official_website", "confidence": "HIGH" },
+          { "claim": "Requisition for delivery coordinator to manage manual intake", "source_url": "https://example.com/careers", "source_type": "job_board", "confidence": "HIGH" }
         ],
         "problem_confidence": "STRONG_SIGNAL",
         "opportunity_hypothesis": "Automating recurring client reporting and sprint delivery handoffs",
@@ -171,7 +177,7 @@ export async function draftOutreachWithGemini(
 Core rule: Personalization comes from evidence. Never invent achievements, clients, or technologies not present in the recon record.
 
 ## Rules:
-1. Open with a real observation from recon.observed_signals or recon.likely_operational_problem — never a generic compliment.
+1. Open with a real observation from recon.observed_signals, recon.problem_evidence, or recon.multi_platform (e.g. citing specific hiring signals on their careers page or client friction reviews on Clutch) — never a generic compliment.
 2. Exactly one diagnostic question testing the hypothesis.
 3. No pricing, no 'book a call' CTA in this first message.
 4. Voice: peer-to-peer, direct, brief, warm, curious.

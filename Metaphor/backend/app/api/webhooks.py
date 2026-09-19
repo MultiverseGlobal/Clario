@@ -12,7 +12,7 @@ import logging
 logger = logging.getLogger("metaphor.webhooks")
 router = APIRouter()
 
-async def process_webhook_event(org_id, event_id: str, db: AsyncSession):
+async def process_webhook_event(org_id, event_id: str, db: AsyncSession, workspace_id=None, project_id=None):
     """Background task to run reflection."""
     from app.services.reflection import ReflectionService
     from app.services.graph import GraphService
@@ -28,7 +28,10 @@ async def process_webhook_event(org_id, event_id: str, db: AsyncSession):
         return
         
     try:
-        await reflection.reflect_and_evolve(org_id, event)
+        import uuid
+        w_id = uuid.UUID(workspace_id) if workspace_id else None
+        p_id = uuid.UUID(project_id) if project_id else None
+        await reflection.reflect_and_evolve(org_id, event, workspace_id=w_id, project_id=p_id)
         logger.info(f"Successfully processed webhook event {event_id} for org {org_id}")
     except Exception as e:
         logger.error(f"Error processing webhook event {event_id}: {e}")
@@ -39,6 +42,8 @@ async def receive_webhook(
     request: Request,
     background_tasks: BackgroundTasks,
     api_key: str = None,
+    workspace_id: str = None,
+    project_id: str = None,
     db: AsyncSession = Depends(get_session)
 ):
     """
@@ -71,11 +76,11 @@ async def receive_webhook(
     await db.commit()
     await db.refresh(event)
     
-    async def run_reflection_safe(org_id, event_id):
+    async def run_reflection_safe(org_id, event_id, workspace_id, project_id):
         from app.database.session import async_session_maker
         async with async_session_maker() as new_session:
-            await process_webhook_event(org_id, event_id, new_session)
+            await process_webhook_event(org_id, event_id, new_session, workspace_id, project_id)
 
-    background_tasks.add_task(run_reflection_safe, org_id, event.id)
+    background_tasks.add_task(run_reflection_safe, org_id, event.id, workspace_id, project_id)
     
     return {"status": "accepted", "event_id": str(event.id)}
