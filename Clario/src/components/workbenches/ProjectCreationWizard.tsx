@@ -54,7 +54,7 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
     onProjectCreated({
       id: Date.now().toString(),
       name: atlasBrief ? `Pitch for ${atlasBrief.target}` : 'New Video Draft',
-      mode: 'sales_pitch',
+      mode: 'video',
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
@@ -135,13 +135,13 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
                   <FileText className="w-5 h-5 mr-3 text-[#4F46E5]" /> Use the Atlas brief
                 </Button>
               )}
-              <Button onClick={() => setStep(2)} variant="outline" className="h-14 justify-start px-6 border-[#374151] hover:bg-[#1F2937] text-white w-full">
+              <Button onClick={() => setStep(2)} variant="secondary" className="h-14 justify-start px-6 border-[#374151] hover:bg-[#1F2937] text-white w-full">
                 <FileText className="w-5 h-5 mr-3 text-[#9CA3AF]" /> Start from a script
               </Button>
-              <Button onClick={() => setStep(3)} variant="outline" className="h-14 justify-start px-6 border-[#374151] hover:bg-[#1F2937] text-white w-full">
+              <Button onClick={() => setStep(3)} variant="secondary" className="h-14 justify-start px-6 border-[#374151] hover:bg-[#1F2937] text-white w-full">
                 <Camera className="w-5 h-5 mr-3 text-[#9CA3AF]" /> Record now
               </Button>
-              <Button onClick={() => setStep(3)} variant="outline" className="h-14 justify-start px-6 border-[#374151] hover:bg-[#1F2937] text-white w-full">
+              <Button onClick={() => setStep(3)} variant="secondary" className="h-14 justify-start px-6 border-[#374151] hover:bg-[#1F2937] text-white w-full">
                 <UploadCloud className="w-5 h-5 mr-3 text-[#9CA3AF]" /> Upload a video
               </Button>
             </div>
@@ -168,9 +168,9 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" className="h-8 text-xs border-[#374151] hover:bg-[#1F2937]"><Edit2 className="w-3 h-3 mr-2" /> Rewrite</Button>
-              <Button variant="outline" className="h-8 text-xs border-[#374151] hover:bg-[#1F2937]">Make shorter</Button>
-              <Button variant="outline" className="h-8 text-xs border-[#374151] hover:bg-[#1F2937]">Make conversational</Button>
+              <Button variant="secondary" className="h-8 text-xs border-[#374151] hover:bg-[#1F2937]"><Edit2 className="w-3 h-3 mr-2" /> Rewrite</Button>
+              <Button variant="secondary" className="h-8 text-xs border-[#374151] hover:bg-[#1F2937]">Make shorter</Button>
+              <Button variant="secondary" className="h-8 text-xs border-[#374151] hover:bg-[#1F2937]">Make conversational</Button>
             </div>
 
             <div className="pt-6 border-t border-[#374151]/50 flex justify-end">
@@ -238,7 +238,7 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
                     <h3 className="text-lg font-semibold text-white flex items-center gap-2"><CheckCircle2 className="w-5 h-5 text-[#10B981]" /> Nice. Your first take is ready.</h3>
                     <div className="flex gap-3">
                       <Button onClick={() => setStep(5)} className="bg-[#4F46E5] hover:bg-[#4338CA] text-white">Use this take</Button>
-                      <Button variant="outline" onClick={() => setRecordingState('idle')} className="border-[#374151] hover:bg-[#1F2937]">Retake</Button>
+                      <Button variant="secondary" onClick={() => setRecordingState('idle')} className="border-[#374151] hover:bg-[#1F2937]">Retake</Button>
                     </div>
                   </div>
                 )}
@@ -348,7 +348,7 @@ export function ProjectCreationWizard({ onClose, onProjectCreated }: ProjectCrea
                     Export Video
                   </Button>
                 )}
-                <Button variant="outline" onClick={() => setStep(5)} className="h-12 border-[#374151] hover:bg-[#1F2937]">
+                <Button variant="secondary" onClick={() => setStep(5)} className="h-12 border-[#374151] hover:bg-[#1F2937]">
                   Make adjustments
                 </Button>
               </div>
