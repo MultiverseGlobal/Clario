@@ -19,7 +19,6 @@ import {
   Zap,
 } from "lucide-react";
 import { MetaphorLogo } from "@/components/ui/MetaphorLogo";
-import { EcosystemSwitcher } from "@/components/ui/EcosystemSwitcher";
 import { useTheme } from "next-themes";
 
 interface FloatingNavProps {
@@ -30,19 +29,17 @@ interface FloatingNavProps {
 }
 
 const ROUTES = [
-  { path: "/home",     label: "Home",     icon: Home,     exact: false },
-  { path: "/context",  label: "Context",  icon: Terminal,  exact: false },
-  { path: "/world",    label: "World",    icon: Network,   exact: false },
-  { path: "/work",     label: "Work",     icon: Layers,    exact: false },
+  { path: "/canvas",   label: "Studio",   icon: Network,   exact: false },
+  { path: "/projects", label: "Projects", icon: Layers,    exact: false },
+  { path: "/world",    label: "World",    icon: Terminal,  exact: false },
   { path: "/settings", label: "Settings", icon: Settings,  exact: false },
 ];
 
 const SCOPE_LABELS: Record<string, string> = {
-  "/home":     "Observatory",
-  "/context":  "Context Explorer",
+  "/canvas":   "Flora Canvas Studio",
+  "/projects": "Project Directory",
   "/world":    "Relationship World",
-  "/work":     "Work & Handoffs",
-  "/settings": "System Configuration",
+  "/settings": "MCP Configuration",
 };
 
 export function FloatingNav({
@@ -176,10 +173,6 @@ export function FloatingNav({
           )}
         </div>
 
-        {/* Ecosystem Switcher */}
-        <div className="flex items-center px-1.5 py-1 rounded-xl bg-surface-1/85 border border-border-subtle/80 shadow-sm backdrop-blur-xl">
-          <EcosystemSwitcher />
-        </div>
       </div>
 
       {/* ── Bottom Center: Scope breadcrumb ── */}

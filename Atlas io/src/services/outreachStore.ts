@@ -138,8 +138,24 @@ export async function recordOutreachDispatch(
   };
 
   try {
-    // If we have a contact_id, we just insert the conversation directly.
-    // If not, in a real system we would create company and contact here.
+    // If contact_id is missing, auto-resolve or create CRM company and contact records
+    if (!newRecord.contact_id && (newRecord.company_name || newRecord.recipient_email)) {
+      const autoContactId = await saveLeadToCrm({
+        company: newRecord.company_name,
+        website: newRecord.website,
+        executive: {
+          name: newRecord.recipient_name,
+          title: newRecord.recipient_role || "Decision Maker",
+        },
+        contact: {
+          email: newRecord.recipient_email,
+        },
+      });
+      if (autoContactId) {
+        newRecord.contact_id = autoContactId;
+      }
+    }
+
     if (newRecord.contact_id) {
       const { data, error } = await supabase.from("crm_conversations").insert({
         contact_id: newRecord.contact_id,
@@ -156,7 +172,7 @@ export async function recordOutreachDispatch(
         newRecord.id = data.id; // update to real UUID from backend
       }
     } else {
-      console.warn("[OutreachStore] No contact_id provided, skipping db insert for now.");
+      console.warn("[OutreachStore] No contact could be resolved, recorded in local ledger.");
     }
     
     // Dispatch event so UI can react

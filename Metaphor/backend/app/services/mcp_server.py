@@ -241,6 +241,85 @@ async def read_mcp_resource(uri: str, organization_id: uuid.UUID, session: Async
 async def list_mcp_tools() -> List[Dict[str, Any]]:
     return [
         {
+            "name": "get_agent_directory",
+            "description": "Retrieve the registry of all 9 AI agents in the network (ChatGPT, Antigravity, Atlas, Clario, Claude, Manus, Perplexity, Orion, Metaphor) and their specializations.",
+            "inputSchema": {"type": "object", "properties": {}},
+            "annotations": {"readOnly": True, "destructive": False}
+        },
+        {
+            "name": "recommend_agent_for_task",
+            "description": "Analyze a task description and identify which AI agent is best equipped to execute it.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "task_description": {"type": "string", "description": "What needs to be accomplished"}
+                },
+                "required": ["task_description"]
+            },
+            "annotations": {"readOnly": True, "destructive": False}
+        },
+        {
+            "name": "list_board_tasks",
+            "description": "List collaborative tasks on the shared cross-AI project board.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "status": {"type": "string", "description": "Optional status filter: pending, in_progress, completed, review_needed"},
+                    "assigned_to": {"type": "string", "description": "Optional agent filter: antigravity, chatgpt, atlas, clario, claude, manus, perplexity, orion"}
+                }
+            },
+            "annotations": {"readOnly": True, "destructive": False}
+        },
+        {
+            "name": "post_task_to_board",
+            "description": "Post a new task to the shared cross-AI project board for another AI agent to execute.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string", "description": "Short title of the task"},
+                    "description": {"type": "string", "description": "Detailed instructions and context"},
+                    "assigned_to": {"type": "string", "description": "Target agent: antigravity, chatgpt, atlas, clario, claude, manus, perplexity, orion"},
+                    "created_by": {"type": "string", "default": "chatgpt"},
+                    "priority": {"type": "string", "default": "normal"},
+                    "context_summary": {"type": "string", "description": "Relevant background context"}
+                },
+                "required": ["title", "description", "assigned_to"]
+            },
+            "annotations": {"readOnly": False, "destructive": False}
+        },
+        {
+            "name": "post_task_checkpoint",
+            "description": "Post an execution checkpoint, list of files modified, or outcome for collaborating AI agents.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "task_id": {"type": "string", "description": "ID of the task"},
+                    "agent_name": {"type": "string", "description": "Calling AI agent name"},
+                    "summary": {"type": "string", "description": "Summary of work completed"},
+                    "files_touched": {"type": "array", "items": {"type": "string"}, "description": "List of files modified or created"},
+                    "next_steps": {"type": "string", "description": "Next steps for collaborating agents"},
+                    "new_status": {"type": "string", "description": "Optional status update: in_progress, review_needed, completed"}
+                },
+                "required": ["task_id", "agent_name", "summary"]
+            },
+            "annotations": {"readOnly": False, "destructive": False}
+        },
+        {
+            "name": "update_task_status",
+            "description": "Update task status and optionally hand it off to another AI agent.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "task_id": {"type": "string"},
+                    "status": {"type": "string", "description": "Status: pending, in_progress, review_needed, completed, blocked"},
+                    "notes": {"type": "string"},
+                    "handoff_to": {"type": "string", "description": "Optional agent to hand off to"}
+                },
+                "required": ["task_id", "status"]
+            },
+            "annotations": {"readOnly": False, "destructive": False}
+        },
+        {
             "name": "search_context",
             "description": "Semantic context search across workspace memory.",
             "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]},
@@ -704,8 +783,8 @@ async def call_mcp_tool(
             pid = None
 
         # Create handoff record for audit / passive fallback
-        from app.models.task_handoff import TaskHandoff
-        handoff = TaskHandoff(
+        from app.models.task_handoff import Task
+        handoff = Task(
             id=uuid.uuid4(),
             organization_id=organization_id,
             project_id=pid,
@@ -864,6 +943,62 @@ async def call_mcp_tool(
             "status": "resolved",
             "resolution_summary": summary
         }, indent=2)}]}
+
+    elif name == "get_agent_directory":
+        from app.services.agent_mesh import AgentMeshService
+        mesh = AgentMeshService(session)
+        return {"content": [{"type": "text", "text": json.dumps(mesh.get_directory(), indent=2)}]}
+
+    elif name == "recommend_agent_for_task":
+        from app.services.agent_mesh import AgentMeshService
+        mesh = AgentMeshService(session)
+        task_desc = arguments.get("task_description", "")
+        return {"content": [{"type": "text", "text": json.dumps(mesh.recommend_agent(task_desc), indent=2)}]}
+
+    elif name == "list_board_tasks":
+        from app.services.agent_mesh import AgentMeshService
+        mesh = AgentMeshService(session)
+        status = arguments.get("status")
+        assigned_to = arguments.get("assigned_to")
+        tasks = mesh.list_tasks(status=status, assigned_to=assigned_to)
+        return {"content": [{"type": "text", "text": json.dumps({"tasks": tasks, "count": len(tasks)}, indent=2)}]}
+
+    elif name == "post_task_to_board":
+        from app.services.agent_mesh import AgentMeshService
+        mesh = AgentMeshService(session)
+        task = mesh.create_task(
+            title=arguments.get("title", ""),
+            description=arguments.get("description", ""),
+            assigned_to=arguments.get("assigned_to", "antigravity"),
+            created_by=arguments.get("created_by", "chatgpt"),
+            priority=arguments.get("priority", "normal"),
+            context_summary=arguments.get("context_summary", ""),
+        )
+        return {"content": [{"type": "text", "text": json.dumps({"success": True, "task": task}, indent=2)}]}
+
+    elif name == "post_task_checkpoint":
+        from app.services.agent_mesh import AgentMeshService
+        mesh = AgentMeshService(session)
+        res = mesh.post_checkpoint(
+            task_id=arguments.get("task_id", ""),
+            agent_name=arguments.get("agent_name", "unknown"),
+            summary=arguments.get("summary", ""),
+            files_touched=arguments.get("files_touched"),
+            next_steps=arguments.get("next_steps"),
+            new_status=arguments.get("new_status"),
+        )
+        return {"content": [{"type": "text", "text": json.dumps(res, indent=2)}]}
+
+    elif name == "update_task_status":
+        from app.services.agent_mesh import AgentMeshService
+        mesh = AgentMeshService(session)
+        res = mesh.update_task_status(
+            task_id=arguments.get("task_id", ""),
+            status=arguments.get("status", ""),
+            notes=arguments.get("notes", ""),
+            handoff_to=arguments.get("handoff_to"),
+        )
+        return {"content": [{"type": "text", "text": json.dumps(res, indent=2)}]}
 
     else:
         raise HTTPException(404, detail=f"Tool '{name}' not found.")

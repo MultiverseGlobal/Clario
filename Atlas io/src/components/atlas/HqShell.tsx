@@ -8,9 +8,6 @@ import { NewLeadModal } from "@/components/atlas/NewLeadModal";
 import { FloatingNav } from "@/components/atlas/FloatingNav";
 import { TheVaultDrawer } from "@/components/atlas/TheVaultDrawer";
 import { ChatDrawer } from "@/components/atlas/ChatDrawer";
-import { AppShell } from "@pseudonyms/ui";
-
-
 
 // ── Inlined: CommandPalette ───────────────────────────────────────────────────
 type CmdAction = { id: string; label: string; description?: string; accent?: string; shortcut?: string; action: () => void; };
@@ -112,8 +109,6 @@ function CommandPalette({ currentApp: _, extraCommands = [] }: { currentApp?: st
   );
 }
 
-
-
 export default function HqShell() {
   const { user, loading, signOut } = useAuth();
   const { theme, cycleTheme } = useTheme();
@@ -139,8 +134,6 @@ export default function HqShell() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // ⌘K handled by <CommandPalette /> mounted in JSX
-
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -156,14 +149,15 @@ export default function HqShell() {
   }
 
   return (
-    <AppShell
-      appName="Atlas"
-      appDescription="Commercial Execution System"
-      user={user ? { name: user.email?.split('@')[0] || 'User' } : null}
-      className="max-w-none p-0 lg:p-0"
-    >
+    <div className="min-h-screen atlas-grid-bg text-foreground flex flex-col overflow-x-hidden relative">
+      {/* ── Fixed Ambient Radiant Light Mesh ── */}
+      <div className="fixed inset-0 atlas-light-mesh pointer-events-none z-0" />
+
+      {/* ── Floating Navigation (separate elements, not a header) ─── */}
+      <FloatingNav onNewLead={() => setNewLeadOpen(true)} />
+
       {/* ── Main Full-Width Process Workspace ───────────────────────────────── */}
-      <main className="flex-1 min-w-0 w-full pt-6">
+      <main className="flex-1 min-w-0 w-full pt-24">
         <AnimatePresence mode="wait">
           <motion.div
             key={location.pathname}
@@ -178,7 +172,7 @@ export default function HqShell() {
         </AnimatePresence>
       </main>
 
-      {/* ── Command Palette (⌘K) — shared from @pseudonyms/ui ──────────────── */}
+      {/* ── Command Palette (⌘K) ────────────────────────────────────────────── */}
       <CommandPalette
         currentApp="atlas"
         extraCommands={[
@@ -210,6 +204,6 @@ export default function HqShell() {
       {/* ── Drawers ─────────────────────────────────────────────────────────── */}
       <TheVaultDrawer open={vaultOpen} onClose={() => setVaultOpen(false)} onOpenChat={() => setChatOpen(true)} />
       <ChatDrawer open={chatOpen} onClose={() => setChatOpen(false)} />
-    </AppShell>
+    </div>
   );
 }

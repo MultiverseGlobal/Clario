@@ -49,7 +49,7 @@ async def init_db() -> None:
             Node, NodeMetadata, Edge, Evidence, Embedding, SearchDocument,
             ContextPackage, ContextSession,
             Integration, WebhookEvent, Activity, APIKey, MCPSession,
-            ChatSession, TaskHandoff, ContextInsight, UniversalEvent
+            ChatSession, Task, ContextInsight, UniversalEvent
         )
         await conn.run_sync(SQLModel.metadata.create_all)
 

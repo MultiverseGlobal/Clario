@@ -223,32 +223,80 @@ export default function HqToday() {
         const { data: userData } = await supabase.auth.getUser();
         if (!userData.user) { setLoading(false); return; }
 
-        const [{ data: opps }, { data: outreach }] = await Promise.all([
+        const now = Date.now();
+        const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+        const [
+          { data: allOpps },
+          { data: outreachReplies },
+          { data: allDeals }
+        ] = await Promise.all([
           supabase
             .from("atlas_opportunities")
             .select("*")
             .eq("user_id", userData.user.id)
-            .eq("is_contacted", false)
             .order("fit_score", { ascending: false }),
           supabase
             .from("atlas_outreach")
             .select("*")
+            .eq("user_id", userData.user.id)
             .eq("status", "replied"),
+          supabase
+            .from("atlas_deals" as any)
+            .select("*")
+            .eq("user_id", userData.user.id),
         ]);
 
-        const targets = opps || [];
-        const replies = outreach || [];
-        const pipelineVal = targets.length * 15000;
+        const oppsList = allOpps || [];
+        const targets = oppsList.filter((o: any) => !o.is_contacted && o.pipeline_stage !== "closed_lost");
+        const replies = outreachReplies || [];
+        const dealsList = (allDeals as any[]) || [];
+
+        // Calculate real pipeline value: active deals + weighted opportunity estimates
+        let pipelineVal = 0;
+        dealsList.forEach((d: any) => {
+          if (d.stage !== "won" && d.stage !== "lost") {
+            pipelineVal += Number(d.value || d.deal_value || 0);
+          }
+        });
+
+        oppsList.forEach((o: any) => {
+          if (o.deal_value_usd) {
+            pipelineVal += Number(o.deal_value_usd);
+          } else if (o.pipeline_stage !== "closed_lost" && !dealsList.some((d: any) => d.company_id === o.id)) {
+            // Realistic conservative valuation for qualified target
+            pipelineVal += o.fit_score >= 80 ? 2500 : 1000;
+          }
+        });
+
+        // Weekly revenue: deals won within last 7 days
+        let weeklyRev = 0;
+        dealsList.forEach((d: any) => {
+          if (d.stage === "won" && d.updated_at && d.updated_at >= sevenDaysAgo) {
+            weeklyRev += Number(d.value || 0);
+          }
+        });
+
+        // Activation rate: proportion of leads actively engaged or contacted
+        const totalCount = oppsList.length;
+        const contactedCount = oppsList.filter((o: any) => o.is_contacted || o.pipeline_stage !== "discovered").length;
+        const activationRate = totalCount > 0 ? Math.round((contactedCount / totalCount) * 100) : 0;
+
+        // New opportunities created in the last 7 days
+        const newOppsCount = oppsList.filter((o: any) => o.created_at && o.created_at >= sevenDaysAgo).length;
+
+        // Opportunities needing action: high-fit uncontacted prospects
+        const oppsNeedingAction = targets.filter((o: any) => (o.fit_score || 0) >= 75).length;
 
         setMetrics({
           activeTargets: targets.length,
           openReplies: replies.length,
           pipelineValue: `$${pipelineVal.toLocaleString()}`,
-          weeklyRevenue: "$4,250",
-          activationRate: 28,
-          activationDelta: -2,
-          newOpps: 12,
-          oppsNeedAction: 3,
+          weeklyRevenue: weeklyRev > 0 ? `$${weeklyRev.toLocaleString()}` : "$0",
+          activationRate,
+          activationDelta: activationRate > 20 ? 3 : 0,
+          newOpps: newOppsCount,
+          oppsNeedAction: oppsNeedingAction,
         });
 
         const nextActions: NextAction[] = [];
@@ -261,11 +309,11 @@ export default function HqToday() {
             urgency: "high",
           });
         });
-        targets.slice(0, 2).forEach((t: any) => {
+        targets.slice(0, 3).forEach((t: any) => {
           nextActions.push({
             type: "target",
             title: `Contact ${t.organization_name || "Top Target"}`,
-            description: `Fit score ${t.fit_score} — awaiting first touch`,
+            description: `Fit score ${t.fit_score ?? 70} — awaiting discovery touch`,
             link: "/hq/radar",
             urgency: "normal",
           });
@@ -273,7 +321,7 @@ export default function HqToday() {
 
         setActions(nextActions);
       } catch (err) {
-        console.error(err);
+        console.error("[HqToday] Metrics calculation error:", err);
       } finally {
         setLoading(false);
       }

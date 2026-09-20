@@ -12,7 +12,7 @@ from app.models.orchestration import (
     ContextViewPreferences,
 )
 from app.models.graph import Node, Edge, Evidence
-from app.models.task_handoff import TaskHandoff
+from app.models.task_handoff import Task
 from app.models.insight import ContextInsight
 from app.services.retrieval import RetrievalService, RetrievalScope
 from app.services.llm import llm_service
@@ -290,15 +290,15 @@ class ContextOrchestrator:
             )
         return ContextViewPreferences(consumer=consumer)
 
-    async def _fetch_handoffs(self, scope: RetrievalScope) -> List[TaskHandoff]:
+    async def _fetch_handoffs(self, scope: RetrievalScope) -> List[Task]:
         stmt = (
-            select(TaskHandoff)
-            .where(TaskHandoff.organization_id == scope.organization_id)
-            .where(TaskHandoff.status.in_(["pending", "in_progress"]))
+            select(Task)
+            .where(Task.organization_id == scope.organization_id)
+            .where(Task.status.in_(["pending", "in_progress"]))
         )
         if scope.workspace_id and "global" not in scope.allowed_scopes:
-            stmt = stmt.where(TaskHandoff.workspace_id == scope.workspace_id)
+            stmt = stmt.where(Task.workspace_id == scope.workspace_id)
             
-        stmt = stmt.order_by(desc(TaskHandoff.updated_at)).limit(5)
+        stmt = stmt.order_by(desc(Task.updated_at)).limit(5)
         res = await self.session.execute(stmt)
         return res.scalars().all()

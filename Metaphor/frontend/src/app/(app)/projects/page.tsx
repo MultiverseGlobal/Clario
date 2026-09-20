@@ -253,6 +253,13 @@ function ProjectRouterPanel({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
+          <a
+            href={`/canvas/${project.id}`}
+            className="flex items-center gap-1 text-[10px] uppercase font-bold text-indigo-300 hover:text-white bg-indigo-600/20 hover:bg-indigo-600 border border-indigo-500/30 px-2.5 py-1 rounded-md transition-all shadow-sm"
+          >
+            <span>Open Canvas</span>
+            <ChevronRight className="w-3 h-3" />
+          </a>
           <button onClick={() => setShowConfig(!showConfig)}
             className="text-[10px] uppercase font-bold text-muted hover:text-foreground border border-border-subtle px-2 py-1 rounded-md transition-colors">
             {showConfig ? "Hide Config" : "MCP Config"}

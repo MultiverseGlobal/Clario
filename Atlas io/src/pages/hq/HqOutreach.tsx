@@ -572,10 +572,10 @@ export default function HqOutreach() {
                 animate={{ x: 0 }}
                 exit={{ x: "100%" }}
                 transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                className="fixed top-0 right-0 bottom-0 w-full max-w-xl z-[999] bg-white dark:bg-[#0c0d12] border-l border-border shadow-2xl flex flex-col overflow-hidden text-left"
+                className="fixed top-0 right-0 bottom-0 w-full max-w-xl z-[999] bg-card border-l border-border shadow-2xl flex flex-col overflow-hidden text-left"
               >
                 {/* Drawer Header */}
-                <div className="p-5 border-b border-border flex items-center justify-between bg-slate-50 dark:bg-[#12141d]">
+                <div className="p-5 border-b border-border flex items-center justify-between bg-muted/30">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-xl bg-muted border border-border flex items-center justify-center font-bold text-xs uppercase text-foreground">
                     {selectedRecord.company_name.slice(0, 2)}
@@ -785,7 +785,7 @@ export default function HqOutreach() {
                 initial={{ opacity: 0, scale: 0.95, y: 10 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                className="fixed inset-0 m-auto max-w-lg max-h-[85vh] w-full z-[999] bg-white dark:bg-[#0c0d12] border border-border shadow-2xl p-6 flex flex-col overflow-hidden"
+                className="fixed inset-0 m-auto max-w-lg max-h-[85vh] w-full z-[999] bg-card border border-border shadow-2xl p-6 flex flex-col overflow-hidden"
               >
                 <div className="flex items-center justify-between pb-4 border-b border-border">
                   <div className="flex items-center gap-2">
@@ -812,7 +812,7 @@ export default function HqOutreach() {
                       value={formCompany}
                       onChange={(e) => setFormCompany(e.target.value)}
                       placeholder="e.g. Acme Corp"
-                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#151722] border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
+                      className="w-full px-3 py-2 rounded-xl bg-muted/40 border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
                     />
                   </div>
 
@@ -824,7 +824,7 @@ export default function HqOutreach() {
                         value={formRecipient}
                         onChange={(e) => setFormRecipient(e.target.value)}
                         placeholder="e.g. Jane Doe"
-                        className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#151722] border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
+                        className="w-full px-3 py-2 rounded-xl bg-muted/40 border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
                       />
                     </div>
                     <div>
@@ -834,7 +834,7 @@ export default function HqOutreach() {
                         value={formRole}
                         onChange={(e) => setFormRole(e.target.value)}
                         placeholder="e.g. Founder & CEO"
-                        className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#151722] border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
+                        className="w-full px-3 py-2 rounded-xl bg-muted/40 border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
                       />
                     </div>
                   </div>
@@ -847,7 +847,7 @@ export default function HqOutreach() {
                       value={formEmail}
                       onChange={(e) => setFormEmail(e.target.value)}
                       placeholder="jane@acme.com"
-                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#151722] border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
+                      className="w-full px-3 py-2 rounded-xl bg-muted/40 border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
                     />
                   </div>
 
@@ -857,7 +857,7 @@ export default function HqOutreach() {
                       <select
                         value={formChannel}
                         onChange={(e) => setFormChannel(e.target.value as any)}
-                        className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#151722] border border-border text-foreground focus:outline-none focus:border-foreground/40 cursor-pointer"
+                        className="w-full px-3 py-2 rounded-xl bg-muted/40 border border-border text-foreground focus:outline-none focus:border-foreground/40 cursor-pointer"
                       >
                         <option value="email">Email</option>
                         <option value="linkedin">LinkedIn</option>
@@ -869,7 +869,7 @@ export default function HqOutreach() {
                       <select
                         value={formStatus}
                         onChange={(e) => setFormStatus(e.target.value as any)}
-                        className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#151722] border border-border text-foreground focus:outline-none focus:border-foreground/40 cursor-pointer"
+                        className="w-full px-3 py-2 rounded-xl bg-muted/40 border border-border text-foreground focus:outline-none focus:border-foreground/40 cursor-pointer"
                       >
                         <option value="sent">Sent</option>
                         <option value="delivered">Delivered</option>
@@ -886,7 +886,7 @@ export default function HqOutreach() {
                       value={formSubject}
                       onChange={(e) => setFormSubject(e.target.value)}
                       placeholder="Quick question on outbound tooling"
-                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#151722] border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
+                      className="w-full px-3 py-2 rounded-xl bg-muted/40 border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
                     />
                   </div>
 
@@ -897,7 +897,7 @@ export default function HqOutreach() {
                       value={formBody}
                       onChange={(e) => setFormBody(e.target.value)}
                       placeholder="Paste the outreach text sent to the recipient..."
-                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#151722] border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 font-sans"
+                      className="w-full px-3 py-2 rounded-xl bg-muted/40 border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 font-sans"
                     />
                   </div>
 

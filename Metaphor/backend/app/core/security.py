@@ -227,11 +227,11 @@ def decrypt_token(encrypted_token: str) -> str:
     return f.decrypt(encrypted_token.encode('utf-8')).decode('utf-8')
 
 
-from app.models.identity import Consumer, Workspace
+from app.models.identity import Participant, Workspace
 
-async def get_authorized_consumer(request: Request, session: AsyncSession = Depends(get_session)) -> Consumer:
+async def get_authorized_participant(request: Request, session: AsyncSession = Depends(get_session)) -> Participant:
     """
-    Authenticates the request and resolves the Consumer identity and its allowed scope.
+    Authenticates the request and resolves the Participant identity and its allowed scope.
     """
     # 1. Try X-API-Key
     api_key = request.headers.get("X-API-Key", "")
@@ -243,17 +243,17 @@ async def get_authorized_consumer(request: Request, session: AsyncSession = Depe
         stmt = select(APIKey).where(APIKey.hashed_key == hashed_api_key)
         db_key = (await session.execute(stmt)).scalars().first()
         
-        if db_key and db_key.consumer_id:
-            consumer = await session.get(Consumer, db_key.consumer_id)
-            if consumer:
-                return consumer
+        if db_key and db_key.participant_id:
+            participant = await session.get(Participant, db_key.participant_id)
+            if participant:
+                return participant
         
         if db_key:
-            # Fallback for old API keys without consumer ID
-            return Consumer(
+            # Fallback for old API keys without participant ID
+            return Participant(
                 id=uuid.uuid4(),
                 organization_id=db_key.organization_id,
-                name="Legacy API Key Consumer",
+                name="Legacy API Key Participant",
                 allowed_scopes=["global", "workspace:*", "project:*"]
             )
 
@@ -276,9 +276,9 @@ async def get_authorized_consumer(request: Request, session: AsyncSession = Depe
                     member = (await session.execute(stmt)).scalars().first()
                     
                     if member:
-                        # For users logging in via UI, we generate a synthetic Consumer object 
+                        # For users logging in via UI, we generate a synthetic Participant object 
                         # granting them full access to their active organization.
-                        return Consumer(
+                        return Participant(
                             id=user.id, # Use user ID for tracking
                             organization_id=member.organization_id,
                             name=f"User {user.email}",
@@ -290,6 +290,6 @@ async def get_authorized_consumer(request: Request, session: AsyncSession = Depe
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Consumer authentication failed. Provide a valid Bearer token or X-API-Key mapped to a Consumer.",
+        detail="Participant authentication failed. Provide a valid Bearer token or X-API-Key mapped to a Participant.",
         headers={"WWW-Authenticate": "Bearer"},
     )

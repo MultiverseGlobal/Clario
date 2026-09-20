@@ -16,25 +16,25 @@ import Landing from "./pages/Landing";
 import NotFound from "./pages/NotFound";
 
 const Onboarding = React.lazy(() => import("./pages/Onboarding"));
-const FounderHome = React.lazy(() => import("./pages/FounderHome"));
+const CommandFeed = React.lazy(() => import("./pages/CommandFeed"));
+const DailyBriefing = React.lazy(() => import("./pages/hq/DailyBriefing"));
 const ObjectivesStudio = React.lazy(() => import("./pages/hq/ObjectivesStudio"));
 const HqRadar = React.lazy(() => import("./pages/hq/HqRadar"));
 const HqLeadDetail = React.lazy(() => import("./pages/hq/HqLeadDetail"));
 const HqProposal = React.lazy(() => import("./pages/hq/HqProposal"));
-const CommandFeed = React.lazy(() => import("./pages/hq/HqToday"));
-const DailyBriefing = React.lazy(() => import("./pages/hq/HqToday"));
 const HqSettings = React.lazy(() => import("./pages/hq/HqSettings"));
 const HqTrustCenter = React.lazy(() => import("./pages/hq/HqTrustCenter"));
 const HqInsights = React.lazy(() => import("./pages/hq/HqInsights"));
 const HqOutreach = React.lazy(() => import("./pages/hq/HqOutreach"));
-
-const HqToday = React.lazy(() => import("./pages/hq/HqToday"));
+const HqDashboard = React.lazy(() => import("./pages/hq/HqDashboard"));
 const HqPartnerships = React.lazy(() => import("./pages/hq/HqPartnerships"));
 const HqTeam = React.lazy(() => import("./pages/hq/HqTeam"));
 const HqReport = React.lazy(() => import("./pages/hq/HqReport"));
 const HqMediaJobs = React.lazy(() => import("./pages/hq/HqMediaJobs"));
+const HqCampaignHub = React.lazy(() => import("./pages/hq/HqCampaignHub"));
 const Privacy = React.lazy(() => import("./pages/Privacy"));
 const PublicProfile = React.lazy(() => import("./pages/PublicProfile"));
+
 
 const SovereignSyncWrapper = ({ children }: { children: React.ReactNode }) => {
   useSovereignSync();
@@ -58,13 +58,15 @@ const App = () => (
               <Routes>
                 {/* ── Sovereign App Shell (Atlas V1 Core Surfaces & Extended) ─ */}
                 <Route element={<HqShell />}>
-                  <Route path="/" element={<FounderHome />} />
-                  <Route path="/briefing" element={<HqToday />} />
+                  <Route path="/" element={<CommandFeed />} />
+                  <Route path="/briefing" element={<DailyBriefing />} />
                   <Route path="/objectives" element={<ObjectivesStudio />} />
                   <Route path="/outreach" element={<HqOutreach />} />
-                  <Route path="/workspace" element={<HqToday />} />
-                  <Route path="/command" element={<HqToday />} />
-                  <Route path="/engine" element={<HqToday />} />
+                  <Route path="/campaigns" element={<HqCampaignHub />} />
+                  <Route path="/campaign" element={<HqCampaignHub />} />
+                  <Route path="/workspace" element={<CommandFeed />} />
+                  <Route path="/command" element={<CommandFeed />} />
+                  <Route path="/engine" element={<CommandFeed />} />
 
                   {/* ── Sovereign Pipeline Flow ────────────────────────────── */}
                   <Route path="/hq">
@@ -73,12 +75,14 @@ const App = () => (
                     <Route path="trust" element={<HqTrustCenter />} />
                     <Route path="insights" element={<HqInsights />} />
                     <Route path="outreach" element={<HqOutreach />} />
-                    <Route path="engine" element={<HqToday />} />
-                    <Route path="command" element={<HqToday />} />
-                    <Route path="dashboard" element={<HqToday />} />
+                    <Route path="engine" element={<CommandFeed />} />
+                    <Route path="command" element={<CommandFeed />} />
+                    <Route path="dashboard" element={<HqDashboard />} />
                     <Route path="partnerships" element={<HqPartnerships />} />
                     <Route path="team" element={<HqTeam />} />
                     <Route path="report" element={<HqReport />} />
+                    <Route path="campaigns" element={<HqCampaignHub />} />
+                    <Route path="campaign" element={<HqCampaignHub />} />
                     <Route path="media-jobs" element={<HqMediaJobs />} />
                     <Route path="leads" element={<Navigate to="/hq/radar" replace />} />
                     <Route path="leads/:id" element={<HqLeadDetail />} />

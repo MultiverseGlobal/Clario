@@ -12,7 +12,7 @@ logger = logging.getLogger("metaphor.services.retrieval")
 from pydantic import BaseModel
 
 class RetrievalScope(BaseModel):
-    consumer_id: uuid.UUID
+    participant_id: uuid.UUID
     organization_id: uuid.UUID
     workspace_id: Optional[uuid.UUID] = None
     project_id: Optional[uuid.UUID] = None
@@ -33,7 +33,7 @@ class RetrievalService:
         Unified canonical retrieval pipeline.
         Replaces fragmented context generation across MCP and REST.
         """
-        logger.info(f"Retrieving context for consumer={scope.consumer_id} query='{query}' org={scope.organization_id} workspace={scope.workspace_id}")
+        logger.info(f"Retrieving context for participant={scope.participant_id} query='{query}' org={scope.organization_id} workspace={scope.workspace_id}")
 
         # 1. Semantic Embedding of Query
         query_embedding = None
@@ -139,7 +139,7 @@ class RetrievalService:
 
         package = {
             "query": query,
-            "consumer_id": str(scope.consumer_id),
+            "participant_id": str(scope.participant_id),
             "workspace_id": str(scope.workspace_id) if scope.workspace_id else None,
             "results_count": len(results),
             "nodes": results,

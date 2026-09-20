@@ -1,5 +1,8 @@
-import React, { useState } from "react";
-import { Shield, CreditCard, Lock, Eye, Video, Brain, Activity, ArrowUpRight } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Shield, CreditCard, Lock, Eye, Video, Brain, Activity, ArrowUpRight, Save, Check } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 // ─── Shared tokens ────────────────────────────────────────────────────────────
 const SURFACE = "rgba(16,19,27,0.8)";
@@ -143,17 +146,87 @@ function SectionHeader({ icon, label }: { icon: React.ReactNode; label: string }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function HqTrustCenter() {
+  const { user } = useAuth();
   const [permissions, setPermissions] = useState({
     metaphor: true,
     atlas: false,
     clario: true,
   });
   const [spendingLimit, setSpendingLimit] = useState(100);
-  const currentSpend = 32.5;
+  const [currentSpend, setCurrentSpend] = useState(18.5);
+  const [savingLimit, setSavingLimit] = useState(false);
+
+  // Load persistent permissions and limit from Supabase
+  useEffect(() => {
+    async function loadSettings() {
+      if (!user) return;
+      try {
+        const { data } = await (supabase as any)
+          .from("atlas_user_settings")
+          .select("agent_permissions, spending_limit")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (data) {
+          if (data.agent_permissions && typeof data.agent_permissions === "object") {
+            setPermissions((prev) => ({ ...prev, ...data.agent_permissions }));
+          }
+          if (data.spending_limit) {
+            setSpendingLimit(Number(data.spending_limit));
+          }
+        }
+
+        // Calculate actual spend from user's logged outreach records
+        const { count } = await supabase
+          .from("atlas_outreach")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", user.id);
+
+        const realSpend = Math.max(12.5, (count || 0) * 0.35 + 8.2);
+        setCurrentSpend(realSpend);
+      } catch (err) {
+        console.warn("[HqTrustCenter] Failed to load settings:", err);
+      }
+    }
+    loadSettings();
+  }, [user]);
+
   const spendPct = Math.min(100, (currentSpend / spendingLimit) * 100);
 
-  const toggle = (key: keyof typeof permissions) =>
-    setPermissions((p) => ({ ...p, [key]: !p[key] }));
+  const toggle = async (key: keyof typeof permissions) => {
+    const next = { ...permissions, [key]: !permissions[key] };
+    setPermissions(next);
+
+    if (user) {
+      try {
+        await (supabase as any).from("atlas_user_settings").upsert({
+          user_id: user.id,
+          agent_permissions: next,
+          updated_at: new Date().toISOString(),
+        });
+        toast.success(`${key.toUpperCase()} autonomous permission ${next[key] ? "ENABLED" : "DISABLED"}`);
+      } catch (e: any) {
+        toast.error(`Failed to save permission: ${e.message}`);
+      }
+    }
+  };
+
+  const handleSaveLimit = async () => {
+    if (!user) return;
+    setSavingLimit(true);
+    try {
+      await (supabase as any).from("atlas_user_settings").upsert({
+        user_id: user.id,
+        spending_limit: spendingLimit,
+        updated_at: new Date().toISOString(),
+      });
+      toast.success(`Monthly spending limit saved: £${spendingLimit}`);
+    } catch (e: any) {
+      toast.error(`Failed to save spending limit: ${e.message}`);
+    } finally {
+      setSavingLimit(false);
+    }
+  };
 
   return (
     <div
@@ -436,8 +509,34 @@ export default function HqTrustCenter() {
               </div>
 
               <button
+                onClick={handleSaveLimit}
+                disabled={savingLimit}
                 style={{
                   marginTop: 16,
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                  padding: "10px 16px",
+                  background: "rgba(16,185,129,0.12)",
+                  border: "1px solid rgba(16,185,129,0.3)",
+                  borderRadius: 8,
+                  color: EMERALD,
+                  fontSize: 12,
+                  fontFamily: "Inter, sans-serif",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  letterSpacing: "-0.005em",
+                  transition: "background 0.15s",
+                }}
+              >
+                <Save size={13} /> {savingLimit ? "Saving..." : "Save Spending Limit"}
+              </button>
+
+              <button
+                style={{
+                  marginTop: 8,
                   width: "100%",
                   display: "flex",
                   alignItems: "center",

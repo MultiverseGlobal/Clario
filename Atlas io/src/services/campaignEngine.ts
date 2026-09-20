@@ -15,6 +15,7 @@ export interface SourceEvidence {
 
 export interface DiscoveredLead {
   id?: string;
+  isSynthetic?: boolean; // true = fallback-generated, not a real company
   // Flat aliases for backwards compatibility with existing UI components:
   company: string;
   website: string;
@@ -549,7 +550,128 @@ const CURATED_DIRECTORIES: CuratedTargetLead[] = [
     tags: ["agency", "digital", "design", "creative", "us-based"],
   },
 
-  // ── YC: Tech & AI Startups ─────────────────────────────────────────────────
+  // ── UK Paid-Media Agencies (5–15 staff) ────────────────────────────────────
+  {
+    company: "Hallam",
+    website: "https://hallaminternet.com",
+    founder: { name: "Julio Taylor", email: "julio@hallaminternet.com", role: "CEO" },
+    founder_thesis: "Award-winning digital performance agency specialising in paid media, SEO, and data-led growth.",
+    bottleneck: "Manual monthly client reporting across Meta Ads, Google Ads, and GA4 into custom-branded decks.",
+    channel: "clutch",
+    location: "Nottingham, UK",
+    regions: ["UK"],
+    headcount: 50,
+    tags: ["agency", "digital", "ppc", "paid media", "uk-based", "performance"],
+  },
+  {
+    company: "Impression",
+    website: "https://www.impressiondigital.com",
+    founder: { name: "Aaron Dicks", email: "aaron@impressiondigital.com", role: "Director" },
+    founder_thesis: "Specialist digital performance agency with award-winning paid media and SEO teams.",
+    bottleneck: "Multi-client Google Ads and Meta reporting compiled manually into per-client slide templates each month.",
+    channel: "clutch",
+    location: "Nottingham, UK",
+    regions: ["UK"],
+    headcount: 45,
+    tags: ["agency", "digital", "ppc", "seo", "uk-based", "performance"],
+  },
+  {
+    company: "Spike Digital",
+    website: "https://spikedigital.co.uk",
+    founder: { name: "Oliver Kenyon", email: "oliver@spikedigital.co.uk", role: "Founder" },
+    founder_thesis: "Independent paid media agency focused on Google Ads, Meta, and e-commerce growth for DTC brands.",
+    bottleneck: "Weekly and monthly paid media reports manually assembled from platform exports into client PDFs.",
+    channel: "clutch",
+    location: "London, UK",
+    regions: ["UK"],
+    headcount: 8,
+    tags: ["agency", "ppc", "paid media", "meta ads", "google ads", "uk-based", "ecommerce"],
+  },
+  {
+    company: "Clicteq",
+    website: "https://clicteq.com",
+    founder: { name: "Wesley Parker", email: "wes@clicteq.com", role: "CEO" },
+    founder_thesis: "Boutique Google Ads and PPC agency serving B2B and e-commerce businesses across the UK.",
+    bottleneck: "Preparing bespoke monthly PPC performance reports manually for each client from raw Google Ads data.",
+    channel: "clutch",
+    location: "London, UK",
+    regions: ["UK"],
+    headcount: 10,
+    tags: ["agency", "ppc", "google ads", "b2b", "uk-based", "performance"],
+  },
+  {
+    company: "Summit Digital",
+    website: "https://summitdigital.co.uk",
+    founder: { name: "Chris Airey", email: "chris@summitdigital.co.uk", role: "Managing Director" },
+    founder_thesis: "Performance-led digital marketing agency focusing on paid search and paid social for ambitious UK brands.",
+    bottleneck: "Monthly paid media reports built manually in Google Slides from Meta and Google Ads platform exports.",
+    channel: "clutch",
+    location: "Newcastle, UK",
+    regions: ["UK"],
+    headcount: 12,
+    tags: ["agency", "ppc", "paid social", "meta ads", "uk-based", "performance"],
+  },
+  {
+    company: "Tillison Consulting",
+    website: "https://tillisonconsulting.com",
+    founder: { name: "Nick Tillison", email: "nick@tillisonconsulting.com", role: "Founder" },
+    founder_thesis: "Independent digital marketing agency delivering paid search, SEO and analytics for growing UK companies.",
+    bottleneck: "End-of-month reporting cycle consuming 2–3 days of account manager time pulling data from multiple platforms.",
+    channel: "clutch",
+    location: "Hampshire, UK",
+    regions: ["UK"],
+    headcount: 14,
+    tags: ["agency", "ppc", "seo", "analytics", "uk-based"],
+  },
+  {
+    company: "PPC Geeks",
+    website: "https://ppcgeeks.co.uk",
+    founder: { name: "Dean Barker", email: "dean@ppcgeeks.co.uk", role: "Founder" },
+    founder_thesis: "Specialist Google Ads agency focused on maximising paid search ROI for UK SMEs.",
+    bottleneck: "Monthly client reporting done manually by account managers — pulling raw data from Google Ads and exporting to spreadsheets.",
+    channel: "clutch",
+    location: "Leeds, UK",
+    regions: ["UK"],
+    headcount: 9,
+    tags: ["agency", "ppc", "google ads", "uk-based", "smb"],
+  },
+  {
+    company: "Circus PPC",
+    website: "https://circusppc.com",
+    founder: { name: "Nick Boddington", email: "nick@circusppc.com", role: "Director" },
+    founder_thesis: "Pure-play paid media agency running Google Ads, Meta Ads, and Shopping campaigns for e-commerce and B2B.",
+    bottleneck: "Manual cross-platform data extraction and report assembly each month across multiple client accounts.",
+    channel: "clutch",
+    location: "Manchester, UK",
+    regions: ["UK"],
+    headcount: 11,
+    tags: ["agency", "ppc", "meta ads", "google ads", "ecommerce", "uk-based"],
+  },
+  {
+    company: "Kaizen",
+    website: "https://kaizen.co.uk",
+    founder: { name: "Andrew Tate", email: "andrew@kaizen.co.uk", role: "CEO" },
+    founder_thesis: "Digital PR and performance agency running paid social and content campaigns for ambitious UK brands.",
+    bottleneck: "Monthly paid social reporting manually assembled from Meta Business Suite exports into branded client docs.",
+    channel: "clutch",
+    location: "London, UK",
+    regions: ["UK"],
+    headcount: 30,
+    tags: ["agency", "paid social", "digital pr", "meta ads", "uk-based", "content"],
+  },
+  {
+    company: "Found",
+    website: "https://found.co.uk",
+    founder: { name: "Patrick Altoft", email: "patrick@found.co.uk", role: "Director" },
+    founder_thesis: "Award-winning digital agency delivering paid media, SEO and analytics strategies for UK retail and B2B.",
+    bottleneck: "Recurring paid media and SEO report production taking multiple team-hours monthly per client.",
+    channel: "clutch",
+    location: "London, UK",
+    regions: ["UK"],
+    headcount: 35,
+    tags: ["agency", "ppc", "seo", "analytics", "uk-based", "retail"],
+  },
+
   {
     company: "Supabase",
     website: "https://supabase.com",
@@ -779,6 +901,7 @@ function synthesizeDynamicLeads(
 
     return {
       id: `syn-${Math.random().toString(36).substring(2, 9)}`,
+      isSynthetic: true, // ⚠️ This is a generated placeholder, not a real company
       company,
       website: `https://${domain}`,
       founder: {
@@ -1420,11 +1543,21 @@ function enforceWordCap(str: string, maxWords: number): string {
 export async function generateLeadOutreach(
   lead: DiscoveredLead, 
   hypothesis: string, 
-  clarioVideoUrl?: string
+  clarioVideoUrl?: string,
+  senderName?: string
 ): Promise<OutreachDraft> {
   const firstName = lead.founder?.name?.split(" ")[0] || "there";
-  const bottleneck = lead.bottleneck || lead.recon?.likely_operational_problem || "operational delivery and client acquisition";
-  const senderName = "Atlas Partner";
+  const bottleneck = lead.bottleneck || lead.recon?.likely_operational_problem || "recurring client reporting";
+
+  // Pull sender name: passed in > atlas_user_settings > hardcoded default
+  let resolvedSenderName = senderName || "Ben";
+  try {
+    const { data: settings } = await supabase
+      .from("atlas_user_settings")
+      .select("sender_name")
+      .maybeSingle();
+    if (settings?.sender_name) resolvedSenderName = settings.sender_name;
+  } catch { /* non-blocking */ }
 
   // Check for multi-platform evidence to inject grounded citations
   const careerEvidence = lead.recon?.problem_evidence?.find(e => e.source_type === "job_board");
@@ -1433,7 +1566,7 @@ export async function generateLeadOutreach(
   if (careerEvidence) {
     evidenceCitation = `I noticed you're actively scaling delivery capacity (${careerEvidence.claim}).`;
   } else if (reviewEvidence) {
-    evidenceCitation = `I was reviewing your team's client feedback and delivery cadence (${reviewEvidence.claim}).`;
+    evidenceCitation = `I was reviewing your team's client feedback and delivery cadence.`;
   }
 
   try {
@@ -1481,16 +1614,34 @@ export async function generateLeadOutreach(
     console.warn("[CampaignEngine] Remote generate-outreach invocation fallback:", err.message);
   }
 
-  // Graceful local synthesizer fallback adhering strictly to v3 constraints
-  const videoToken = clarioVideoUrl || "{{CLARIO_VIDEO_URL}}";
-  const rawEmailBody = `Hi ${firstName},\n\nI noticed ${lead.company}'s focus on high-velocity client delivery and had a quick operational question.\n\n${evidenceCitation ? `${evidenceCitation}\n\n` : ""}${hypothesis}\n\nIs that ${bottleneck.toLowerCase()} still handled manually by the team, or already systematized?\n\nI recorded a short walkthrough of the workflow I had in mind: ${videoToken}\n\nBest,\n${senderName}`;
+  // Graceful local synthesizer fallback — matches the exact discovery kit message
+  // NO sales framing. This is a research conversation opener only.
+  const rawEmailBody = `Hi ${firstName},
+
+I'm researching how smaller paid-media agencies handle recurring client reporting.
+
+I'm particularly interested in how much of the monthly report preparation is still manual — from collecting campaign data through to preparing the first draft.
+
+Would you be open to answering a few quick questions about how your team handles it? I'm researching the workflow before building anything, so I'm not trying to sell you something here.
+
+Best,
+${resolvedSenderName}`;
 
   const emailBody = enforceWordCap(rawEmailBody, 130);
-  const linkedinDm = enforceWordCap(`Hi ${firstName} — noticed ${lead.company}'s trajectory. Quick question on how your team is handling ${bottleneck.toLowerCase()} this quarter?`, 60);
+  const linkedinDm = enforceWordCap(
+    `Hi ${firstName} — I'm researching how paid-media agencies handle monthly client reporting. How much of your report prep is still manual? Quick question, not a pitch.`,
+    60
+  );
 
-  const loomScript = `Hey ${firstName}, recorded a quick 60-second screen walkthrough for ${lead.company}.\n\n${evidenceCitation ? `${evidenceCitation}\n\n` : ""}I was looking into how your team manages ${bottleneck.toLowerCase()}.\n\nHere's the hypothesis: ${hypothesis}\n\nIn this walkthrough, I demonstrate a 3-step operational pipeline that removes manual reporting overhead and accelerates delivery turnaround.\n\nCurious if this resembles your actual process, or if your team already has this systematized?`;
+  const loomScript = `Hey ${firstName}, recording a quick 60-second note for ${lead.company}.
 
-  const humanSummary = `Qualified. ${lead.company} (${lead.founder?.role || "Founder"} ${lead.founder?.name || ""}); observed ${bottleneck}. ${lead.contact?.send_email_allowed !== false ? "Email verified — ready for email dispatch." : "Email unverified — send via LinkedIn DM first or verify address before emailing."}`;
+I'm researching the reporting workflow at smaller paid-media agencies — specifically how much of the monthly prep is still manual, from pulling campaign data to sending the first draft.
+
+Not pitching anything — just trying to understand the actual workflow before I build anything.
+
+Would love 15 minutes if you're open to it.`;
+
+  const humanSummary = `${lead.company} (${lead.founder?.role || "Founder"} ${lead.founder?.name || ""}); hypothesis: ${bottleneck}. ${lead.contact?.send_email_allowed !== false ? "Email gate: open." : "Email unverified — LinkedIn DM first."}`;
 
   return {
     subject: `Question regarding ${lead.company}'s operations`,

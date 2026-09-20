@@ -7,7 +7,7 @@ from app.services.retrieval import RetrievalService
 from app.services.graph import GraphService
 from app.services.identity import IdentityService
 from app.services.reflection import ReflectionService
-from app.core.security import get_user_via_api_key, get_authorized_consumer
+from app.core.security import get_user_via_api_key, get_authorized_participant
 from app.core.rate_limiter import llm_rate_limiter
 from app.models.identity import User
 from app.models.operations import WebhookEvent
@@ -17,7 +17,7 @@ router = APIRouter()
 
 class ContextRequest(BaseModel):
     query: str
-    ai_consumer: str = "claude"
+    ai_participant: str = "claude"
 
 class LoreRequest(BaseModel):
     content: str
@@ -29,14 +29,14 @@ class AnalyzeDraftRequest(BaseModel):
 
 
 @router.post("/query")
-async def query_context(req: ContextRequest, consumer: Any = Depends(get_authorized_consumer), db: AsyncSession = Depends(get_session), _rate_limit: bool = Depends(llm_rate_limiter)):
+async def query_context(req: ContextRequest, participant: Any = Depends(get_authorized_participant), db: AsyncSession = Depends(get_session), _rate_limit: bool = Depends(llm_rate_limiter)):
     from app.services.retrieval import RetrievalScope
     
     scope = RetrievalScope(
-        consumer_id=consumer.id,
-        organization_id=consumer.organization_id,
-        workspace_id=consumer.workspace_id,
-        allowed_scopes=consumer.allowed_scopes
+        participant_id=participant.id,
+        organization_id=participant.organization_id,
+        workspace_id=participant.workspace_id,
+        allowed_scopes=participant.allowed_scopes
     )
     
     retrieval = RetrievalService(db)
@@ -51,18 +51,18 @@ async def analyze_draft(req: AnalyzeDraftRequest, current_user: User = Depends(g
     return result
 
 @router.post("/chat")
-async def chat_with_context(req: ContextRequest, current_user: User = Depends(get_user_via_api_key), consumer: Any = Depends(get_authorized_consumer), db: AsyncSession = Depends(get_session), _rate_limit: bool = Depends(llm_rate_limiter)):
-    """Powers the Playground UI by simulating a Consumer AI that uses Metaphor Context."""
+async def chat_with_context(req: ContextRequest, current_user: User = Depends(get_user_via_api_key), participant: Any = Depends(get_authorized_participant), db: AsyncSession = Depends(get_session), _rate_limit: bool = Depends(llm_rate_limiter)):
+    """Powers the Playground UI by simulating a Participant AI that uses Metaphor Context."""
     from app.services.retrieval import RetrievalScope
     
     identity = IdentityService(db)
     org = await identity.get_user_organization(current_user.id) or await identity.get_or_create_default_organization()
     
     scope = RetrievalScope(
-        consumer_id=consumer.id,
-        organization_id=consumer.organization_id,
-        workspace_id=consumer.workspace_id,
-        allowed_scopes=consumer.allowed_scopes
+        participant_id=participant.id,
+        organization_id=participant.organization_id,
+        workspace_id=participant.workspace_id,
+        allowed_scopes=participant.allowed_scopes
     )
     
     retrieval = RetrievalService(db)

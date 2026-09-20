@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.models.events import UniversalEvent
 from app.models.graph import Node, Evidence
-from app.models.task_handoff import TaskHandoff
+from app.models.task_handoff import Task
 from app.services.insight import InsightService
 
 logger = logging.getLogger(__name__)
@@ -118,7 +118,7 @@ class EventIngestionService:
                 node.updated_at = datetime.utcnow()
 
     async def _update_handoff_status(self, handoff_id: uuid.UUID, new_status: str):
-        handoff = await self.db.get(TaskHandoff, handoff_id)
+        handoff = await self.db.get(Task, handoff_id)
         if handoff:
             handoff.status = new_status
             handoff.updated_at = datetime.utcnow()

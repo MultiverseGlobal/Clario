@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select
 from fastapi import HTTPException
-from app.models.task_handoff import TaskHandoff
+from app.models.task_handoff import Task
 from app.models.identity import Consumer
 from app.services.retrieval import RetrievalScope
 
@@ -21,7 +21,7 @@ class HandoffService:
                              context_refs: List[dict] = None,
                              artifact_refs: List[dict] = None,
                              decision_refs: List[dict] = None,
-                             constraint_refs: List[dict] = None) -> TaskHandoff:
+                             constraint_refs: List[dict] = None) -> Task:
         # Validate scope provides required fields
         if not scope.organization_id or not scope.consumer_id:
             raise HTTPException(status_code=403, detail="Invalid retrieval scope for handoff creation.")
@@ -32,7 +32,7 @@ class HandoffService:
         if not target_consumer or target_consumer.organization_id != scope.organization_id:
             raise HTTPException(status_code=404, detail="Target consumer not found or access denied.")
 
-        handoff = TaskHandoff(
+        handoff = Task(
             organization_id=scope.organization_id,
             workspace_id=scope.workspace_id,
             project_id=scope.project_id,
@@ -54,8 +54,8 @@ class HandoffService:
         await self.session.refresh(handoff)
         return handoff
 
-    async def get_handoff(self, scope: RetrievalScope, handoff_id: uuid.UUID) -> TaskHandoff:
-        handoff = await self.session.get(TaskHandoff, handoff_id)
+    async def get_handoff(self, scope: RetrievalScope, handoff_id: uuid.UUID) -> Task:
+        handoff = await self.session.get(Task, handoff_id)
         if not handoff:
             raise HTTPException(status_code=404, detail="Handoff not found")
             
@@ -75,30 +75,30 @@ class HandoffService:
 
         return handoff
 
-    async def list_pending_handoffs(self, scope: RetrievalScope, role: str = "target") -> List[TaskHandoff]:
+    async def list_pending_handoffs(self, scope: RetrievalScope, role: str = "target") -> List[Task]:
         """List handoffs where the consumer is either the target or source."""
-        query = select(TaskHandoff).where(TaskHandoff.organization_id == scope.organization_id)
+        query = select(Task).where(Task.organization_id == scope.organization_id)
         
         if role == "target":
-            query = query.where(TaskHandoff.target_consumer_id == scope.consumer_id)
+            query = query.where(Task.target_consumer_id == scope.consumer_id)
         elif role == "source":
-            query = query.where(TaskHandoff.source_consumer_id == scope.consumer_id)
+            query = query.where(Task.source_consumer_id == scope.consumer_id)
         else:
             raise ValueError("Role must be 'target' or 'source'")
             
-        query = query.where(TaskHandoff.status == "pending")
+        query = query.where(Task.status == "pending")
         
         if scope.workspace_id:
             # Global handoffs (workspace_id = None) or specific workspace
-            query = query.where((TaskHandoff.workspace_id == None) | (TaskHandoff.workspace_id == scope.workspace_id))
+            query = query.where((Task.workspace_id == None) | (Task.workspace_id == scope.workspace_id))
             
         if scope.project_id:
-            query = query.where((TaskHandoff.project_id == None) | (TaskHandoff.project_id == scope.project_id))
+            query = query.where((Task.project_id == None) | (Task.project_id == scope.project_id))
             
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
-    async def _transition_status(self, scope: RetrievalScope, handoff_id: uuid.UUID, current_status: str, new_status: str) -> TaskHandoff:
+    async def _transition_status(self, scope: RetrievalScope, handoff_id: uuid.UUID, current_status: str, new_status: str) -> Task:
         handoff = await self.get_handoff(scope, handoff_id)
         
         # Only target can accept/start/complete
@@ -121,20 +121,20 @@ class HandoffService:
         await self.session.refresh(handoff)
         return handoff
 
-    async def accept_handoff(self, scope: RetrievalScope, handoff_id: uuid.UUID) -> TaskHandoff:
+    async def accept_handoff(self, scope: RetrievalScope, handoff_id: uuid.UUID) -> Task:
         return await self._transition_status(scope, handoff_id, "pending", "accepted")
 
-    async def start_handoff(self, scope: RetrievalScope, handoff_id: uuid.UUID) -> TaskHandoff:
+    async def start_handoff(self, scope: RetrievalScope, handoff_id: uuid.UUID) -> Task:
         # Can transition from accepted to in_progress
         return await self._transition_status(scope, handoff_id, "accepted", "in_progress")
 
-    async def complete_handoff(self, scope: RetrievalScope, handoff_id: uuid.UUID) -> TaskHandoff:
+    async def complete_handoff(self, scope: RetrievalScope, handoff_id: uuid.UUID) -> Task:
         return await self._transition_status(scope, handoff_id, "in_progress", "completed")
 
-    async def reject_handoff(self, scope: RetrievalScope, handoff_id: uuid.UUID) -> TaskHandoff:
+    async def reject_handoff(self, scope: RetrievalScope, handoff_id: uuid.UUID) -> Task:
         return await self._transition_status(scope, handoff_id, "pending", "rejected")
 
-    async def cancel_handoff(self, scope: RetrievalScope, handoff_id: uuid.UUID) -> TaskHandoff:
+    async def cancel_handoff(self, scope: RetrievalScope, handoff_id: uuid.UUID) -> Task:
         # Cancel can be done by source
         handoff = await self.get_handoff(scope, handoff_id)
         if scope.consumer_id != handoff.source_consumer_id:

@@ -59,15 +59,28 @@ class Workspace(SQLModel, table=True):
     
     created_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime(timezone=True)))
 
-class Consumer(SQLModel, table=True):
-    __tablename__ = "consumers"
+class Project(SQLModel, table=True):
+    __tablename__ = "projects"
     
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     organization_id: uuid.UUID = Field(foreign_key="organizations.id", index=True)
     workspace_id: Optional[uuid.UUID] = Field(default=None, foreign_key="workspaces.id", index=True)
     
-    name: str # e.g., "Claude", "ChatGPT", "Orion Agent"
-    type: str = Field(default="agent") # "user", "agent", "system"
+    name: str
+    description: Optional[str] = None
+    
+    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime(timezone=True)))
+    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime(timezone=True)))
+
+class Participant(SQLModel, table=True):
+    __tablename__ = "participants"
+    
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    organization_id: uuid.UUID = Field(foreign_key="organizations.id", index=True)
+    workspace_id: Optional[uuid.UUID] = Field(default=None, foreign_key="workspaces.id", index=True)
+    
+    name: str # e.g., "Claude", "ChatGPT", "Lovable", "GitHub"
+    type: str = Field(default="agent") # "agent", "tool", "user", "system"
     
     # E.g. ["global", "workspace:orion", "project:*"]
     allowed_scopes: dict = Field(default_factory=list, sa_column=Column(JSON))
@@ -75,8 +88,11 @@ class Consumer(SQLModel, table=True):
     # E.g. {"excluded_context": ["history", "tasks"]}
     context_preferences: dict = Field(default_factory=dict, sa_column=Column(JSON))
     
-    # E.g. ["create_handoff", "update_state", "read_insights"]
+    # Capability description, e.g. ["code_generation", "code_review"]
     capabilities: dict = Field(default_factory=list, sa_column=Column(JSON))
+    
+    # Configuration for connection (MCP URI, webhook URL, auth)
+    connection_config: dict = Field(default_factory=dict, sa_column=Column(JSON))
     
     status: str = Field(default="active")
     created_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime(timezone=True)))

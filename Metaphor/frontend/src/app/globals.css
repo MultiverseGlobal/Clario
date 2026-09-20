@@ -480,3 +480,80 @@ h1, h2, h3, h4, h5, h6, .font-display {
   background: var(--color-success);
   animation: pulse-green 2.5s infinite;
 }
+
+/* ── Flora AI Studio Node Canvas Styles ────────────────────────────────── */
+
+.flora-canvas-bg {
+  background-color: #06070a;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.flora-glass {
+  background: rgba(14, 16, 24, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+}
+
+.flora-node {
+  background: #0d0f17;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.flora-node:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.65), 0 0 12px rgba(129, 140, 248, 0.15);
+}
+
+.flora-node.selected {
+  border-color: #818cf8;
+  box-shadow: 0 0 0 1px #818cf8, 0 12px 32px rgba(99, 102, 241, 0.25);
+}
+
+.flora-node-running {
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.35) !important;
+  animation: floraRunningGlow 2s ease-in-out infinite;
+}
+
+@keyframes floraRunningGlow {
+  0%, 100% { border-color: rgba(56, 189, 248, 0.5); box-shadow: 0 0 12px rgba(56, 189, 248, 0.2); }
+  50% { border-color: rgba(56, 189, 248, 1); box-shadow: 0 0 24px rgba(56, 189, 248, 0.5); }
+}
+
+/* React Flow custom edge signal pulse */
+@keyframes signalFlow {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.flora-wire-active {
+  stroke-dasharray: 6, 6;
+  animation: signalFlow 0.8s linear infinite;
+}
+
+.react-flow__handle.flora-handle {
+  width: 10px;
+  height: 10px;
+  background: #1e2230;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  transition: all 0.15s ease;
+}
+
+.react-flow__handle.flora-handle:hover {
+  background: #818cf8;
+  border-color: #ffffff;
+  transform: scale(1.3);
+  box-shadow: 0 0 8px #818cf8;
+}
+

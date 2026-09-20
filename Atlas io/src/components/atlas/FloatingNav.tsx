@@ -8,7 +8,6 @@ import {
   Compass, Handshake, Film, User, Bot, Send
 } from "lucide-react";
 import { AtlasIcon } from "@/components/atlas/EcosystemIcons";
-import { EcosystemSwitcher } from "@/components/atlas/EcosystemSwitcher";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,7 +58,16 @@ export function FloatingNav({ onNewLead }: FloatingNavProps) {
               </span>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-48 bg-card/95 backdrop-blur-xl border-border/50 shadow-xl rounded-xl p-1">
+          <DropdownMenuContent align="start" className="w-52 bg-card/95 backdrop-blur-xl border-border/50 shadow-xl rounded-xl p-1">
+            <DropdownMenuItem 
+              onClick={() => navigate("/hq/campaigns")}
+              className="gap-2 text-[12px] cursor-pointer focus:bg-foreground focus:text-background rounded-lg"
+            >
+              <Target className="w-3.5 h-3.5 text-primary" />
+              <span>Campaign Hub</span>
+              <span className="ml-auto text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold">Playbook</span>
+            </DropdownMenuItem>
+
             <DropdownMenuItem onClick={onNewLead} className="gap-2 text-[12px] cursor-pointer focus:bg-foreground focus:text-background rounded-lg">
               <Plus className="w-3.5 h-3.5" />
               <span>New Lead</span>
@@ -97,10 +105,6 @@ export function FloatingNav({ onNewLead }: FloatingNavProps) {
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-
-        <div className="flex items-center px-1 py-0.5 rounded-xl bg-card/80 border border-border/50 shadow-sm backdrop-blur-md">
-          <EcosystemSwitcher align="left" isDark={theme === "dark"} />
-        </div>
       </motion.div>
 
 

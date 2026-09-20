@@ -320,8 +320,8 @@ async def get_project_handoffs(
     if not node or node.organization_id != org.id:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    from app.models.task_handoff import TaskHandoff
-    stmt = select(TaskHandoff).where(TaskHandoff.project_id == project_id).order_by(TaskHandoff.created_at.desc())
+    from app.models.task_handoff import Task
+    stmt = select(Task).where(Task.project_id == project_id).order_by(Task.created_at.desc())
     res = await db.execute(stmt)
     handoffs = res.scalars().all()
     
@@ -363,8 +363,8 @@ async def create_handoff(
     if not node or node.organization_id != org.id:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    from app.models.task_handoff import TaskHandoff
-    handoff = TaskHandoff(
+    from app.models.task_handoff import Task
+    handoff = Task(
         id=uuid.uuid4(),
         project_id=project_id,
         source_ai=req.source_ai.lower(),
@@ -404,8 +404,8 @@ async def resolve_handoff(
     if not node or node.organization_id != org.id:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    from app.models.task_handoff import TaskHandoff
-    handoff = await db.get(TaskHandoff, handoff_id)
+    from app.models.task_handoff import Task
+    handoff = await db.get(Task, handoff_id)
     if not handoff or handoff.project_id != project_id:
         raise HTTPException(status_code=404, detail="Handoff not found")
     if req.status not in ("resolved", "cancelled"):
@@ -431,10 +431,10 @@ async def clear_handoff_queue(
     if not node or node.organization_id != org.id:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    from app.models.task_handoff import TaskHandoff
-    stmt = select(TaskHandoff).where(
-        TaskHandoff.project_id == project_id,
-        TaskHandoff.status == "pending"
+    from app.models.task_handoff import Task
+    stmt = select(Task).where(
+        Task.project_id == project_id,
+        Task.status == "pending"
     )
     res = await db.execute(stmt)
     pending = res.scalars().all()
@@ -474,10 +474,10 @@ async def dispatch_command(
     if not node or node.organization_id != org.id:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    from app.models.task_handoff import TaskHandoff
+    from app.models.task_handoff import Task
     
     # 1. Always record the command in the Handoff Queue for visibility
-    handoff = TaskHandoff(
+    handoff = Task(
         id=uuid.uuid4(),
         project_id=project_id,
         source_ai=req.source_tool.lower(),
@@ -541,7 +541,7 @@ async def delete_node(
 ):
     """
     Delete a node and all its associated edges.
-    Chat history (TaskHandoffs) is intentionally orphaned, not deleted.
+    Chat history (Tasks) is intentionally orphaned, not deleted.
     """
     org = await get_user_org(user, db)
     node = await db.get(Node, node_id)

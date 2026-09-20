@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from app.database.session import get_db
 from app.api.auth import get_authorized_consumer
 from app.services.retrieval import RetrievalScope
-from app.models.task_handoff import TaskHandoff
+from app.models.task_handoff import Task
 from app.services.handoff import HandoffService
 
 router = APIRouter(prefix="/handoffs", tags=["Handoffs"])
@@ -23,7 +23,7 @@ class CreateHandoffRequest(BaseModel):
     decision_refs: List[Dict[str, Any]] = []
     constraint_refs: List[Dict[str, Any]] = []
 
-@router.post("", response_model=TaskHandoff)
+@router.post("", response_model=Task)
 async def create_handoff(
     request: CreateHandoffRequest,
     scope: RetrievalScope = Depends(get_authorized_consumer),
@@ -43,7 +43,7 @@ async def create_handoff(
         constraint_refs=request.constraint_refs
     )
 
-@router.get("", response_model=List[TaskHandoff])
+@router.get("", response_model=List[Task])
 async def list_pending_handoffs(
     role: str = "target",
     scope: RetrievalScope = Depends(get_authorized_consumer),
@@ -52,7 +52,7 @@ async def list_pending_handoffs(
     service = HandoffService(db)
     return await service.list_pending_handoffs(scope=scope, role=role)
 
-@router.get("/{handoff_id}", response_model=TaskHandoff)
+@router.get("/{handoff_id}", response_model=Task)
 async def get_handoff(
     handoff_id: uuid.UUID,
     scope: RetrievalScope = Depends(get_authorized_consumer),
@@ -61,7 +61,7 @@ async def get_handoff(
     service = HandoffService(db)
     return await service.get_handoff(scope, handoff_id)
 
-@router.post("/{handoff_id}/accept", response_model=TaskHandoff)
+@router.post("/{handoff_id}/accept", response_model=Task)
 async def accept_handoff(
     handoff_id: uuid.UUID,
     scope: RetrievalScope = Depends(get_authorized_consumer),
@@ -70,7 +70,7 @@ async def accept_handoff(
     service = HandoffService(db)
     return await service.accept_handoff(scope, handoff_id)
 
-@router.post("/{handoff_id}/start", response_model=TaskHandoff)
+@router.post("/{handoff_id}/start", response_model=Task)
 async def start_handoff(
     handoff_id: uuid.UUID,
     scope: RetrievalScope = Depends(get_authorized_consumer),
@@ -79,7 +79,7 @@ async def start_handoff(
     service = HandoffService(db)
     return await service.start_handoff(scope, handoff_id)
 
-@router.post("/{handoff_id}/complete", response_model=TaskHandoff)
+@router.post("/{handoff_id}/complete", response_model=Task)
 async def complete_handoff(
     handoff_id: uuid.UUID,
     scope: RetrievalScope = Depends(get_authorized_consumer),
@@ -88,7 +88,7 @@ async def complete_handoff(
     service = HandoffService(db)
     return await service.complete_handoff(scope, handoff_id)
 
-@router.post("/{handoff_id}/reject", response_model=TaskHandoff)
+@router.post("/{handoff_id}/reject", response_model=Task)
 async def reject_handoff(
     handoff_id: uuid.UUID,
     scope: RetrievalScope = Depends(get_authorized_consumer),
@@ -97,7 +97,7 @@ async def reject_handoff(
     service = HandoffService(db)
     return await service.reject_handoff(scope, handoff_id)
 
-@router.post("/{handoff_id}/cancel", response_model=TaskHandoff)
+@router.post("/{handoff_id}/cancel", response_model=Task)
 async def cancel_handoff(
     handoff_id: uuid.UUID,
     scope: RetrievalScope = Depends(get_authorized_consumer),

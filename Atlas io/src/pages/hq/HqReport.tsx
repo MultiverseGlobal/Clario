@@ -527,8 +527,8 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
           </div>
         ) : !report ? (
           /* Empty State */
-          <div className="rounded-3xl border border-dashed border-border/60 bg-white dark:bg-[#0c0d12] p-16 text-center shadow-sm max-w-2xl mx-auto space-y-5">
-            <div className="w-14 h-14 rounded-2xl bg-white/5 border border-border/50 flex items-center justify-center mx-auto text-foreground">
+          <div className="rounded-3xl border border-dashed border-border/60 bg-card p-16 text-center shadow-sm max-w-2xl mx-auto space-y-5">
+            <div className="w-14 h-14 rounded-2xl bg-muted/50 border border-border/50 flex items-center justify-center mx-auto text-foreground">
               <Sparkles className="h-7 w-7" />
             </div>
             <div>
@@ -567,26 +567,26 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
               </div>
 
               {/* Health Score Pill */}
-              <div className="flex items-center gap-3 bg-white dark:bg-[#0f1118] border border-border/80 px-4 py-2 rounded-2xl shadow-xs">
+              <div className="flex items-center gap-3 bg-card border border-border/80 px-4 py-2 rounded-2xl shadow-xs">
                 <div className="flex flex-col items-end">
                   <span className="text-[10px] font-mono uppercase text-muted-foreground">Atlas Pipeline Health</span>
                   <span className="text-xs font-mono font-bold text-foreground">
                     {healthScore >= 75 ? "High Momentum" : healthScore >= 50 ? "Active Traction" : "Ignition Phase"}
                   </span>
                 </div>
-                <div className="h-8 w-8 rounded-xl bg-[#0c0f1d] border border-[#1d2642] flex items-center justify-center font-mono font-bold text-foreground text-xs">
+                <div className="h-8 w-8 rounded-xl bg-primary/10 border border-primary/25 flex items-center justify-center font-mono font-bold text-primary text-xs">
                   {healthScore}
                 </div>
               </div>
             </div>
 
             {/* ── The Single Move (Spotlight Banner) ── */}
-            <div className="rounded-3xl border border-foreground/15 bg-gradient-to-br from-foreground/5 via-foreground/[0.02] to-transparent p-6 shadow-sm relative overflow-hidden">
+            <div className="rounded-3xl border border-foreground/15 bg-card p-6 shadow-sm relative overflow-hidden">
               <div className="flex items-start justify-between gap-4">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <span className="flex h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-foreground/60">
+                    <span className="flex h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-muted-foreground">
                       The Single Weekly Move · Tactical North Star
                     </span>
                   </div>
@@ -611,10 +611,10 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
             {/* ── Core Telemetry: Revenue & Outreach Grid ── */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* Revenue & Pipeline Card */}
-              <div className="rounded-3xl border border-border bg-white dark:bg-[#0c0d12] p-6 shadow-xs space-y-5">
+              <div className="rounded-3xl border border-border/70 bg-card p-6 shadow-xs space-y-5">
                 <div className="flex items-center justify-between pb-3 border-b border-border/50">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-white/[0.04] border border-border/50 flex items-center justify-center text-foreground">
+                    <div className="w-7 h-7 rounded-lg bg-muted/60 border border-border/50 flex items-center justify-center text-foreground">
                       <DollarSign className="h-4 w-4" />
                     </div>
                     <h3 className="text-xs font-bold uppercase font-mono tracking-wider text-foreground">
@@ -628,23 +628,23 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
 
                 {/* Metric Tiles */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-[#13151f] border border-border/60">
+                  <div className="p-3.5 rounded-2xl bg-muted/40 border border-border/60">
                     <span className="text-[10px] font-mono text-muted-foreground uppercase">This Month Closed</span>
                     <div className="text-xl font-bold font-mono text-foreground mt-1">
                       {formatMoney(report.content.revenue_this_month)}
                     </div>
                   </div>
-                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-[#13151f] border border-border/60">
+                  <div className="p-3.5 rounded-2xl bg-muted/40 border border-border/60">
                     <span className="text-[10px] font-mono text-muted-foreground uppercase">Weighted Pipeline</span>
                     <div className="text-xl font-bold font-mono text-foreground mt-1">
                       {formatMoney(report.content.pipeline_weighted)}
                     </div>
                   </div>
-                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-[#13151f] border border-border/60 flex items-center justify-between">
+                  <div className="p-3 rounded-2xl bg-muted/40 border border-border/60 flex items-center justify-between">
                     <span className="text-[10px] font-mono text-muted-foreground uppercase">Deals Won</span>
                     <span className="text-sm font-bold font-mono text-foreground">{report.content.deals_won}</span>
                   </div>
-                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-[#13151f] border border-border/60 flex items-center justify-between">
+                  <div className="p-3 rounded-2xl bg-muted/40 border border-border/60 flex items-center justify-between">
                     <span className="text-[10px] font-mono text-muted-foreground uppercase">Deals Lost</span>
                     <span className="text-sm font-bold font-mono text-muted-foreground">{report.content.deals_lost}</span>
                   </div>
@@ -670,10 +670,10 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
               </div>
 
               {/* Outreach Velocity Card */}
-              <div className="rounded-3xl border border-border bg-white dark:bg-[#0c0d12] p-6 shadow-xs space-y-5">
+              <div className="rounded-3xl border border-border/70 bg-card p-6 shadow-xs space-y-5">
                 <div className="flex items-center justify-between pb-3 border-b border-border/50">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-white/[0.04] border border-border/50 flex items-center justify-center text-foreground">
+                    <div className="w-7 h-7 rounded-lg bg-muted/60 border border-border/50 flex items-center justify-center text-foreground">
                       <MessageSquare className="h-4 w-4" />
                     </div>
                     <h3 className="text-xs font-bold uppercase font-mono tracking-wider text-foreground">
@@ -687,19 +687,19 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
 
                 {/* Metric Tiles */}
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-[#13151f] border border-border/60 text-center">
+                  <div className="p-3.5 rounded-2xl bg-muted/40 border border-border/60 text-center">
                     <span className="text-[10px] font-mono text-muted-foreground uppercase block">Sent This Week</span>
                     <div className="text-2xl font-bold font-mono text-foreground mt-1">
                       {report.content.outreach_sent}
                     </div>
                   </div>
-                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-[#13151f] border border-border/60 text-center">
+                  <div className="p-3.5 rounded-2xl bg-muted/40 border border-border/60 text-center">
                     <span className="text-[10px] font-mono text-muted-foreground uppercase block">Replies</span>
                     <div className="text-2xl font-bold font-mono text-foreground mt-1">
                       {report.content.replies}
                     </div>
                   </div>
-                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-[#13151f] border border-border/60 text-center">
+                  <div className="p-3.5 rounded-2xl bg-muted/40 border border-border/60 text-center">
                     <span className="text-[10px] font-mono text-muted-foreground uppercase block">Reply Rate</span>
                     <div className="text-2xl font-bold font-mono text-foreground mt-1">
                       {report.content.outreach_sent > 0
@@ -710,7 +710,7 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
                 </div>
 
                 {/* Conversion Guidance */}
-                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-[#13151f] border border-border/40 text-xs font-mono space-y-1">
+                <div className="p-3.5 rounded-2xl bg-muted/30 border border-border/40 text-xs font-mono space-y-1">
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <Activity className="h-3.5 w-3.5 text-foreground/50" />
                     <span>Outreach Cadence Status:</span>
@@ -731,11 +731,11 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
 
             {/* ── Stalled Deals Action Matrix ── */}
             {(report.content?.stalled || []).length > 0 && (
-              <div className="rounded-3xl border border-[#1d2642] bg-[#0c0f1d] p-6 space-y-4 shadow-xs">
+              <div className="rounded-3xl border border-amber-500/30 bg-amber-500/5 dark:bg-amber-500/10 p-6 space-y-4 shadow-xs">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <ShieldAlert className="h-4 w-4 text-foreground/70" />
-                    <h3 className="text-xs font-bold text-foreground uppercase font-mono tracking-wider">
+                    <ShieldAlert className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    <h3 className="text-xs font-bold text-amber-700 dark:text-amber-300 uppercase font-mono tracking-wider">
                       Stalled Accounts · Direct Intervention Required
                     </h3>
                   </div>
@@ -748,13 +748,13 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
                   {report.content.stalled.map((d, i) => (
                     <div
                       key={i}
-                      className="p-4 rounded-2xl bg-[#0e1118] border border-[#1d2642]/60 flex items-center justify-between gap-3 shadow-xs"
+                      className="p-4 rounded-2xl bg-card border border-amber-500/20 flex items-center justify-between gap-3 shadow-xs"
                     >
                       <div className="min-w-0">
                         <span className="font-bold text-xs text-foreground truncate block font-sans">
                           {d.company}
                         </span>
-                        <span className="text-[10px] font-mono text-muted-foreground font-semibold">
+                        <span className="text-[10px] font-mono text-amber-600 dark:text-amber-400 font-semibold">
                           {d.days} days with zero movement
                         </span>
                       </div>
@@ -762,7 +762,7 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
                       <button
                         type="button"
                         onClick={() => copyNudge(d.company)}
-                        className="h-8 px-3 rounded-xl bg-white/5 hover:bg-white/10 text-foreground text-[11px] font-mono font-semibold transition-colors cursor-pointer shrink-0 border border-border/40"
+                        className="h-8 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 text-[11px] font-mono font-semibold transition-colors cursor-pointer shrink-0 border border-amber-500/30"
                       >
                         Copy Nudge
                       </button>
@@ -775,40 +775,40 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
             {/* ── Qualitative Strategic Diagnosis ── */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* What's Working */}
-              <div className="rounded-3xl border border-[#1d2642] bg-[#0c0f1d] p-6 space-y-3 shadow-xs">
+              <div className="rounded-3xl border border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-500/10 p-6 space-y-3 shadow-xs">
                 <div className="flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-foreground/60" />
-                  <h3 className="text-xs font-bold text-foreground uppercase font-mono tracking-wider">
+                  <TrendingUp className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  <h3 className="text-xs font-bold text-emerald-700 dark:text-emerald-300 uppercase font-mono tracking-wider">
                     What's Working (Traction Signals)
                   </h3>
                 </div>
-                <p className="text-xs text-foreground/80 leading-relaxed font-sans font-medium">
+                <p className="text-xs text-foreground/90 leading-relaxed font-sans font-medium">
                   {report.content.whats_working}
                 </p>
-                <div className="pt-2 border-t border-border/40 mt-3">
+                <div className="pt-2 border-t border-emerald-500/20 mt-3">
                   <EvidenceChip sourceName="Atlas AI Synthesis" confidence={92} />
                 </div>
               </div>
 
               {/* What's Dragging */}
-              <div className="rounded-3xl border border-border/50 bg-white dark:bg-[#0c0d12] p-6 space-y-3 shadow-xs">
+              <div className="rounded-3xl border border-rose-500/30 bg-rose-500/5 dark:bg-rose-500/10 p-6 space-y-3 shadow-xs">
                 <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-foreground/50" />
-                  <h3 className="text-xs font-bold text-foreground/70 uppercase font-mono tracking-wider">
+                  <AlertCircle className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                  <h3 className="text-xs font-bold text-rose-700 dark:text-rose-300 uppercase font-mono tracking-wider">
                     What's Dragging (Pipeline Friction)
                   </h3>
                 </div>
-                <p className="text-xs text-foreground/80 leading-relaxed font-sans font-medium">
+                <p className="text-xs text-foreground/90 leading-relaxed font-sans font-medium">
                   {report.content.whats_not}
                 </p>
-                <div className="pt-2 border-t border-border/40 mt-3">
+                <div className="pt-2 border-t border-rose-500/20 mt-3">
                   <EvidenceChip sourceName="Atlas AI Synthesis" confidence={87} />
                 </div>
               </div>
             </div>
 
             {/* ── Checkable Weekly Tactical Priorities ── */}
-            <div className="rounded-3xl border border-border bg-white dark:bg-[#0c0d12] p-6 space-y-4 shadow-xs">
+            <div className="rounded-3xl border border-border/70 bg-card p-6 space-y-4 shadow-xs">
               <div className="flex items-center justify-between pb-3 border-b border-border/50">
                 <div className="flex items-center gap-2">
                   <ListChecks className="h-4 w-4 text-foreground" />
@@ -830,8 +830,8 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
                       onClick={() => togglePriority(i)}
                       className={`flex items-start gap-3 p-3 rounded-2xl border transition-all cursor-pointer select-none ${
                         isChecked
-                          ? "bg-muted/40 border-border/40 opacity-60"
-                          : "bg-slate-50 dark:bg-[#13151f] border-border/60 hover:border-foreground/30"
+                          ? "bg-muted/30 border-border/30 opacity-60"
+                          : "bg-muted/40 border-border/60 hover:border-foreground/30 text-foreground"
                       }`}
                     >
                       <button
@@ -839,7 +839,7 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
                         className="mt-0.5 text-foreground hover:text-foreground/80 transition-colors cursor-pointer"
                       >
                         {isChecked ? (
-                          <CheckSquare className="h-4 w-4 text-foreground" />
+                          <CheckSquare className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                         ) : (
                           <Square className="h-4 w-4 text-muted-foreground" />
                         )}
@@ -876,12 +876,12 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
                 initial={{ opacity: 0, scale: 0.95, y: 12 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 12 }}
-                className="fixed inset-0 m-auto max-w-lg h-fit max-h-[85vh] w-full z-[999] bg-white dark:bg-[#0c0d12] border border-border shadow-2xl rounded-3xl p-6 flex flex-col space-y-5"
+                className="fixed inset-0 m-auto max-w-lg h-fit max-h-[85vh] w-full z-[999] bg-card border border-border shadow-2xl rounded-3xl p-6 flex flex-col space-y-5"
               >
                 {/* Header */}
                 <div className="flex items-center justify-between pb-3 border-b border-border">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-[#0c0f1d] border border-[#1d2642] flex items-center justify-center text-foreground">
+                    <div className="w-8 h-8 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
                       <Sparkles className="h-4 w-4 animate-spin" />
                     </div>
                     <div>
@@ -917,7 +917,7 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
                         key={stage.id}
                         className={`flex items-start gap-3 p-3 rounded-2xl border transition-colors ${
                           isCurrent
-                            ? "bg-white/[0.03] border-border/50 text-foreground"
+                            ? "bg-primary/10 border-primary/30 text-foreground"
                             : isDone
                             ? "bg-muted/20 border-border/40 text-muted-foreground"
                             : "opacity-40 border-transparent text-muted-foreground"
@@ -925,9 +925,9 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
                       >
                         <div className="mt-0.5">
                           {isDone ? (
-                            <CheckCircle2 className="h-4 w-4 text-foreground" />
+                            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                           ) : isCurrent ? (
-                            <Loader2 className="h-4 w-4 animate-spin text-foreground/70" />
+                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
                           ) : (
                             <div className="h-4 w-4 rounded-full border border-border" />
                           )}
@@ -948,7 +948,7 @@ ${(report.content.next_week_priorities || []).map((p, i) => `${i + 1}. ${p}`).jo
                 {/* Terminal Footer */}
                 <div className="pt-2 border-t border-border flex items-center justify-between text-[10px] font-mono text-muted-foreground">
                   <span className="flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
                     Live telemetry link established
                   </span>
                   <span>Atlas v5.2</span>

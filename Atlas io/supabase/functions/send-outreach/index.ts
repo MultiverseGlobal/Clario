@@ -50,6 +50,10 @@ serve(async (req) => {
     const body: SendRequest = await req.json();
     const { lead_id, to_email, to_name, company_name, subject, body: messageBody, sender_name = "Ben" } = body;
 
+    // Sender identity — must match a verified Resend domain
+    const senderEmail = Deno.env.get('SENDER_EMAIL') ?? 'ben@yourdomain.com';
+    const bccEmail = Deno.env.get('BCC_EMAIL') ?? senderEmail; // Get a copy of everything sent
+
     if (!to_email || !subject || !messageBody) {
       return new Response(JSON.stringify({ error: "to_email, subject, and body are required" }), {
         status: 400,
@@ -88,8 +92,9 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: `${sender_name} <onboarding@resend.dev>`,
+        from: `${sender_name} <${senderEmail}>`,
         to: [to_email],
+        bcc: [bccEmail],  // Always BCC yourself so you have a record in Gmail
         subject,
         html: htmlBody,
         text: messageBody,

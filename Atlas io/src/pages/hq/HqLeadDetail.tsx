@@ -21,7 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { invokeSourcingMachine } from "@/lib/sourcingMachineProxy";
 
-type Tab = "overview" | "research" | "pain" | "offer" | "outreach" | "timeline" | "proposal" | "notes" | "referrals";
+type Tab = "overview" | "research" | "pain" | "offer" | "outreach" | "timeline" | "proposal" | "notes" | "referrals" | "interview";
 
 interface Lead {
   id: string;
@@ -82,15 +82,16 @@ const TYPE_ICONS: Record<string, typeof Mail> = {
 };
 
 const TABS: { id: Tab; label: string; icon: typeof Target }[] = [
-  { id: "overview",  label: "Overview",  icon: BarChart2 },
-  { id: "research",  label: "Research",  icon: Brain },
-  { id: "pain",      label: "Pain",      icon: AlertTriangle },
-  { id: "offer",     label: "Offer",     icon: Zap },
-  { id: "outreach",  label: "Outreach",  icon: Send },
-  { id: "timeline",  label: "Timeline",  icon: Activity },
-  { id: "proposal",  label: "Proposal",  icon: FileText },
-  { id: "referrals", label: "Referrals", icon: Network },
-  { id: "notes",     label: "Notes",     icon: BookOpen },
+  { id: "overview",   label: "Overview",   icon: BarChart2 },
+  { id: "research",   label: "Research",   icon: Brain },
+  { id: "pain",       label: "Pain",       icon: AlertTriangle },
+  { id: "offer",      label: "Offer",      icon: Zap },
+  { id: "outreach",   label: "Outreach",   icon: Send },
+  { id: "interview",  label: "Interview",  icon: MessageSquare },
+  { id: "timeline",   label: "Timeline",   icon: Activity },
+  { id: "proposal",   label: "Proposal",   icon: FileText },
+  { id: "referrals",  label: "Referrals",  icon: Network },
+  { id: "notes",      label: "Notes",      icon: BookOpen },
 ];
 
 const STAGE_STEPS = ["new", "researched", "contacted", "interested", "proposal_sent", "won"];
@@ -680,6 +681,63 @@ export default function HqLeadDetail() {
         {/* ── OUTREACH ── */}
         {tab === "outreach" && (
           <div className="space-y-4">
+
+            {/* LinkedIn Ready — primary channel per SOP */}
+            {contacts.length > 0 && (
+              <div className="rounded-xl border border-[#0A66C2]/20 bg-[#0A66C2]/5 p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Linkedin className="h-4 w-4 text-[#0A66C2]" />
+                  <span className="text-xs font-semibold text-[#0A66C2] uppercase tracking-wider">LinkedIn — Primary Channel</span>
+                </div>
+                <p className="text-xs text-muted-foreground">Send this DM first. Come back and log it below once sent.</p>
+                {contacts.filter(c => c.linkedin).map((c) => {
+                  const dm = `Hi ${c.name?.split(" ")[0] || "there"} — I'm researching how paid-media agencies handle monthly client reporting. How much of your report prep is still manual? Quick question, not a pitch.`;
+                  return (
+                    <div key={c.id} className="rounded-lg border border-[#0A66C2]/20 bg-background/60 p-3 space-y-2">
+                      <div className="text-xs font-medium">{c.name} · {c.role}</div>
+                      <div className="text-xs text-muted-foreground leading-relaxed bg-muted/20 rounded p-2 font-mono border border-border/40 select-all">{dm}</div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="h-7 text-xs gap-1.5 bg-[#0A66C2] text-white hover:bg-[#0A66C2]/90"
+                          onClick={() => {
+                            window.open(c.linkedin!, "_blank");
+                            navigator.clipboard.writeText(dm);
+                            toast.success("LinkedIn opened · DM copied to clipboard");
+                          }}
+                        >
+                          <Linkedin className="h-3 w-3" /> Open LinkedIn + Copy DM
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs gap-1.5 border-border/60"
+                          onClick={async () => {
+                            await supabase.from("atlas_interactions").insert({
+                              user_id: user?.id,
+                              company_id: id,
+                              type: "linkedin",
+                              direction: "sent",
+                              subject: "LinkedIn DM — discovery",
+                              content: dm,
+                              occurred_at: new Date().toISOString(),
+                            });
+                            toast.success("Logged as LinkedIn DM sent");
+                            load();
+                          }}
+                        >
+                          <CheckCircle2 className="h-3 w-3" /> Mark as Sent
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+                {contacts.filter(c => c.linkedin).length === 0 && (
+                  <p className="text-xs text-muted-foreground/60 italic">No LinkedIn URL saved for contacts on this lead yet. Add one in the Contacts section.</p>
+                )}
+              </div>
+            )}
+
             {/* Log interaction */}
             <div className="rounded-xl border border-border/60 bg-card p-4 space-y-3">
               <div className="flex items-center justify-between">
@@ -861,6 +919,61 @@ export default function HqLeadDetail() {
           </div>
         )}
 
+        {/* ── INTERVIEW NOTES ── */}
+        {tab === "interview" && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-1">
+              <div className="text-xs font-semibold text-primary uppercase tracking-wider">Discovery Interview Template</div>
+              <p className="text-xs text-muted-foreground">Use this after the founder responds. Log what you learn so you can compare across 5 interviews.</p>
+            </div>
+
+            {/* Interview fields */}
+            {[
+              { key: "reporting_clue", label: "Reporting Clue", placeholder: "What did you spot on their website/Clutch that suggested manual reporting? e.g. 'No reporting tool mentioned on services page'" },
+              { key: "personalisation_note", label: "Personalisation Note", placeholder: "What specific detail will you reference to show you've actually looked at their agency?" },
+              { key: "q1_manual_or_tool", label: "Q1 — Manual or tool?", placeholder: "Do you use any tool to produce client reports, or is it mostly manual? (Google Slides / Sheets / Looker / custom?)" },
+              { key: "q2_time_per_report", label: "Q2 — Time per report", placeholder: "Roughly how long does it take to produce one monthly report per client right now?" },
+              { key: "q3_who_does_it", label: "Q3 — Who does it?", placeholder: "Who owns the reporting — you, account managers, or someone else?" },
+              { key: "q4_biggest_friction", label: "Q4 — Biggest friction point", placeholder: "What's the most annoying part of that process?" },
+              { key: "q5_would_pay", label: "Q5 — Would they pay?", placeholder: "If you could cut report prep from [current time] to 30 minutes, would that be worth paying for? What would fair look like?" },
+              { key: "key_finding", label: "Key Finding", placeholder: "One-line summary of the most important thing you learned from this conversation." },
+              { key: "next_step", label: "Next Step", placeholder: "e.g. Follow up in 2 weeks / Send demo / Not a fit — close" },
+            ].map(({ key, label, placeholder }) => (
+              <div key={key} className="rounded-xl border border-border/60 bg-card p-4 space-y-2">
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</div>
+                <textarea
+                  defaultValue={(lead.notes ? (() => { try { return JSON.parse(lead.notes)?.[key] ?? ""; } catch { return ""; } })() : "")}
+                  placeholder={placeholder}
+                  rows={2}
+                  id={`interview-${key}`}
+                  className="w-full text-sm bg-background border border-border/60 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-primary/50 placeholder:text-muted-foreground/40"
+                />
+              </div>
+            ))}
+
+            <Button
+              onClick={async () => {
+                const fields = ["reporting_clue", "personalisation_note", "q1_manual_or_tool", "q2_time_per_report", "q3_who_does_it", "q4_biggest_friction", "q5_would_pay", "key_finding", "next_step"];
+                const data: Record<string, string> = {};
+                fields.forEach(f => {
+                  const el = document.getElementById(`interview-${f}`) as HTMLTextAreaElement;
+                  if (el) data[f] = el.value;
+                });
+                try {
+                  await supabase.from("atlas_opportunities").update({ deal_notes: JSON.stringify(data) }).eq("id", id!);
+                  toast.success("Interview notes saved");
+                  load();
+                } catch (err: any) {
+                  toast.error("Failed: " + err.message);
+                }
+              }}
+              className="h-9 text-sm gap-2"
+            >
+              <Save className="h-4 w-4" /> Save Interview Notes
+            </Button>
+          </div>
+        )}
+
         {/* ── NOTES ── */}
         {tab === "notes" && (
           <div className="space-y-4">
@@ -885,6 +998,7 @@ export default function HqLeadDetail() {
     </div>
   );
 }
+
 
 function ResearchCard({ title, icon, content, compact, highlight }: { title: string; icon: string; content: string; compact?: boolean; highlight?: boolean }) {
   const border = highlight ? "border-primary/20" : "border-border/60";
