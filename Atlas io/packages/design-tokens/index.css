@@ -1,0 +1,177 @@
+/* packages/design-tokens/index.css
+ * PDS-v5 — Light-first, Dark override
+ * ─────────────────────────────────────────────────────────────────────────────
+ * :root         = Light canvas (porcelain, default)
+ * .dark :root   = Dark canvas (warm obsidian, class override)
+ */
+
+/* ── Light Mode (Default) ────────────────────────────────────────────────── */
+
+:root {
+  /* Canvas */
+  --pds-canvas:    #F8F7F4;
+  --pds-surface-1: #FFFFFF;
+  --pds-surface-2: #F1F0EC;
+  --pds-surface-3: #EBEBE6;
+  --pds-surface-4: #E3E2DC;
+
+  /* Borders — ink-specular on light */
+  --pds-border-subtle: rgba(17, 19, 24, 0.06);
+  --pds-border-mid:    rgba(17, 19, 24, 0.12);
+  --pds-border-strong: rgba(17, 19, 24, 0.20);
+
+  /* Text — obsidian hierarchy */
+  --pds-text-primary:   #111318;
+  --pds-text-secondary: #6B7280;
+  --pds-text-muted:     #9CA3AF;
+  --pds-text-disabled:  #D1D5DB;
+
+  /* Accent — obsidian ink on porcelain */
+  --pds-accent:     #111318;
+  --pds-accent-inv: #F8F7F4;
+  --pds-accent-dim: rgba(17, 19, 24, 0.06);
+  --pds-accent-glow: rgba(17, 19, 24, 0.12);
+
+  /* Shadows — ink-tone, no glow */
+  --pds-shadow-sm:    0 1px 2px rgba(17, 19, 24, 0.04);
+  --pds-shadow-md:    0 4px 12px rgba(17, 19, 24, 0.06), 0 1px 3px rgba(17, 19, 24, 0.03);
+  --pds-shadow-lg:    0 16px 32px rgba(17, 19, 24, 0.08), 0 4px 8px rgba(17, 19, 24, 0.04);
+  --pds-shadow-float: 0 24px 48px rgba(17, 19, 24, 0.10), 0 8px 16px rgba(17, 19, 24, 0.05);
+  --pds-shadow-glow:  none; /* No glow in light mode */
+
+  /* Motion */
+  --pds-ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.05);
+  --pds-ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --pds-t-fast:  150ms;
+  --pds-t-base:  300ms;
+  --pds-t-slow:  500ms;
+
+  /* Semantic Status */
+  --pds-success: #22c55e;
+  --pds-warning: #f59e0b;
+  --pds-danger:  #ef4444;
+  --pds-info:    #38bdf8;
+}
+
+/* ── Dark Mode (.dark class on <html>) ───────────────────────────────────── */
+
+.dark {
+  /* Canvas */
+  --pds-canvas:    #07080c;
+  --pds-surface-1: rgba(14, 16, 24, 0.60);
+  --pds-surface-2: rgba(20, 23, 32, 0.75);
+  --pds-surface-3: rgba(27, 31, 44, 0.85);
+  --pds-surface-4: rgba(35, 40, 55, 0.95);
+
+  /* Borders — specular white on obsidian */
+  --pds-border-subtle: rgba(255, 255, 255, 0.055);
+  --pds-border-mid:    rgba(255, 255, 255, 0.10);
+  --pds-border-strong: rgba(255, 255, 255, 0.18);
+
+  /* Text — crisp off-white hierarchy */
+  --pds-text-primary:   #eef0f8;
+  --pds-text-secondary: rgba(238, 240, 248, 0.60);
+  --pds-text-muted:     rgba(238, 240, 248, 0.40);
+  --pds-text-disabled:  rgba(238, 240, 248, 0.20);
+
+  /* Accent — white on obsidian */
+  --pds-accent:     #ffffff;
+  --pds-accent-inv: #07080c;
+  --pds-accent-dim: rgba(255, 255, 255, 0.10);
+  --pds-accent-glow: rgba(255, 255, 255, 0.15);
+
+  /* Shadows — dark glow */
+  --pds-shadow-sm:    0 1px 2px rgba(0, 0, 0, 0.40), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --pds-shadow-md:    0 4px 12px rgba(0, 0, 0, 0.50), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --pds-shadow-lg:    0 16px 32px rgba(0, 0, 0, 0.60), 0 0 0 1px rgba(255, 255, 255, 0.10);
+  --pds-shadow-float: 0 24px 48px rgba(0, 0, 0, 0.70), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --pds-shadow-glow:  0 0 24px -4px rgba(255, 255, 255, 0.15);
+}
+
+/* ── Glassmorphism Utils ─────────────────────────────────────────────────── */
+
+.pds-glass {
+  background: rgba(255, 255, 255, 0.70);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--pds-border-subtle);
+  box-shadow: var(--pds-shadow-sm);
+}
+
+.dark .pds-glass {
+  background: var(--pds-surface-1);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+.pds-glass-elevated {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  border: 1px solid var(--pds-border-mid);
+  box-shadow: var(--pds-shadow-lg);
+}
+
+.dark .pds-glass-elevated {
+  background: var(--pds-surface-3);
+}
+
+/* ── Interactive Card ────────────────────────────────────────────────────── */
+
+.pds-card {
+  background: var(--pds-surface-1);
+  border: 1px solid var(--pds-border-subtle);
+  border-radius: 12px;
+  box-shadow: var(--pds-shadow-sm);
+  transition:
+    transform var(--pds-t-base) var(--pds-ease-out),
+    box-shadow var(--pds-t-base) var(--pds-ease-out),
+    border-color var(--pds-t-base) var(--pds-ease-out);
+}
+
+.pds-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--pds-shadow-md);
+  border-color: var(--pds-border-mid);
+}
+
+/* ── Animations ──────────────────────────────────────────────────────────── */
+
+@keyframes pds-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes pds-slide-up-fade {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); filter: blur(4px); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    filter: blur(0); }
+}
+
+@keyframes pds-blur-in {
+  from { opacity: 0; filter: blur(12px); }
+  to   { opacity: 1; filter: blur(0); }
+}
+
+@keyframes pds-scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.pds-animate-enter {
+  animation: pds-slide-up-fade var(--pds-t-slow) var(--pds-ease-spring) both;
+}
+
+.pds-animate-blur-in {
+  animation: pds-blur-in var(--pds-t-slow) var(--pds-ease-out) both;
+}
+
+.pds-animate-scale-in {
+  animation: pds-scale-in var(--pds-t-base) var(--pds-ease-spring) both;
+}
+
+/* Staggered entry delays */
+.pds-delay-1 { animation-delay: 50ms; }
+.pds-delay-2 { animation-delay: 100ms; }
+.pds-delay-3 { animation-delay: 150ms; }
+.pds-delay-4 { animation-delay: 200ms; }
+.pds-delay-5 { animation-delay: 250ms; }

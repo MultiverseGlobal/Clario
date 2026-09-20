@@ -13,8 +13,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@pseudonyms/core": "*",
-    "@pseudonyms/ui": "*",
+    "@pseudonyms/core": "file:./packages/core",
+    "@pseudonyms/ui": "file:./packages/ui",
     "@fontsource/fraunces": "^5.2.9",
     "@fontsource/ibm-plex-mono": "^5.2.7",
     "@fontsource/ibm-plex-sans": "^5.2.8",
