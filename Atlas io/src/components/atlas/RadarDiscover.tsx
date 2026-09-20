@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { invokeSourcingMachine } from "@/lib/sourcingMachineProxy";
-import { WizardStepper } from "@pseudonyms/ui/src/components/WizardStepper";
+import { WizardStepper } from "@pseudonyms/ui";
 
 interface DiscoveredLead {
   company: string;

@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { format, startOfWeek, endOfWeek } from "date-fns";
 import { invokeSourcingMachine } from "@/lib/sourcingMachineProxy";
 import { soundManager } from "@/lib/audioFeedback";
-import { EvidenceChip } from "@pseudonyms/ui/src/components/EvidenceChip";
+import { EvidenceChip } from "@pseudonyms/ui";
 
 interface WeeklyReport {
   id: string;

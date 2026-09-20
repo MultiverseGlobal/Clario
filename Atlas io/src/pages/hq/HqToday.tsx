@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowUpRight, CheckCircle2, Inbox, Activity, CalendarDays, Target } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@pseudonyms/ui/src/components/Card";
-import { Button } from "@pseudonyms/ui/src/components/Button";
-import { Badge } from "@pseudonyms/ui/src/components/Badge";
-import { EmptyState } from "@pseudonyms/ui/src/components/EmptyState";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@pseudonyms/ui";
+import { Button } from "@pseudonyms/ui";
+import { Badge } from "@pseudonyms/ui";
+import { EmptyState } from "@pseudonyms/ui";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function HqToday() {
