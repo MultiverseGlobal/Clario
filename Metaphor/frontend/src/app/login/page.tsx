@@ -3,7 +3,8 @@
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, Mail, Lock, Sparkles, CheckCircle2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { MetaphorLogo } from "@/components/ui/MetaphorLogo";
 import { createClient } from "@/utils/supabase/client";
 import { getLocalSettings, pushSettingsToCloud } from "@/lib/settings";
@@ -12,13 +13,14 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const settingsMem = typeof window !== "undefined" ? getLocalSettings() : null;
-  const isAlreadyOnboarded = settingsMem?.onboarded || (typeof window !== "undefined" && document.cookie.includes("metaphor_onboarded=true"));
-  const defaultTarget = isAlreadyOnboarded ? "/explorer" : "/onboarding";
+  const isAlreadyOnboarded =
+    settingsMem?.onboarded ||
+    (typeof window !== "undefined" && document.cookie.includes("metaphor_onboarded=true"));
+  const defaultTarget = isAlreadyOnboarded ? "/world" : "/onboard";
   const redirectTarget = searchParams.get("redirect") || defaultTarget;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const isSignUp = false;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -26,7 +28,7 @@ function LoginForm() {
   const supabase = createClient();
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.location.hash) {
+    if (typeof window !== "undefined" && window.location.hash) {
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
       const errorDesc = hashParams.get("error_description") || hashParams.get("error");
       if (errorDesc) {
@@ -35,7 +37,7 @@ function LoginForm() {
     }
   }, []);
 
-  const handleOAuthLogin = async (provider: 'github' | 'google') => {
+  const handleOAuthLogin = async (provider: "github" | "google") => {
     setLoading(true);
     setError("");
     setMessage("");
@@ -80,138 +82,188 @@ function LoginForm() {
     }
 
     setMessage("Success! Redirecting...");
-    
-    // Ensure settings proxy is updated optimistically if needed
-    pushSettingsToCloud({ onboarded: true });
-    
-    router.push(redirectTarget);
+
+    let finalTarget = redirectTarget;
+    if (data?.user) {
+      const onboarded = !!data.user.user_metadata?.project_name;
+      pushSettingsToCloud({ onboarded });
+      if (onboarded) {
+        document.cookie = "metaphor_onboarded=true; path=/; max-age=31536000";
+        if (finalTarget === "/onboard") {
+          finalTarget = "/world";
+        }
+      }
+    }
+
+    router.push(finalTarget);
   };
 
-
   return (
-    <div className="min-h-screen bg-background text-foreground flex items-center justify-center relative px-4 font-sans selection:bg-primary-dim">
-      <div className="w-full max-w-md space-y-6">
-        
-        {/* Logo and Branding */}
-        <div className="flex flex-col items-center space-y-3 text-center mb-8">
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <MetaphorLogo size={32} />
-            <span className="text-2xl font-semibold tracking-tight text-foreground">
-              Metaphor OS
+    <div className="min-h-screen bg-transparent flex flex-col items-center justify-between px-6 py-8">
+      {/* ── Header ── */}
+      <header className="w-full max-w-4xl flex items-center justify-between z-50">
+        <div className="flex items-center justify-between w-full h-[52px] px-8 rounded-full glass-clear backdrop-blur-xl border border-[rgba(10,10,10,0.06)] shadow-[0_14px_40px_rgba(0,0,0,0.04)]">
+          <Link href="/" className="flex items-center gap-2 group" aria-label="Metaphor home">
+            <MetaphorLogo className="w-5 h-5 opacity-90 group-hover:opacity-100 transition-opacity" />
+            <span className="text-[14px] font-medium tracking-wide text-[var(--color-ink)]">
+              Metaphor
             </span>
           </Link>
-          <p className="text-muted text-xs font-mono tracking-wider">Universal Context Engine</p>
+          <Link
+            href="/signup"
+            className="text-[13px] text-[#555E64] hover:text-[var(--color-ink)] transition-colors"
+          >
+            Create account &rarr;
+          </Link>
         </div>
+      </header>
 
-        {/* Form Card */}
-        <div className="bg-surface-1 border border-border-subtle rounded-2xl p-8 shadow-xl space-y-6">
-          
-          <div className="text-center space-y-1 pb-2">
-            <h1 className="text-lg font-semibold tracking-tight text-foreground">
-              Sign In
+      {/* ── Main Form ── */}
+      <main className="flex-1 flex flex-col items-center justify-center w-full max-w-md my-12">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          className="w-full flex flex-col gap-10"
+        >
+          {/* Headline */}
+          <div className="flex flex-col gap-3 text-center items-center">
+            <h1
+              className="font-display text-[clamp(40px,5vw,52px)] leading-[1.08] tracking-[-0.01em] text-[var(--color-ink)]"
+              style={{ fontWeight: 400 }}
+            >
+              Sign In.
             </h1>
-            <p className="text-sm text-muted">
-              Authenticate to access your workspace.
+            <p className="text-[15px] text-[#555E64] leading-relaxed max-w-xs">
+              Enter your workspace to continue your session.
             </p>
           </div>
 
-          {error && (
-            <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs">
-              {error}
-            </div>
-          )}
-
-          {message && (
-            <div className="p-3 rounded-lg bg-success/10 border border-success/20 text-success text-xs flex items-center gap-2">
-              <CheckCircle2 size={16} />
-              <span>{message}</span>
-            </div>
-          )}
-
-          {/* Social Auth Buttons */}
-          <div className="space-y-3">
-
-            <button 
+          {/* Social Auth */}
+          <div className="w-full">
+            <button
               type="button"
-              onClick={() => handleOAuthLogin('github')}
+              onClick={() => handleOAuthLogin("github")}
               disabled={loading}
-              className="w-full flex items-center justify-center gap-3 p-3.5 rounded-xl border border-border-subtle bg-background hover:bg-surface-2 hover:border-border-strong transition-all duration-200 cursor-pointer disabled:opacity-50 text-sm font-medium shadow-sm"
+              className="w-full flex items-center justify-center gap-3 h-[46px] rounded-full border border-[rgba(10,10,10,0.12)] bg-white/70 hover:bg-white hover:border-[var(--color-ink)] transition-all cursor-pointer disabled:opacity-50 text-[13px] font-medium text-[var(--color-ink)] shadow-sm"
             >
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <path
+                  fillRule="evenodd"
+                  clipRule="evenodd"
+                  d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
+                />
               </svg>
               <span>Continue with GitHub</span>
             </button>
           </div>
 
-          <div className="relative flex items-center justify-center my-6">
-            <div className="border-t border-border-subtle w-full" />
-            <span className="bg-surface-1 px-3 text-[10px] font-mono uppercase text-muted tracking-wider absolute">or continue with email</span>
+          {/* Divider */}
+          <div className="relative flex items-center justify-center">
+            <div className="border-t border-[rgba(10,10,10,0.08)] w-full" />
+            <span className="bg-white/80 backdrop-blur-sm px-3 text-[10px] font-mono uppercase text-[#AEB7BC] tracking-widest absolute">
+              or email
+            </span>
           </div>
 
-          {/* Email Form */}
-          <form onSubmit={handleEmailAuth} className="space-y-4">
-            <div className="space-y-3">
-              <div className="relative">
-                <Mail className="w-4 h-4 text-muted absolute left-3.5 top-3.5" />
-                <input 
-                  type="email" 
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  required
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border-subtle bg-background text-sm text-foreground placeholder:text-muted focus:outline-none focus:border-border-strong transition-colors shadow-sm"
-                />
-              </div>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-muted absolute left-3.5 top-3.5" />
-                <input 
-                  type="password" 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Password"
-                  required
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border-subtle bg-background text-sm text-foreground placeholder:text-muted focus:outline-none focus:border-border-strong transition-colors shadow-sm"
-                />
-              </div>
-              <div className="flex justify-end">
-                <a href="#" className="text-xs text-muted hover:text-foreground transition-colors" onClick={(e) => { e.preventDefault(); setError("Password recovery is currently disabled."); }}>
-                  Forgot password?
-                </a>
-              </div>
+          {/* Error / Success Feedback */}
+          {error && (
+            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-600 text-[12px] text-center">
+              {error}
+            </div>
+          )}
+
+          {message && (
+            <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-[12px] flex items-center justify-center gap-2">
+              <CheckCircle2 size={15} />
+              <span>{message}</span>
+            </div>
+          )}
+
+          {/* Email form */}
+          <form onSubmit={handleEmailAuth} className="flex flex-col gap-6">
+            <div className="flex flex-col gap-2">
+              <label
+                htmlFor="email"
+                className="text-[10px] tracking-widest uppercase text-[#AEB7BC] font-mono"
+              >
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="name@company.com"
+                required
+                className="w-full px-0 py-2.5 bg-transparent border-b text-[18px] text-[var(--color-ink)] placeholder:text-[rgba(10,10,10,0.2)] outline-none transition-colors"
+                style={{
+                  fontFamily: "'Cormorant Garamond', var(--next-font-display), serif",
+                  fontStyle: "italic",
+                  borderBottomColor: email ? "var(--color-ink)" : "rgba(10,10,10,0.15)",
+                }}
+              />
             </div>
 
-            <button 
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <label
+                  htmlFor="password"
+                  className="text-[10px] tracking-widest uppercase text-[#AEB7BC] font-mono"
+                >
+                  Password
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setError("Password reset is currently managed by workspace admin.")}
+                  className="text-[11px] text-[#AEB7BC] hover:text-[var(--color-ink)] transition-colors"
+                >
+                  Forgot?
+                </button>
+              </div>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••••••"
+                required
+                className="w-full px-0 py-2.5 bg-transparent border-b text-[18px] text-[var(--color-ink)] placeholder:text-[rgba(10,10,10,0.2)] outline-none transition-colors"
+                style={{
+                  borderBottomColor: password ? "var(--color-ink)" : "rgba(10,10,10,0.15)",
+                }}
+              />
+            </div>
+
+            <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-foreground text-background text-sm font-medium rounded-xl hover:opacity-90 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50 shadow-md"
+              className="mt-4 w-full h-[46px] rounded-full bg-[var(--color-ink)] text-white hover:bg-black transition-colors flex items-center justify-center gap-2 text-[14px] font-medium cursor-pointer disabled:opacity-50"
             >
-              <span>{loading ? "Processing..." : "Sign In"}</span>
+              <span>{loading ? "Authenticating..." : "Sign In"}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
+        </motion.div>
+      </main>
 
-        </div>
-
-        {/* Back Link */}
-        <div className="text-center">
-          <Link href="/" className="text-xs text-muted hover:text-foreground transition-colors inline-flex items-center gap-1">
-            &larr; Back to Landing Page
-          </Link>
-        </div>
-
-      </div>
+      {/* ── Footer ── */}
+      <footer className="text-center text-[12px] text-[#AEB7BC]">
+        Metaphor &middot; Context Engine for Autonomous Systems
+      </footer>
     </div>
   );
 }
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-transparent flex items-center justify-center">
+          <div className="w-6 h-6 border-2 border-[var(--color-ink)] border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
       <LoginForm />
     </Suspense>
   );

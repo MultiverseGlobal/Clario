@@ -9,16 +9,23 @@ interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
 
 export function Badge({ variant = "default", children, className = "", ...props }: BadgeProps) {
   const variants = {
-    default: "bg-surface-2 text-muted border-border-subtle",
-    primary: "bg-primary-dim text-primary border-primary-dim",
-    success: "bg-success-dim text-success border-success-dim",
-    warning: "bg-warning-dim text-warning border-warning-dim",
-    danger: "bg-danger-dim text-danger border-danger-dim",
+    default: { bg: "rgba(148,163,184,0.06)", border: "rgba(148,163,184,0.15)", text: "rgba(148,163,184,0.80)" },
+    primary: { bg: "rgba(76,175,125,0.07)", border: "rgba(76,175,125,0.25)", text: "var(--color-primary)" },
+    success: { bg: "rgba(34,197,94,0.07)", border: "rgba(34,197,94,0.20)", text: "rgba(34,197,94,0.85)" },
+    warning: { bg: "rgba(245,158,11,0.07)", border: "rgba(245,158,11,0.18)", text: "rgba(245,158,11,0.85)" },
+    danger: { bg: "rgba(244,63,94,0.08)", border: "rgba(244,63,94,0.20)", text: "rgba(244,63,94,0.85)" },
   };
+
+  const current = variants[variant];
 
   return (
     <span 
-      className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-medium border ${variants[variant]} ${className}`}
+      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-mono font-medium tracking-widest uppercase ${className}`}
+      style={{
+        background: current.bg,
+        border: `1px solid ${current.border}`,
+        color: current.text,
+      }}
       {...props}
     >
       {children}

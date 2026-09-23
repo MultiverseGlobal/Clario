@@ -1,6 +1,5 @@
 import React from 'react';
 import { BaseEdge, EdgeProps, getSmoothStepPath } from '@xyflow/react';
-import { motion } from 'framer-motion';
 
 export function GlowEdge({
   id,
@@ -30,26 +29,17 @@ export function GlowEdge({
         style={{
           ...style,
           strokeWidth: 2,
-          stroke: 'hsla(260, 70%, 62%, 0.2)',
+          stroke: 'rgba(17, 19, 21, 0.12)',
         }}
         id={`${id}-base`}
       />
-      <motion.path
+      <path
         d={edgePath}
         fill="none"
-        stroke="hsla(260, 70%, 62%, 0.8)"
-        strokeWidth={2}
+        stroke="rgba(17, 19, 21, 0.6)"
+        strokeWidth={1.5}
         strokeLinecap="round"
-        initial={{ strokeDasharray: '0 100', strokeDashoffset: 0 }}
-        animate={{
-          strokeDasharray: ['0 100', '20 100', '0 100'],
-          strokeDashoffset: [0, -100],
-        }}
-        transition={{
-          duration: 3,
-          ease: 'linear',
-          repeat: Infinity,
-        }}
+        className="flora-wire-active"
       />
     </>
   );

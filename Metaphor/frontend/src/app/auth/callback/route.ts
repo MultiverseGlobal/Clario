@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   
   const cookieStore = await cookies()
   const onboardedCookie = cookieStore.get('metaphor_onboarded')?.value
-  const defaultTarget = onboardedCookie === 'true' ? '/explorer' : '/onboarding'
+  const defaultTarget = onboardedCookie === 'true' ? '/world' : '/onboard'
   const next = searchParams.get('next') ?? defaultTarget
 
 
@@ -33,12 +33,28 @@ export async function GET(request: Request) {
       }
     )
     
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    const { error, data } = await supabase.auth.exchangeCodeForSession(code)
     
     if (!error) {
-      let redirectUrl = `${origin}${next}`
-      if (next === '/onboarding' && !next.includes('step=')) {
-        redirectUrl = `${origin}/onboarding?step=connect`
+      // Check user metadata if cookie is missing
+      let isUserOnboarded = onboardedCookie === 'true';
+      if (!isUserOnboarded && data?.session?.user) {
+        isUserOnboarded = !!data.session.user.user_metadata?.project_name;
+        if (isUserOnboarded) {
+          try {
+            cookieStore.set('metaphor_onboarded', 'true');
+          } catch {}
+        }
+      }
+
+      let actualNext = next;
+      if (actualNext === '/onboard' && isUserOnboarded) {
+        actualNext = '/world';
+      }
+
+      let redirectUrl = `${origin}${actualNext}`
+      if (actualNext === '/onboard' && !actualNext.includes('step=')) {
+        redirectUrl = `${origin}/onboard/step-1`
       }
       return NextResponse.redirect(redirectUrl)
     }

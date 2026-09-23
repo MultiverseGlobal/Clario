@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { motion, useAnimation } from "framer-motion";
+import React, { useEffect, useRef, useState } from "react";
+import { gsap } from "@/lib/gsap";
 
 export type FieldState = "idle" | "resolving" | "focused" | "exploring" | "attention";
 
@@ -10,85 +10,70 @@ interface AmbientFieldProps {
 }
 
 export function AmbientField({ fieldState = "idle" }: AmbientFieldProps) {
-  const controls = useAnimation();
   const [mounted, setMounted] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const orb1Ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted || !orb1Ref.current) return;
 
-    // React to state changes by animating the ambient field
+    const isReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (isReduced) {
+      gsap.set(orb1Ref.current, { opacity: 0.1, scale: 1 });
+      return;
+    }
+
     switch (fieldState) {
       case "idle":
-        controls.start({
-          opacity: 0.15,
-          scale: 1,
-          transition: { duration: 2, ease: "easeInOut" }
-        });
+        gsap.to(orb1Ref.current, { opacity: 0.15, scale: 1, duration: 1.5, ease: "power2.inOut" });
         break;
       case "resolving":
-        controls.start({
-          opacity: 0.3,
-          scale: 1.05,
-          transition: { duration: 0.8, ease: "easeInOut", repeat: Infinity, repeatType: "reverse" }
-        });
+        gsap.to(orb1Ref.current, { opacity: 0.25, scale: 1.05, duration: 0.8, repeat: -1, yoyo: true, ease: "power2.inOut" });
         break;
       case "focused":
-        controls.start({
-          opacity: 0.4,
-          scale: 0.95,
-          transition: { duration: 1.2, ease: "easeOut" }
-        });
+        gsap.to(orb1Ref.current, { opacity: 0.3, scale: 0.95, duration: 1.2, ease: "power2.out" });
         break;
       case "exploring":
-        controls.start({
-          opacity: 0.5,
-          scale: 1.1,
-          transition: { duration: 3, ease: "linear" }
-        });
+        gsap.to(orb1Ref.current, { opacity: 0.25, scale: 1.1, duration: 2.5, ease: "power1.inOut" });
         break;
       case "attention":
-        controls.start({
-          opacity: 0.6,
-          scale: 1.02,
-          transition: { duration: 0.4, ease: "easeOut" }
-        });
+        gsap.to(orb1Ref.current, { opacity: 0.35, scale: 1.02, duration: 0.4, ease: "power2.out" });
         break;
     }
-  }, [fieldState, controls, mounted]);
+  }, [fieldState, mounted]);
 
   if (!mounted) return null;
 
   return (
-    <div className="fixed inset-0 pointer-events-none" style={{ zIndex: "var(--z-background)" }}>
-      {/* Base dark canvas or subtle light canvas based on theme */}
+    <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }} aria-hidden="true">
+      {/* Base clean canvas */}
       <div className="absolute inset-0 bg-background transition-colors duration-1000" />
       
-      {/* The spatial moving elements */}
-      <motion.div 
-        animate={controls}
-        initial={{ opacity: 0 }}
-        className="absolute inset-0 flex items-center justify-center mix-blend-screen dark:mix-blend-lighten"
+      {/* Moving ambient elements */}
+      <div 
+        ref={containerRef}
+        className="absolute inset-0 flex items-center justify-center pointer-events-none"
       >
         <div 
-          className="w-[60vw] h-[60vw] max-w-[800px] max-h-[800px] rounded-full transition-all duration-1000"
+          ref={orb1Ref}
+          className="w-[60vw] h-[60vw] max-w-[800px] max-h-[800px] rounded-full blur-[120px] transition-all duration-1000"
           style={{
-            background: "radial-gradient(circle, var(--color-accent) 0%, rgba(79, 70, 229, 0.15) 40%, transparent 70%)",
-            opacity: 0.25,
-            willChange: "transform, opacity",
+            background: "radial-gradient(circle, var(--color-ink) 0%, rgba(17, 19, 21, 0.05) 40%, transparent 70%)",
+            opacity: 0.15,
           }}
         />
         <div 
-          className="absolute w-[40vw] h-[40vw] max-w-[600px] max-h-[600px] translate-x-1/4 -translate-y-1/4 rounded-full transition-all duration-1000"
+          className="absolute w-[40vw] h-[40vw] max-w-[600px] max-h-[600px] translate-x-1/4 -translate-y-1/4 rounded-full blur-[100px]"
           style={{
-            background: "radial-gradient(circle, rgba(99, 102, 241, 0.2) 0%, transparent 65%)",
-            willChange: "transform, opacity",
+            background: "radial-gradient(circle, rgba(17, 19, 21, 0.04) 0%, transparent 65%)",
+            opacity: 0.1,
           }}
         />
-      </motion.div>
+      </div>
       
       {/* Atmosphere Mask */}
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/40 to-background" />

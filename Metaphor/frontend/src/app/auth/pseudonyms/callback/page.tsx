@@ -35,9 +35,10 @@ function CallbackContent() {
 
       const settingsModule = await import("@/lib/settings");
       const settingsMem = await settingsModule.pullSettingsFromCloud();
-      const onboarded = settingsMem?.onboarded;
-      if (!onboarded && next === "/dashboard") {
-        next = "/onboarding?step=connect";
+      if (!onboarded) {
+        next = "/onboard";
+      } else if (next === "/dashboard" || next === "/home") {
+        next = "/world";
       }
 
       router.push(next);

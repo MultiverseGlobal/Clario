@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { gsap } from "@/lib/gsap";
 
 const STORAGE_KEY = "metaphor_first_entry_shown";
 
@@ -9,7 +9,6 @@ interface FirstEntrySequenceProps {
   onComplete?: () => void;
 }
 
-// Deterministic seeded nodes for the assembly animation
 function seededRandom(seed: number) {
   const x = Math.sin(seed + 1) * 10000;
   return x - Math.floor(x);
@@ -39,14 +38,14 @@ const FIELD_EDGES = (() => {
 
 export function FirstEntrySequence({ onComplete }: FirstEntrySequenceProps) {
   const [visible, setVisible] = useState(false);
-  const [phase, setPhase] = useState<"field" | "text" | "done">("field");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLDivElement>(null);
   const hasChecked = useRef(false);
 
   useEffect(() => {
     if (hasChecked.current) return;
     hasChecked.current = true;
 
-    // Respect reduced motion
     const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const alreadySeen = localStorage.getItem(STORAGE_KEY) === "true";
 
@@ -56,103 +55,109 @@ export function FirstEntrySequence({ onComplete }: FirstEntrySequenceProps) {
     }
 
     setVisible(true);
-
-    // Phase timeline
-    const t1 = setTimeout(() => setPhase("text"), 900);
-    const t2 = setTimeout(() => {
-      setPhase("done");
-      localStorage.setItem(STORAGE_KEY, "true");
-    }, 2200);
-    const t3 = setTimeout(() => {
-      setVisible(false);
-      onComplete?.();
-    }, 2800);
-
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [onComplete]);
 
+  useEffect(() => {
+    if (!visible || !containerRef.current) return;
+
+    const ctx = gsap.context(() => {
+      const tl = gsap.timeline({
+        onComplete: () => {
+          localStorage.setItem(STORAGE_KEY, "true");
+          setVisible(false);
+          onComplete?.();
+        }
+      });
+
+      // Animate nodes & edges
+      tl.fromTo(
+        ".entry-edge",
+        { opacity: 0, strokeDasharray: 100, strokeDashoffset: 100 },
+        { opacity: 0.08, strokeDashoffset: 0, duration: 0.8, stagger: 0.03, ease: "power2.out" },
+        0.1
+      );
+
+      tl.fromTo(
+        ".entry-node",
+        { opacity: 0, scale: 0 },
+        { opacity: 0.15, scale: 1, duration: 0.5, stagger: 0.02, ease: "back.out(1.5)" },
+        0.15
+      );
+
+      // Animate wordmark in
+      if (textRef.current) {
+        tl.fromTo(
+          textRef.current,
+          { opacity: 0, y: 12, scale: 0.95 },
+          { opacity: 1, y: 0, scale: 1, duration: 0.8, ease: "power2.out" },
+          0.8
+        );
+      }
+
+      // Hold and fade out
+      tl.to(containerRef.current, {
+        opacity: 0,
+        duration: 0.6,
+        ease: "power2.inOut"
+      }, "+=0.9");
+    }, containerRef);
+
+    return () => ctx.revert();
+  }, [visible, onComplete]);
+
+  if (!visible) return null;
+
   return (
-    <AnimatePresence>
-      {visible && (
-        <motion.div
-          className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden"
-          style={{ background: "var(--color-background)" }}
-          initial={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-        >
-          {/* Ambient light bloom */}
-          <motion.div
-            className="absolute inset-0 pointer-events-none"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5 }}
-          >
-            <div
-              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[50vw] h-[50vh] rounded-full blur-[120px]"
-              style={{ background: "radial-gradient(circle, var(--color-accent-dim) 0%, transparent 70%)", opacity: 0.6 }}
+    <div
+      ref={containerRef}
+      className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-white"
+      aria-hidden="true"
+    >
+      {/* Ambient bloom */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[50vw] h-[50vh] rounded-full blur-[120px] bg-[radial-gradient(circle,rgba(17,19,21,0.04)_0%,transparent_70%)]"
+        />
+      </div>
+
+      {/* SVG field assembly */}
+      <div className="absolute inset-0">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" className="w-full h-full">
+          {FIELD_EDGES.map((e) => (
+            <line
+              key={e.key}
+              x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2}
+              stroke="currentColor"
+              strokeWidth="0.15"
+              className="text-[#111315] entry-edge"
             />
-          </motion.div>
+          ))}
+          {FIELD_NODES.map((n) => (
+            <circle
+              key={n.id}
+              cx={n.x} cy={n.y} r={n.size * 0.4}
+              fill="currentColor"
+              className="text-[#111315] entry-node"
+            />
+          ))}
+        </svg>
+      </div>
 
-          {/* SVG field assembly */}
-          <div className="absolute inset-0">
-            <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" className="w-full h-full" aria-hidden="true">
-              {FIELD_EDGES.map((e) => (
-                <motion.line
-                  key={e.key}
-                  x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2}
-                  stroke="currentColor"
-                  strokeWidth="0.15"
-                  className="text-foreground"
-                  initial={{ opacity: 0, pathLength: 0 }}
-                  animate={{ opacity: 0.08, pathLength: 1 }}
-                  transition={{ duration: 0.8, delay: 0.2 + seededRandom(parseInt(e.key)) * 0.5 }}
-                />
-              ))}
-              {FIELD_NODES.map((n) => (
-                <motion.circle
-                  key={n.id}
-                  cx={n.x} cy={n.y} r={n.size * 0.4}
-                  fill="currentColor"
-                  className="text-foreground"
-                  initial={{ opacity: 0, scale: 0 }}
-                  animate={{ opacity: 0.15, scale: 1 }}
-                  transition={{
-                    duration: 0.5,
-                    delay: 0.1 + n.delay,
-                    type: "spring",
-                    stiffness: 200,
-                    damping: 20,
-                  }}
-                />
-              ))}
-            </svg>
-          </div>
-
-          {/* METAPHOR wordmark */}
-          <AnimatePresence>
-            {phase === "text" || phase === "done" ? (
-              <motion.div
-                className="relative z-10 text-center select-none"
-                initial={{ opacity: 0, y: 12, filter: "blur(12px)", scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, filter: "blur(0px)", scale: 1 }}
-                exit={{ opacity: 0, y: -4, filter: "blur(4px)" }}
-                transition={{ duration: 0.8, ease: [0.25, 1, 0.5, 1] }}
-              >
-                <div className="text-[10px] font-mono uppercase tracking-[0.35em] text-muted mb-3">
-                  Ecosystem Synchronized
-                </div>
-                <div
-                  className="text-5xl md:text-7xl text-foreground tracking-tighter"
-                  style={{ fontFamily: "var(--font-display)", fontWeight: 500, letterSpacing: "-0.02em" }}
-                >
-                  Metaphor
-                </div>
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
-        </motion.div>
-      )}
-    </AnimatePresence>
+      {/* METAPHOR wordmark */}
+      <div
+        ref={textRef}
+        className="relative z-10 text-center select-none"
+      >
+        <div className="text-[10px] font-mono uppercase tracking-[0.35em] text-[#6B7280] mb-3">
+          Ecosystem Synchronized
+        </div>
+        <div
+          className="text-5xl md:text-7xl text-[var(--color-ink)] tracking-tighter"
+          style={{ fontFamily: "var(--font-display)", fontWeight: 500, letterSpacing: "-0.02em" }}
+        >
+          Metaphor
+        </div>
+      </div>
+    </div>
   );
 }

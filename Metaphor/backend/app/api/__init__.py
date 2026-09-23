@@ -12,11 +12,13 @@ from app.routes.ai_registry import router as ai_registry_router
 from app.routes.callbacks import router as callbacks_router
 from app.routes.events import router as events_router
 from .agent_mesh import router as agent_mesh_router
+from .handoffs import router as handoffs_router
 
 api_router = APIRouter()
 api_router.include_router(integrations_router, prefix="/integrations", tags=["integrations"])
 api_router.include_router(context_router, prefix="/context", tags=["context"])
 api_router.include_router(graph_router, prefix="/graph", tags=["graph"])
+api_router.include_router(handoffs_router)
 api_router.include_router(webhooks_router, prefix="/webhooks", tags=["webhooks"])
 api_router.include_router(apikeys_router, prefix="/auth/apikeys", tags=["API Keys"])
 api_router.include_router(auth_router, prefix="/auth", tags=["auth"])

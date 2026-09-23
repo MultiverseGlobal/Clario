@@ -44,58 +44,35 @@ export async function updateSession(request: NextRequest) {
       console.error("Middleware auth error:", err);
       user = null;
     }
-  } else if (!hasSupabaseConfig) {
-    // Single-tenant or sovereign environment without cloud Supabase keys
-    user = { id: "sovereign_admin" };
   }
 
   const isUnlocked = request.cookies.has("metaphor_unlocked");
-  const isAuthenticated = !hasSupabaseConfig || !!user || isUnlocked;
+  const hasOnboarded = request.cookies.has("metaphor_onboarded");
+  const isAuthenticated = !!user || isUnlocked || (!hasSupabaseConfig && hasOnboarded);
 
-  const isProtectedRoute = request.nextUrl.pathname.startsWith('/home') || request.nextUrl.pathname.startsWith('/inbox');
-  const isLoginRoute = request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup';
+  const pathname = request.nextUrl.pathname;
+  const isProtectedRoute = pathname.startsWith('/world') || pathname.startsWith('/tools') || pathname.startsWith('/handoffs') || pathname.startsWith('/context') || pathname.startsWith('/connections') || pathname.startsWith('/settings');
+  const isAuthRoute = pathname === '/login' || pathname === '/signup';
+  const isOnboardRoute = pathname.startsWith('/onboard');
 
-  if (!isAuthenticated && isProtectedRoute) {
+  // Allow unrestricted access to onboarding and auth flows
+  if (isOnboardRoute || isAuthRoute) {
+    // Only redirect away from login/signup if user has a verified live session and explicitly completed onboarding
+    if (user && hasOnboarded && isAuthRoute) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/world'
+      return NextResponse.redirect(url)
+    }
+    return supabaseResponse;
+  }
+
+  // If trying to access protected routes without authentication when Supabase is configured
+  if (hasSupabaseConfig && !isAuthenticated && isProtectedRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
-    url.searchParams.set('redirect', request.nextUrl.pathname)
-    return NextResponse.redirect(url)
-  }
-
-  const hasOnboarded = request.cookies.has("metaphor_onboarded") || isUnlocked || !hasSupabaseConfig;
-
-  // Redirect logged-in users away from the marketing landing page unless explicitly signed out or viewing landing
-  const isLandingPage = request.nextUrl.pathname === '/';
-  const isExplicitLanding = request.cookies.has("metaphor_signed_out") || request.nextUrl.searchParams.has("landing");
-  if (isAuthenticated && isLandingPage && !isExplicitLanding) {
-    const url = request.nextUrl.clone()
-    url.pathname = hasOnboarded ? '/home' : '/onboarding'
-    return NextResponse.redirect(url)
-  }
-
-  if (isAuthenticated && isLoginRoute) {
-    const url = request.nextUrl.clone()
-    const redirectParam = request.nextUrl.searchParams.get('redirect')
-    url.pathname = redirectParam || (hasOnboarded ? '/home' : '/onboarding')
-    url.searchParams.delete('redirect')
-    return NextResponse.redirect(url)
-  }
-
-  if (isAuthenticated && isProtectedRoute && !hasOnboarded) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/onboarding'
-    url.searchParams.set('redirect', request.nextUrl.pathname)
-    return NextResponse.redirect(url)
-  }
-
-  if (isAuthenticated && hasOnboarded && request.nextUrl.pathname === '/onboarding') {
-    const url = request.nextUrl.clone()
-    const redirectParam = request.nextUrl.searchParams.get('redirect')
-    url.pathname = redirectParam || '/home'
-    url.searchParams.delete('redirect')
+    url.searchParams.set('redirect', pathname)
     return NextResponse.redirect(url)
   }
 
   return supabaseResponse
 }
-

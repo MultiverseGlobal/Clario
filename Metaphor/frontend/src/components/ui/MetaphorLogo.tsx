@@ -1,5 +1,7 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+"use client";
+
+import React, { useRef, useEffect } from 'react';
+import { gsap } from '@/lib/gsap';
 
 interface MetaphorLogoProps {
   className?: string;
@@ -7,45 +9,68 @@ interface MetaphorLogoProps {
 }
 
 export function MetaphorLogo({ className = "", size = 24 }: MetaphorLogoProps) {
-  // The Lens (◎) Concept
-  // Raw information enters. Clear understanding leaves.
-  
+  const containerRef = useRef<HTMLDivElement>(null);
+  const circleRef = useRef<SVGCircleElement>(null);
+  const coreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const isReduced = typeof window !== 'undefined' && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (isReduced) {
+      if (circleRef.current) circleRef.current.style.strokeDasharray = "100 100";
+      if (coreRef.current) {
+        coreRef.current.style.opacity = "1";
+        coreRef.current.style.transform = "scale(1)";
+      }
+      return;
+    }
+
+    const ctx = gsap.context(() => {
+      if (circleRef.current && coreRef.current) {
+        gsap.fromTo(
+          circleRef.current,
+          { strokeDasharray: "0 100", opacity: 0 },
+          { strokeDasharray: "100 100", opacity: 1, duration: 1.2, ease: "power2.out" }
+        );
+        gsap.fromTo(
+          coreRef.current,
+          { scale: 0, opacity: 0 },
+          { scale: 1, opacity: 1, duration: 0.6, delay: 0.35, ease: "back.out(1.7)" }
+        );
+      }
+    }, containerRef);
+
+    return () => ctx.revert();
+  }, []);
+
   return (
     <div 
-      className={`relative flex items-center justify-center ${className}`}
+      ref={containerRef}
+      className={`relative flex items-center justify-center shrink-0 ${className}`}
       style={{ width: size, height: size }}
+      aria-hidden="true"
     >
-      {/* Outer Ring - Represents raw information / the context window */}
-      <motion.svg
+      <svg
         width={size}
         height={size}
         viewBox="0 0 24 24"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-        className="absolute inset-0 text-foreground"
+        className="absolute inset-0 text-current"
       >
-        <motion.circle 
+        <circle 
+          ref={circleRef}
           cx="12" 
           cy="12" 
           r="9" 
           stroke="currentColor" 
           strokeWidth="2"
-          initial={{ strokeDasharray: "0 100" }}
-          animate={{ strokeDasharray: "100 100" }}
-          transition={{ duration: 1.2, ease: "easeOut" }}
         />
-      </motion.svg>
+      </svg>
 
-      {/* Inner Core - Represents clear understanding / focus */}
-      <motion.div
-        className="bg-foreground rounded-full"
+      <div
+        ref={coreRef}
+        className="bg-current rounded-full"
         style={{ width: size * 0.33, height: size * 0.33 }}
-        initial={{ opacity: 0, scale: 0 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.6, delay: 0.4, ease: [0.175, 0.885, 0.32, 1.275] }}
       />
     </div>
   );

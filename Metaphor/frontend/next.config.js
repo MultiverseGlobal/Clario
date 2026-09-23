@@ -7,19 +7,26 @@ const nextConfig = {
   async redirects() {
     return [
       // Root post-login redirects
-      { source: "/dashboard", destination: "/home", permanent: true },
-      { source: "/overview", destination: "/home", permanent: true },
+      { source: "/dashboard", destination: "/world", permanent: true },
+      { source: "/home", destination: "/world", permanent: true },
+      { source: "/overview", destination: "/world", permanent: true },
+      { source: "/work", destination: "/world", permanent: true },
       { source: "/explorer", destination: "/context", permanent: true },
       { source: "/graph", destination: "/world", permanent: true },
-      { source: "/pipeline", destination: "/work", permanent: true },
-      { source: "/inbox", destination: "/work", permanent: true },
+      { source: "/pipeline", destination: "/handoffs", permanent: true },
+      { source: "/inbox", destination: "/world", permanent: true },
+      
+      // Marketing section redirects
+      { source: "/platform", destination: "/#platform", permanent: true },
+      { source: "/how-it-works", destination: "/#how-it-works", permanent: true },
+      { source: "/security", destination: "/#security", permanent: true },
       
       // All old sub-routes
-      { source: "/dashboard/overview",     destination: "/home",         permanent: true },
+      { source: "/dashboard/overview",     destination: "/world",        permanent: true },
       { source: "/dashboard/explorer",     destination: "/context",      permanent: true },
       { source: "/dashboard/graph",        destination: "/world",        permanent: true },
-      { source: "/dashboard/inbox",        destination: "/work",         permanent: true },
-      { source: "/dashboard/pipeline",     destination: "/work",         permanent: true },
+      { source: "/dashboard/inbox",        destination: "/world",        permanent: true },
+      { source: "/dashboard/pipeline",     destination: "/handoffs",     permanent: true },
       
       { source: "/dashboard/integrations", destination: "/integrations", permanent: true },
       { source: "/dashboard/partitions",   destination: "/partitions",   permanent: true },

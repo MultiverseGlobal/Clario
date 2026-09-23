@@ -1,15 +1,15 @@
 "use client";
 
-import React from "react";
-import { motion } from "framer-motion";
+import React, { useEffect, useState, useRef } from "react";
 import { ContextField } from "./ContextField";
+import { gsap } from "@/lib/gsap";
 
 type LoadingContext =
-  | "context"   // "Resolving context..."
-  | "graph"     // "Mapping relationships..."
-  | "evidence"  // "Finding supporting evidence..."
-  | "handoffs"  // "Loading work queue..."
-  | "generic";  // "Loading..."
+  | "context"
+  | "graph"
+  | "evidence"
+  | "handoffs"
+  | "generic";
 
 const MESSAGES: Record<LoadingContext, string[]> = {
   context:  ["Resolving context...", "Traversing relationships...", "Assembling insights..."],
@@ -27,14 +27,25 @@ interface LoadingStateProps {
 
 export function LoadingState({ context = "generic", className = "", compact = false }: LoadingStateProps) {
   const messages = MESSAGES[context];
-  const [msgIndex, setMsgIndex] = React.useState(0);
+  const [msgIndex, setMsgIndex] = useState(0);
+  const textRef = useRef<HTMLDivElement>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const timer = setInterval(() => {
       setMsgIndex((i) => (i + 1) % messages.length);
     }, 1800);
     return () => clearInterval(timer);
   }, [messages.length]);
+
+  useEffect(() => {
+    if (textRef.current) {
+      gsap.fromTo(
+        textRef.current,
+        { opacity: 0, y: 4 },
+        { opacity: 1, y: 0, duration: 0.3, ease: "power2.out" }
+      );
+    }
+  }, [msgIndex]);
 
   if (compact) {
     return (
@@ -46,22 +57,20 @@ export function LoadingState({ context = "generic", className = "", compact = fa
   }
 
   return (
-    <div className={`flex flex-col items-center justify-center gap-6 py-16 ${className}`}>
+    <div className={`flex flex-col items-center justify-center gap-6 py-16 ${className}`} role="status">
       {/* Mini context field during loading */}
       <div className="w-32 h-20 relative opacity-40">
         <ContextField nodeCount={10} intensity="ambient" />
       </div>
 
-      <motion.div
-        key={msgIndex}
-        initial={{ opacity: 0, y: 4 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -4 }}
-        transition={{ duration: 0.3 }}
-        className="text-xs font-mono uppercase tracking-widest text-muted"
+      <div
+        ref={textRef}
+        className="flex flex-col items-center gap-1.5"
       >
-        {messages[msgIndex]}
-      </motion.div>
+        <span className="text-sm text-foreground/80 font-mono tracking-tight">
+          {messages[msgIndex]}
+        </span>
+      </div>
     </div>
   );
 }
