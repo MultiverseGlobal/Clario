@@ -36,11 +36,22 @@ interface HandoffItem {
   title: string;
   objective: string;
   status: string;
+  priority?: string;
+  autonomy_mode?: string;
+  policy_decision?: string;
   context_refs?: any[];
   artifact_refs?: any[];
   decision_refs?: any[];
   created_at?: string;
 }
+
+type AutonomyMode = "manual" | "assisted" | "autonomous";
+
+const AUTONOMY_LABELS: Record<AutonomyMode, { label: string; description: string; color: string }> = {
+  manual:     { label: "Manual",     description: "Every handoff awaits explicit human approval.",                  color: "text-amber-700 bg-amber-50 border-amber-200" },
+  assisted:   { label: "Assisted",   description: "Safe handoffs auto-approve. Risky ones escalate.",             color: "text-indigo-700 bg-indigo-50 border-indigo-200" },
+  autonomous: { label: "Autonomous", description: "All handoffs dispatch immediately. Zero-click pipeline.",       color: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+};
 
 const DEFAULT_PARTICIPANTS: Participant[] = [
   {
@@ -109,6 +120,8 @@ export default function ConnectedWorldPage() {
   const [approvedSuccess, setApprovedSuccess] = useState(false);
   const [inspectedHandoff, setInspectedHandoff] = useState<HandoffItem | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [autonomyMode, setAutonomyMode] = useState<AutonomyMode>("assisted");
+  const [isSettingPolicy, setIsSettingPolicy] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -126,7 +139,25 @@ export default function ConnectedWorldPage() {
         // Active graph connection verified
       }
     } catch {}
+
+    try {
+      const policy = await fetchFromMetaphor("/handoffs/autonomy-policy");
+      if (policy?.mode) setAutonomyMode(policy.mode as AutonomyMode);
+    } catch {}
   }, []);
+
+  const handleSetAutonomyMode = async (mode: AutonomyMode) => {
+    if (isSettingPolicy || mode === autonomyMode) return;
+    setIsSettingPolicy(true);
+    setAutonomyMode(mode); // optimistic
+    try {
+      await fetchFromMetaphor("/handoffs/autonomy-policy", { mode }, "PUT");
+    } catch (err: any) {
+      console.warn("Could not persist autonomy policy:", err.message);
+    } finally {
+      setIsSettingPolicy(false);
+    }
+  };
 
   useEffect(() => {
     try {
@@ -199,21 +230,47 @@ export default function ConnectedWorldPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
-          <Link
-            href="/context"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-[rgba(10,10,10,0.12)] bg-white/80 hover:bg-white hover:border-[var(--color-ink)] transition-all text-[13px] font-medium text-[var(--color-ink)] shadow-sm"
-          >
-            <Search size={14} />
-            <span>Explore Context</span>
-          </Link>
-          <Link
-            href="/connections"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[var(--color-ink)] text-white hover:bg-black transition-colors text-[13px] font-medium shadow-sm"
-          >
-            <Plus size={14} />
-            <span>Add Connection</span>
-          </Link>
+        <div className="flex flex-col items-end gap-3 shrink-0">
+          {/* ── Autonomy Mode Switcher ── */}
+          <div className="flex items-center gap-1 p-1 rounded-full border border-[rgba(10,10,10,0.1)] bg-white/80 shadow-sm">
+            {(["manual", "assisted", "autonomous"] as AutonomyMode[]).map((mode) => {
+              const isActive = autonomyMode === mode;
+              const meta = AUTONOMY_LABELS[mode];
+              return (
+                <button
+                  key={mode}
+                  id={`autonomy-mode-${mode}`}
+                  onClick={() => handleSetAutonomyMode(mode)}
+                  disabled={isSettingPolicy}
+                  title={meta.description}
+                  className={`px-3.5 py-1.5 rounded-full text-[11px] font-mono tracking-wide transition-all cursor-pointer disabled:opacity-50 ${
+                    isActive
+                      ? meta.color + " border font-semibold shadow-sm"
+                      : "text-[#AEB7BC] hover:text-[var(--color-ink)]"
+                  }`}
+                >
+                  {meta.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Link
+              href="/context"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-[rgba(10,10,10,0.12)] bg-white/80 hover:bg-white hover:border-[var(--color-ink)] transition-all text-[13px] font-medium text-[var(--color-ink)] shadow-sm"
+            >
+              <Search size={14} />
+              <span>Explore Context</span>
+            </Link>
+            <Link
+              href="/connections"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[var(--color-ink)] text-white hover:bg-black transition-colors text-[13px] font-medium shadow-sm"
+            >
+              <Plus size={14} />
+              <span>Add Connection</span>
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -309,7 +366,7 @@ export default function ConnectedWorldPage() {
           <div className="p-6 rounded-2xl border border-[rgba(10,10,10,0.08)] bg-white/80 backdrop-blur-md shadow-sm">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-[12px] font-mono text-[#AEB7BC]">
+                <div className="flex flex-wrap items-center gap-2 text-[12px] font-mono text-[#AEB7BC]">
                   <span className="px-2 py-0.5 rounded bg-black/[0.04] text-[var(--color-ink)] font-medium">
                     #HO-{pendingHandoff.id.replace(/-/g, "").slice(0, 6).toUpperCase()}
                   </span>
@@ -318,7 +375,7 @@ export default function ConnectedWorldPage() {
                     {pendingHandoff.from_tool || "ChatGPT"} &rarr; {pendingHandoff.to_tool || "GitHub"}
                   </span>
                   <span>&middot;</span>
-                  <span>{approvedSuccess ? "Approved by you" : "Waiting for human approval"}</span>
+                  <span>{approvedSuccess ? "Approved by you" : "Escalated · Human review required"}</span>
                 </div>
                 <h3 className="text-[17px] font-medium text-[var(--color-ink)]">
                   {pendingHandoff.title}
@@ -326,6 +383,16 @@ export default function ConnectedWorldPage() {
                 <p className="text-[13px] text-[#555E64]">
                   {pendingHandoff.objective || "Context bundle contains schema references, ADR-42, and conversation summary."}
                 </p>
+                {pendingHandoff.policy_decision && (
+                  <div className="flex items-start gap-2 pt-1">
+                    <span className="shrink-0 mt-0.5">
+                      <AlertCircle size={12} className="text-amber-500" />
+                    </span>
+                    <p className="text-[11px] font-mono text-amber-700 leading-relaxed">
+                      {pendingHandoff.policy_decision}
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-3 shrink-0">

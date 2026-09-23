@@ -24,6 +24,10 @@ class Task(SQLModel, table=True):
     summary: Optional[str] = None
     instructions: Optional[str] = None
     
+    # Autonomy and policy routing
+    autonomy_mode: str = Field(default="assisted") # manual, assisted, autonomous
+    policy_decision: Optional[str] = Field(default=None)
+    
     # Required capabilities for this task (e.g., ["frontend_implementation"])
     required_capabilities: dict = Field(default_factory=list, sa_column=Column(JSON))
     

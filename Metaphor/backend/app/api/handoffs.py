@@ -9,9 +9,10 @@ from app.core.security import get_authorized_participant
 from app.models.identity import Participant
 from app.services.retrieval import RetrievalScope
 from app.models.task_handoff import Task
-from app.services.handoff import HandoffService
+from app.services.handoff import HandoffService, get_workspace_autonomy_mode, set_workspace_autonomy_mode
 
 router = APIRouter(prefix="/handoffs", tags=["Handoffs"])
+
 
 async def get_handoff_scope(
     participant: Participant = Depends(get_authorized_participant)
@@ -104,3 +105,38 @@ async def cancel_handoff(
 ):
     service = HandoffService(db)
     return await service.cancel_handoff(scope, handoff_id)
+
+
+# ── Autonomy Policy ──────────────────────────────────────────────────────────
+
+class AutonomyPolicyResponse(BaseModel):
+    mode: str
+    label: str
+    description: str
+
+class SetAutonomyModeRequest(BaseModel):
+    mode: str  # manual | assisted | autonomous
+
+POLICY_META = {
+    "manual":     {"label": "Manual",     "description": "Every handoff requires explicit human approval before dispatch."},
+    "assisted":   {"label": "Assisted",   "description": "Safe handoffs auto-approve. High priority, constrained, or large bundles escalate to human review."},
+    "autonomous": {"label": "Autonomous", "description": "All handoffs execute immediately without human review. Zero-click pipeline."},
+}
+
+@router.get("/autonomy-policy", response_model=AutonomyPolicyResponse)
+async def get_autonomy_policy(
+    scope: RetrievalScope = Depends(get_handoff_scope),
+):
+    mode = get_workspace_autonomy_mode(scope.organization_id)
+    meta = POLICY_META.get(mode, POLICY_META["assisted"])
+    return AutonomyPolicyResponse(mode=mode, **meta)
+
+
+@router.put("/autonomy-policy", response_model=AutonomyPolicyResponse)
+async def update_autonomy_policy(
+    request: SetAutonomyModeRequest,
+    scope: RetrievalScope = Depends(get_handoff_scope),
+):
+    mode = set_workspace_autonomy_mode(request.mode, scope.organization_id)
+    meta = POLICY_META.get(mode, POLICY_META["assisted"])
+    return AutonomyPolicyResponse(mode=mode, **meta)

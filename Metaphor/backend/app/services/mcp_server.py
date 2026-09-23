@@ -432,7 +432,7 @@ async def list_mcp_tools() -> List[Dict[str, Any]]:
         },
         {
             "name": "dispatch_to_tool",
-            "description": "Omni-directional command bus. Dispatch an active command to ANY other tool in the project (Atlas, William, Clario, Claude, Cursor, Manus). If the target has a registered webhook URL, it will execute immediately. If passive, it is pushed to their queue.",
+            "description": "Omni-directional command bus. Dispatch an active command to ANY other tool in the project (Atlas, William, Clario, Claude, Cursor, Manus). If the target has a registered webhook URL, it will execute immediately. If passive, it is pushed to their queue. Autonomy mode controls whether the handoff auto-approves (autonomous/assisted) or requires human review (manual).",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -440,7 +440,8 @@ async def list_mcp_tools() -> List[Dict[str, Any]]:
                     "target_tool": {"type": "string", "description": "Target tool name (e.g. atlas, manus, devin, william)"},
                     "action": {"type": "string", "description": "The command or action to execute"},
                     "payload": {"type": "object", "description": "Structured JSON arguments for the action"},
-                    "project_id": {"type": "string", "description": "Optional project UUID"}
+                    "project_id": {"type": "string", "description": "Optional project UUID"},
+                    "autonomy_mode": {"type": "string", "enum": ["manual", "assisted", "autonomous"], "description": "Override workspace autonomy policy for this handoff (manual=always escalate, assisted=auto-approve if safe, autonomous=always auto-approve)"}
                 },
                 "required": ["source_tool", "target_tool", "action", "payload"]
             },
@@ -782,23 +783,34 @@ async def call_mcp_tool(
         except Exception:
             pid = None
 
-        # Create handoff record for audit / passive fallback
-        from app.models.task_handoff import Task
-        handoff = Task(
-            id=uuid.uuid4(),
-            organization_id=organization_id,
-            project_id=pid,
-            source_ai=source_tool.lower() if source_tool else "unknown",
-            target_ai=target_tool.lower() if target_tool else "unknown",
-            payload=f"Action: {action}\nPayload: {json.dumps(payload)}",
-            instructions=f"Dispatched command: {action}",
-            status="pending"
-        )
-        session.add(handoff)
-        await session.commit()
-        await session.refresh(handoff)
+        # Create handoff record using canonical HandoffService with autonomy policy
+        from app.services.handoff import HandoffService
+        service = HandoffService(session)
 
-        # ── Registry-based webhook dispatch (Phase 6) ──────────────────
+        context_refs = payload.get("context_refs", []) if isinstance(payload, dict) else []
+        constraint_refs = payload.get("constraint_refs", []) if isinstance(payload, dict) else []
+        priority = payload.get("priority", "normal") if isinstance(payload, dict) else "normal"
+        autonomy_mode = arguments.get("autonomy_mode") or (payload.get("autonomy_mode") if isinstance(payload, dict) else "assisted")
+
+        title = f"[{action}] from {source_tool.title()} to {target_tool.title()}"
+        objective = f"Action: {action}\nPayload: {json.dumps(payload, indent=2) if isinstance(payload, dict) else str(payload)}"
+
+        handoff = await service.create_handoff(
+            scope=retrieval_scope,
+            title=title,
+            objective=objective,
+            instructions=f"Dispatched command: {action}",
+            priority=priority,
+            from_tool=source_tool,
+            to_tool=target_tool,
+            autonomy_mode=autonomy_mode,
+            context_refs=context_refs,
+            constraint_refs=constraint_refs
+        )
+
+        is_auto_approved = handoff.status == "completed"
+
+        # ── Registry-based webhook dispatch ───────────────────────────
         from app.services.webhook_dispatcher import dispatch_to_external_agent
         dispatch_result = await dispatch_to_external_agent(
             source_ai=source_tool or "unknown",
@@ -808,29 +820,35 @@ async def call_mcp_tool(
             project_id=str(pid) if pid else project_id_raw,
             org_id=str(organization_id),
             session=session,
-            callback_recipient=source_tool,  # result comes back to the caller
+            callback_recipient=source_tool,
         )
 
         mode = dispatch_result.get("mode", "queued")
         callback_id = dispatch_result.get("callback_id")
-        result_msg = (
-            f"Dispatched '{action}' to {target_tool} via webhook (callback_id: {callback_id})"
-            if mode == "webhook"
-            else f"Queued '{action}' for {target_tool} (passive queue)"
-        )
 
-        if mode == "queued":
-            await broadcast_sse_event(
-                org_id=str(organization_id),
-                target_ai=target_tool or "unknown",
-                event_type="handoff_received",
-                data={
-                    "handoff_id": str(handoff.id),
-                    "source_ai": source_tool,
-                    "action": action,
-                    "payload": payload
-                }
+        if is_auto_approved:
+            result_msg = (
+                f"Auto-approved & dispatched '{action}' to {target_tool} ({handoff.policy_decision}). ID: {handoff.id}"
+                if mode == "webhook"
+                else f"Auto-approved & queued '{action}' for {target_tool} ({handoff.policy_decision}). ID: {handoff.id}"
             )
+        else:
+            result_msg = f"Task queued for human review on Connected World dashboard ({handoff.policy_decision}). Handoff ID: {handoff.id}"
+
+        await broadcast_sse_event(
+            org_id=str(organization_id),
+            target_ai=target_tool or "unknown",
+            event_type="handoff_received" if is_auto_approved else "handoff_pending_approval",
+            data={
+                "handoff_id": str(handoff.id),
+                "source_ai": source_tool,
+                "target_ai": target_tool,
+                "action": action,
+                "status": handoff.status,
+                "policy_decision": handoff.policy_decision,
+                "payload": payload
+            }
+        )
 
         return {"content": [{"type": "text", "text": result_msg}]}
 

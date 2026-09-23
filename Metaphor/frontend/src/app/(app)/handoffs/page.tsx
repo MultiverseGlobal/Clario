@@ -14,6 +14,8 @@ interface HandoffTask {
   instructions?: string;
   status: string;
   priority?: string;
+  autonomy_mode?: string;
+  policy_decision?: string;
   context_refs?: any[];
   artifact_refs?: any[];
   decision_refs?: any[];
@@ -278,6 +280,18 @@ export default function HandoffsPage() {
                           <div className="text-[10px] font-mono uppercase tracking-widest text-[#AEB7BC]">
                             Handoff Payload &amp; Provenance
                           </div>
+                          {task.policy_decision && (
+                            <div className={`flex items-start gap-2 p-2.5 rounded-lg text-[12px] font-mono leading-relaxed border ${
+                              task.status === "completed"
+                                ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                                : task.status === "pending"
+                                  ? "bg-amber-50 border-amber-200 text-amber-800"
+                                  : "bg-black/[0.03] border-[rgba(10,10,10,0.06)] text-[#555E64]"
+                            }`}>
+                              <span className="font-semibold shrink-0">Policy:</span>
+                              <span>{task.policy_decision}</span>
+                            </div>
+                          )}
                           {task.instructions && (
                             <div>
                               <span className="text-[11px] font-mono text-[#AEB7BC] block">Instructions:</span>
