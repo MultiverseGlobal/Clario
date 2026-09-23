@@ -47,7 +47,7 @@ export default function OnboardStep1() {
           </span>
         </div>
         <div className="text-[11px] font-mono tracking-widest uppercase text-[#AEB7BC]">
-          Step 1 of 2 &middot; Identity
+          Step 1 of 3 &middot; Identity
         </div>
       </div>
 

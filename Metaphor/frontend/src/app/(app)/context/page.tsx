@@ -109,7 +109,7 @@ function ContextEnvironmentContent() {
   };
 
   useEffect(() => {
-    const qParam = searchParams.get("query");
+    const qParam = searchParams.get("query") || searchParams.get("q");
     if (qParam && phase === "empty") {
       setPrompt(qParam);
       handleAsk(qParam);

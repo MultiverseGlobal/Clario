@@ -3,15 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Cpu, Key, Trash2, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
-
-interface ConnectionItem {
-  id: string;
-  name: string;
-  type: "mcp" | "oauth" | "api_key";
-  endpoint?: string;
-  account?: string;
-  status: "connected" | "disconnected";
-}
+import { pullConnectionsFromCloud, pushConnectionsToCloud, ConnectionItem } from "@/lib/connections";
 
 const DEFAULT_CONNECTIONS: ConnectionItem[] = [
   {
@@ -30,8 +22,6 @@ const DEFAULT_CONNECTIONS: ConnectionItem[] = [
   },
 ];
 
-const STORAGE_KEY = "metaphor_connections_v2";
-
 export default function ConnectionsPage() {
   const [connections, setConnections] = useState<ConnectionItem[]>(DEFAULT_CONNECTIONS);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -39,25 +29,19 @@ export default function ConnectionsPage() {
   const [serverName, setServerName] = useState("");
   const [savedBanner, setSavedBanner] = useState<string | null>(null);
 
-  // Load from persistent localStorage on mount
+  // Load from Supabase cloud (falls back to localStorage) on mount
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setConnections(parsed);
-        }
+    pullConnectionsFromCloud().then((c) => {
+      if (c && c.length > 0) {
+        setConnections(c);
       }
-    } catch {}
+    });
   }, []);
 
-  // Sync state to localStorage
+  // Sync state to cloud + localStorage
   const saveConnections = (updated: ConnectionItem[]) => {
     setConnections(updated);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    } catch {}
+    pushConnectionsToCloud(updated);
   };
 
   const handleAddServer = (e: React.FormEvent) => {

@@ -35,13 +35,17 @@ app.add_middleware(GZipMiddleware, minimum_size=500)
 
 import os
 
-allowed_origins = ["*"]
+_raw_cors = os.getenv(
+    "CORS_ALLOWED_ORIGINS",
+    "https://metaphor-three.vercel.app,http://localhost:3000,http://localhost:3001"
+)
+allowed_origins = [o.strip() for o in _raw_cors.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -78,7 +82,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.get("/api/v1/mcp/.well-known/oauth-protected-resource")
 async def root_oauth_protected_resource(request: Request):
     base_url = str(request.base_url).rstrip("/")
-    resource_id = getattr(settings, "WORKOS_MCP_RESOURCE_ID", None) or f"{base_url}/api/v1/mcp"
+    resource_id = settings.MCP_RESOURCE_ID or f"{base_url}/api/v1/mcp"
     return {
         "resource": resource_id,
         "authorization_servers": [base_url],
@@ -106,7 +110,12 @@ async def root_oauth_authorization_server(request: Request):
 
 @app.get("/build-version")
 async def build_version():
-    return {"build_time": "2026-08-02T19:00:00Z", "commit": "a3724eb_v2", "mcp_auth_redirect": "enabled"}
+    import os
+    return {
+        "build_time": os.getenv("BUILD_TIME", "unknown"),
+        "commit": os.getenv("GIT_COMMIT", "unknown"),
+        "mcp_auth_redirect": "enabled"
+    }
 
 @app.get("/")
 async def root():

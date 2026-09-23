@@ -27,10 +27,8 @@ export async function updateSession(request: NextRequest) {
               return request.cookies.getAll()
             },
             setAll(cookiesToSet) {
-              cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
-              supabaseResponse = NextResponse.next({
-                request,
-              })
+              cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+              supabaseResponse = NextResponse.next({ request })
               cookiesToSet.forEach(({ name, value, options }) =>
                 supabaseResponse.cookies.set(name, value, options)
               )
@@ -46,18 +44,35 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  const isUnlocked = request.cookies.has("metaphor_unlocked");
   const hasOnboarded = request.cookies.has("metaphor_onboarded");
-  const isAuthenticated = !!user || isUnlocked || (!hasSupabaseConfig && hasOnboarded);
+  // isAuthenticated: verified Supabase user, OR Supabase is not configured (local dev without keys)
+  const isAuthenticated = !!user || (!hasSupabaseConfig && hasOnboarded);
 
   const pathname = request.nextUrl.pathname;
-  const isProtectedRoute = pathname.startsWith('/world') || pathname.startsWith('/tools') || pathname.startsWith('/handoffs') || pathname.startsWith('/context') || pathname.startsWith('/connections') || pathname.startsWith('/settings');
+
+  const isProtectedRoute =
+    pathname.startsWith('/world') ||
+    pathname.startsWith('/tools') ||
+    pathname.startsWith('/handoffs') ||
+    pathname.startsWith('/context') ||
+    pathname.startsWith('/connections') ||
+    pathname.startsWith('/settings') ||
+    pathname.startsWith('/profile');
+
   const isAuthRoute = pathname === '/login' || pathname === '/signup';
   const isOnboardRoute = pathname.startsWith('/onboard');
+  const isRoot = pathname === '/';
+
+  // Redirect root "/" for already-authenticated+onboarded users straight to /world
+  if (isRoot && user && hasOnboarded) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/world'
+    return NextResponse.redirect(url)
+  }
 
   // Allow unrestricted access to onboarding and auth flows
   if (isOnboardRoute || isAuthRoute) {
-    // Only redirect away from login/signup if user has a verified live session and explicitly completed onboarding
+    // Only redirect away from login/signup if user has a live verified session + has onboarded
     if (user && hasOnboarded && isAuthRoute) {
       const url = request.nextUrl.clone()
       url.pathname = '/world'
@@ -66,7 +81,7 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse;
   }
 
-  // If trying to access protected routes without authentication when Supabase is configured
+  // Gate protected routes — redirect unauthenticated users to /login
   if (hasSupabaseConfig && !isAuthenticated && isProtectedRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'

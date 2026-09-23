@@ -26,7 +26,7 @@ export default function SettingsPage() {
     async function loadSettings() {
       try {
         const settingsMem = getLocalSettings();
-        const localTheme = settingsMem?.theme || "dark";
+        const localTheme = settingsMem?.theme || "light";
         applyTheme(localTheme);
         setSettings(prev => ({ ...prev, theme: localTheme }));
 

@@ -107,19 +107,22 @@ export default function ApiAccessPage() {
   const getMcpCommand = (preview: string) => `${BACKEND_URL}/mcp`;
 
   return (
-    <div className="flex flex-col h-full bg-background animate-in fade-in duration-150 max-w-4xl mx-auto p-8 overflow-y-auto">
+    <div className="flex flex-col min-h-screen bg-transparent max-w-4xl mx-auto px-6 md:px-12 py-12 md:py-20 animate-in fade-in duration-200">
       
-      <header className="mb-10 flex items-center justify-between">
+      <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-[rgba(10,10,10,0.06)]">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground tracking-tight mb-2 flex items-center gap-2">
-            <Key className="w-6 h-6 text-primary" /> API Access & Remote MCP
+          <div className="flex items-center gap-2 text-[11px] font-mono tracking-widest uppercase text-[#AEB7BC] mb-1">
+            <span>Model Context Protocol (MCP)</span>
+          </div>
+          <h1 className="font-display text-[clamp(32px,4vw,44px)] leading-tight font-normal text-[var(--color-ink)] flex items-center gap-3">
+            <Key className="w-8 h-8 text-[var(--color-ink)]" /> API Access &amp; Remote MCP
           </h1>
-          <p className="text-sm text-muted max-w-2xl">
-            Connect external AI consumers (ChatGPT, Claude Desktop, Cursor) to Metaphor via OAuth 2.1 Protected Resource protocol backed by WorkOS AuthKit.
+          <p className="text-[14px] text-[#555E64] max-w-2xl mt-2 leading-relaxed">
+            Connect external AI consumers (ChatGPT, Claude Desktop, Cursor, Antigravity) to Metaphor via RFC 9728 and OAuth 2.1 Protected Resource endpoints.
           </p>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 text-emerald-500 rounded-full text-xs font-semibold border border-emerald-500/20">
-          <Shield className="w-3.5 h-3.5" /> WorkOS AuthKit Protected Resource
+        <div className="flex items-center gap-2 px-3.5 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-[11px] font-mono border border-emerald-200/80 shadow-sm shrink-0">
+          <Shield className="w-3.5 h-3.5" /> RFC 9728 Protected Resource
         </div>
       </header>
 
@@ -172,7 +175,7 @@ export default function ApiAccessPage() {
           <div className="p-6 border-b border-border-subtle bg-surface-1/50 flex items-center justify-between">
             <div>
               <h2 className="text-base font-medium text-foreground mb-1">MCP Server Connection URL</h2>
-              <p className="text-xs text-muted">Paste this URL into ChatGPT, Claude Desktop, or Cursor. Clients discover WorkOS AuthKit automatically.</p>
+              <p className="text-xs text-muted">Paste this URL into ChatGPT, Claude Desktop, Cursor, or Antigravity. Clients discover authorization and SSE capabilities automatically.</p>
             </div>
           </div>
           <div className="p-6 bg-surface-1">

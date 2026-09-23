@@ -6,31 +6,33 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     # App Settings
     APP_NAME: str = "Metaphor Context Engine"
-    DEBUG: bool = True
+    DEBUG: bool = False  # Always False by default; override via env var if needed
     API_PREFIX: str = "/api/v1"
-    
-    # Security
-    METAPHOR_API_KEY: str = "metaphor_dev_secret_key_123"
-    SECRET_KEY: str = "super_secret_key_change_me"
+
+    # Security — MUST be set via environment variables in production
+    # Fallback values below are intentionally weak dev-only defaults.
+    # Render / Vercel: set METAPHOR_API_KEY and SECRET_KEY as secret env vars.
+    METAPHOR_API_KEY: str = ""
+    SECRET_KEY: str = ""
     ENCRYPTION_KEY: str = ""
     ALGORITHM: str = "HS256"
     FRONTEND_URL: str = "https://metaphor-three.vercel.app"
     BACKEND_URL: str = "http://localhost:8000"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7 # 1 week
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 1 week
     CHAT_SESSION_RETENTION_DAYS: int = 14
-    
+
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgrespassword@localhost:5432/metaphor"
-    
+
     # LLM Providers
     OPENAI_API_KEY: str = ""
     ANTHROPIC_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
-    
+
     # Integration Developer Tokens
     NOTION_INTEGRATION_TOKEN: str = ""
     GITHUB_PERSONAL_ACCESS_TOKEN: str = ""
-    
+
     # Supabase Settings
     SUPABASE_URL: str = ""
     SUPABASE_ANON_KEY: str = ""
@@ -44,18 +46,16 @@ class Settings(BaseSettings):
     LINEAR_CLIENT_SECRET: str = os.getenv("LINEAR_CLIENT_SECRET", "")
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
     GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
-    
-    # WorkOS AuthKit MCP Settings
-    WORKOS_AUTHKIT_DOMAIN: str = "https://api.workos.com"
-    WORKOS_CLIENT_ID: str = ""
-    WORKOS_MCP_RESOURCE_ID: str = "https://metaphor-backend.onrender.com/api/v1/mcp"
-    
-    # Google Service Account JSON path
+
+    # MCP OAuth Resource Identifier (RFC 9728)
+    MCP_RESOURCE_ID: str = "https://metaphor-backend.onrender.com/api/v1/mcp"
+
+    # Google Service Account JSON path (optional)
     GOOGLE_SERVICE_ACCOUNT_JSON_PATH: str = ""
 
-    # Redis and Security
+    # Redis — for arq background workers
+    # Provision a Redis addon on Render and set REDIS_URL as a secret env var.
     REDIS_URL: str = "redis://localhost:6379"
-    ENCRYPTION_KEY: str = "" # Read from .env
 
     @field_validator("*", mode="before")
     @classmethod

@@ -24,6 +24,7 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [resetSent, setResetSent] = useState(false);
 
   const supabase = createClient();
 
@@ -97,6 +98,25 @@ function LoginForm() {
 
     router.push(finalTarget);
   };
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setError("Enter your email address above first.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/callback?next=/settings`,
+    });
+    setLoading(false);
+    if (error) {
+      setError("Could not send reset email: " + error.message);
+    } else {
+      setResetSent(true);
+      setMessage(`Password reset link sent to ${email}`);
+    }
+  };
+
 
   return (
     <div className="min-h-screen bg-transparent flex flex-col items-center justify-between px-6 py-8">
@@ -215,10 +235,11 @@ function LoginForm() {
                 </label>
                 <button
                   type="button"
-                  onClick={() => setError("Password reset is currently managed by workspace admin.")}
-                  className="text-[11px] text-[#AEB7BC] hover:text-[var(--color-ink)] transition-colors"
+                  onClick={handleForgotPassword}
+                  disabled={loading}
+                  className="text-[11px] text-[#AEB7BC] hover:text-[var(--color-ink)] transition-colors disabled:opacity-50"
                 >
-                  Forgot?
+                  {resetSent ? "Check your email" : "Forgot?"}
                 </button>
               </div>
               <input

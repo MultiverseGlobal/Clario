@@ -30,3 +30,13 @@ services:
         sync: false
       - key: PYTHON_VERSION
         value: "3.10.12"
+      - key: DEBUG
+        value: "false"
+      - key: CORS_ALLOWED_ORIGINS
+        value: "https://metaphor-three.vercel.app,https://metaphor.so"
+      - key: METAPHOR_API_KEY
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: ENCRYPTION_KEY
+        sync: false

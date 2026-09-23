@@ -15,9 +15,11 @@ import {
   Sparkles,
   AlertCircle,
   Loader2,
-  X
+  X,
+  Network
 } from "lucide-react";
 import { fetchFromMetaphor } from "@/app/api";
+import GraphViewer from "../GraphViewer";
 
 interface Participant {
   id: string;
@@ -122,6 +124,8 @@ export default function ConnectedWorldPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [autonomyMode, setAutonomyMode] = useState<AutonomyMode>("assisted");
   const [isSettingPolicy, setIsSettingPolicy] = useState(false);
+  const [viewMode, setViewMode] = useState<"feed" | "mesh">("feed");
+  const [selectedNode, setSelectedNode] = useState<any>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -255,7 +259,34 @@ export default function ConnectedWorldPage() {
             })}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* View Mode Switcher */}
+            <div className="flex items-center gap-1 p-1 rounded-full border border-[rgba(10,10,10,0.1)] bg-white/80 shadow-sm">
+              <button
+                type="button"
+                onClick={() => setViewMode("feed")}
+                className={`px-3 py-1.5 rounded-full text-[11px] font-mono tracking-wide transition-all cursor-pointer ${
+                  viewMode === "feed"
+                    ? "bg-[var(--color-ink)] text-white font-medium shadow-sm"
+                    : "text-[#AEB7BC] hover:text-[var(--color-ink)]"
+                }`}
+              >
+                Feed
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("mesh")}
+                className={`px-3 py-1.5 rounded-full text-[11px] font-mono tracking-wide transition-all flex items-center gap-1.5 cursor-pointer ${
+                  viewMode === "mesh"
+                    ? "bg-[var(--color-ink)] text-white font-medium shadow-sm"
+                    : "text-[#AEB7BC] hover:text-[var(--color-ink)]"
+                }`}
+              >
+                <Network size={12} />
+                <span>Topology Mesh</span>
+              </button>
+            </div>
+
             <Link
               href="/context"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-[rgba(10,10,10,0.12)] bg-white/80 hover:bg-white hover:border-[var(--color-ink)] transition-all text-[13px] font-medium text-[var(--color-ink)] shadow-sm"
@@ -273,6 +304,74 @@ export default function ConnectedWorldPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Interactive Topology Mesh View ── */}
+      {viewMode === "mesh" && (
+        <div className="relative w-full h-[620px] rounded-3xl border border-[rgba(10,10,10,0.08)] bg-white/80 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.04)] overflow-hidden mb-12 animate-in fade-in zoom-in-95 duration-200">
+          <div className="absolute top-4 left-6 z-10 flex items-center gap-2 text-[11px] font-mono uppercase tracking-widest text-[#AEB7BC]">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Interactive Mesh Topology · Pan &amp; Zoom</span>
+          </div>
+
+          <GraphViewer interactive={true} onNodeClick={(node) => setSelectedNode(node)} />
+
+          {selectedNode && (
+            <div className="absolute bottom-6 left-6 right-6 md:right-auto md:w-96 p-5 rounded-2xl border border-[rgba(10,10,10,0.1)] bg-white/95 backdrop-blur-2xl shadow-xl z-20 animate-in fade-in slide-in-from-bottom-2 duration-150">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-mono uppercase tracking-widest text-[#AEB7BC]">
+                  Active Graph Node
+                </span>
+                <button
+                  onClick={() => setSelectedNode(null)}
+                  className="text-[#AEB7BC] hover:text-[var(--color-ink)] p-1"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              <h4 className="text-[16px] font-medium text-[var(--color-ink)] mb-1">
+                {selectedNode.name || selectedNode.id}
+              </h4>
+              <p className="text-[12px] text-[#555E64] mb-3">
+                Classification: <span className="font-mono text-[var(--color-ink)] capitalize">{selectedNode.type || "node"}</span>
+              </p>
+              <Link
+                href={`/context?query=${encodeURIComponent(selectedNode.name || selectedNode.id)}`}
+                className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--color-ink)] hover:underline"
+              >
+                <span>Inspect in Context Engine &rarr;</span>
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Coordination Feed Mode ── */}
+      {viewMode === "feed" && (
+        <>
+          {/* Ambient Mesh Preview Ribbon */}
+          <div
+            onClick={() => setViewMode("mesh")}
+            className="h-28 w-full rounded-2xl border border-[rgba(10,10,10,0.06)] bg-white/50 backdrop-blur-sm shadow-sm overflow-hidden relative cursor-pointer group mb-10 hover:border-[rgba(10,10,10,0.16)] transition-all"
+            title="Click to expand full interactive Topology Mesh"
+          >
+            <div className="absolute inset-0 pointer-events-none opacity-40">
+              <GraphViewer interactive={false} />
+            </div>
+            <div className="absolute inset-0 flex items-center justify-between px-6 z-10">
+              <div>
+                <div className="text-[10px] font-mono uppercase tracking-widest text-[#AEB7BC] flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span>Coordination Topology</span>
+                </div>
+                <div className="text-[13px] font-medium text-[var(--color-ink)] group-hover:underline">
+                  View interactive graph mesh with active tool bounds &rarr;
+                </div>
+              </div>
+              <span className="text-[11px] font-mono uppercase tracking-wider text-[#AEB7BC] bg-white/90 px-3 py-1 rounded-full border border-[rgba(10,10,10,0.06)]">
+                Expand Mesh
+              </span>
+            </div>
+          </div>
 
       {/* ── What Changed While You Were Away (Activity Digest) ── */}
       <div className="p-6 rounded-2xl border border-[rgba(10,10,10,0.08)] bg-white/70 backdrop-blur-md shadow-[0_4px_24px_rgba(0,0,0,0.02)] mb-12">
@@ -487,6 +586,8 @@ export default function ConnectedWorldPage() {
           ))}
         </div>
       </section>
+      </>
+      )}
 
       {/* ── Scope Inspection Drawer / Modal ── */}
       <AnimatePresence>

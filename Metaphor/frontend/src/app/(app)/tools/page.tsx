@@ -103,6 +103,23 @@ export default function ToolsPage() {
   const [tools, setTools] = useState<ConnectedTool[]>(TOOLS);
   const [inspectingTool, setInspectingTool] = useState<ConnectedTool | null>(null);
 
+  const handleDisconnectTool = (toolId: string) => {
+    setTools((prev) =>
+      prev.map((t) => (t.id === toolId ? { ...t, status: "idle" as const, lastActive: "Disconnected" } : t))
+    );
+    try {
+      if (typeof window !== "undefined") {
+        const raw = localStorage.getItem("metaphor_connections_v2");
+        if (raw) {
+          const list = JSON.parse(raw);
+          const updated = list.filter((item: any) => item.id !== toolId && item.name?.toLowerCase() !== toolId);
+          localStorage.setItem("metaphor_connections_v2", JSON.stringify(updated));
+        }
+      }
+    } catch {}
+    setInspectingTool(null);
+  };
+
   return (
     <div className="max-w-4xl mx-auto px-6 md:px-12 py-16 md:py-24 min-h-screen">
       {/* Header */}
@@ -293,12 +310,20 @@ export default function ToolsPage() {
                     <ArrowRight size={13} />
                   </Link>
 
-                  <button
-                    onClick={() => setInspectingTool(null)}
-                    className="px-5 py-2 rounded-full bg-[var(--color-ink)] text-white text-[12px] font-medium cursor-pointer hover:bg-black transition-colors"
-                  >
-                    Done
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleDisconnectTool(inspectingTool.id)}
+                      className="px-4 py-2 rounded-full border border-red-200 text-red-600 hover:bg-red-50 text-[12px] font-medium transition-colors cursor-pointer"
+                    >
+                      Disconnect
+                    </button>
+                    <button
+                      onClick={() => setInspectingTool(null)}
+                      className="px-5 py-2 rounded-full bg-[var(--color-ink)] text-white text-[12px] font-medium cursor-pointer hover:bg-black transition-colors"
+                    >
+                      Done
+                    </button>
+                  </div>
                 </div>
               </div>
             </motion.div>

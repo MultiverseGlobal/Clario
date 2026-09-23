@@ -1,0 +1,87 @@
+name: CI — Metaphor
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ──────────────────────────────────────────────
+  # Frontend: lint + type-check + build
+  # ──────────────────────────────────────────────
+  frontend:
+    name: Frontend (Next.js)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check (advisory)
+        run: npx tsc --noEmit
+        continue-on-error: true
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder_key' }}
+          NEXT_PUBLIC_BACKEND_URL: 'https://metaphor-backend.onrender.com'
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder_key' }}
+          NEXT_PUBLIC_BACKEND_URL: 'https://metaphor-backend.onrender.com'
+
+  # ──────────────────────────────────────────────
+  # Backend: lint + type-check + tests
+  # ──────────────────────────────────────────────
+  backend:
+    name: Backend (FastAPI)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Lint (ruff)
+        run: |
+          pip install ruff --quiet
+          ruff check app/ --select=E,F,W --ignore=E501
+        continue-on-error: true
+
+      - name: Run tests
+        run: pytest tests/ -x -q --tb=short
+        continue-on-error: true
+        env:
+          DATABASE_URL: "sqlite+aiosqlite:///./test.db"
+          SUPABASE_URL: "https://placeholder.supabase.co"
+          SUPABASE_ANON_KEY: "placeholder"
+          GEMINI_API_KEY: "placeholder"
+          SECRET_KEY: "ci_test_secret_key_only"
+          METAPHOR_API_KEY: "ci_test_api_key_only"
+          DEBUG: "false"

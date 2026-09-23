@@ -129,6 +129,31 @@ export default function OnboardStep2() {
 
   const handleContinue = async () => {
     setIsProceeding(true);
+    try {
+      if (typeof window !== "undefined") {
+        const connectedIds = Object.entries(toolStates)
+          .filter(([_, state]) => state === "connected")
+          .map(([id]) => id);
+
+        const existingRaw = localStorage.getItem("metaphor_connections_v2");
+        const existingList = existingRaw ? JSON.parse(existingRaw) : [];
+
+        TOOLS.forEach((tool) => {
+          if (connectedIds.includes(tool.id) && !existingList.some((e: any) => e.id === tool.id)) {
+            existingList.push({
+              id: tool.id,
+              name: tool.name,
+              category: "AI Agent",
+              endpoint: `${tool.id}://workspace.local`,
+              status: "connected",
+              addedAt: new Date().toISOString(),
+            });
+          }
+        });
+        localStorage.setItem("metaphor_connections_v2", JSON.stringify(existingList));
+      }
+    } catch {}
+
     await new Promise((r) => setTimeout(r, 200));
     router.push("/signup");
   };
@@ -148,13 +173,14 @@ export default function OnboardStep2() {
           </Link>
           <div className="flex items-center gap-4">
             <div className="flex gap-2">
-              <div className="w-8 h-1 rounded-full bg-[rgba(10,10,10,0.10)]" />
-              <div className="w-8 h-1 rounded-full bg-[var(--color-ink)]" />
+              <div className="w-6 h-1 rounded-full bg-[rgba(10,10,10,0.10)]" />
+              <div className="w-6 h-1 rounded-full bg-[var(--color-ink)]" />
+              <div className="w-6 h-1 rounded-full bg-[rgba(10,10,10,0.10)]" />
             </div>
             <span
               className="text-[11px] text-[#AEB7BC] font-mono tracking-widest uppercase"
             >
-              02 / 02
+              02 / 03
             </span>
           </div>
         </div>
